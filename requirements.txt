@@ -1,0 +1,5 @@
+streamlit
+pandas
+fpdf
+boto3
+openpyxl
