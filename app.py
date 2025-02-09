@@ -18,7 +18,9 @@ s3 = boto3.client("s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=
 @st.cache_data
 def read_excel_from_s3(bucket_name, file_key):
     response = s3.get_object(Bucket=bucket_name, Key=file_key)
-    return pd.read_excel(BytesIO(response['Body'].read()))
+    df = pd.read_excel(BytesIO(response['Body'].read()))
+    df.columns = df.columns.str.strip()  # Strip leading/trailing spaces from column names
+    return df
 
 # Function to generate and upload PDF invoice
 def generate_and_upload_pdf(items, price_type):
@@ -49,7 +51,6 @@ def main():
     # Load data from S3
     try:
         df = read_excel_from_s3(S3_BUCKET_NAME, "catafactuapp.xlsx")
-        st.write("DataFrame Columns:", list(df.columns))  # Debugging statement
     except Exception as e:
         st.error(f"Failed to load data from S3: {e}")
         return
@@ -62,7 +63,6 @@ def main():
     if search_term:
         # Use regex=False for faster string matching
         filtered_df = df[df['Denomination'].str.contains(search_term, case=False, na=False, regex=False)]
-        st.write(filtered_df)
         
         if not filtered_df.empty:
             selected_item = st.selectbox("Select an item", filtered_df['Denomination'])
@@ -81,7 +81,7 @@ def main():
                     st.session_state['items'].append(item_dict)
                     st.success("Item added!")
                 else:
-                    st.error(f"Price type '{price_type}' not found in data.")
+                    st.error(f"Price type '{price_type}' not found in data. Available columns: {list(selected_row.index)}")
     
     # Display selected items
     if 'items' in st.session_state and st.session_state['items']:
