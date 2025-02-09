@@ -49,6 +49,7 @@ def main():
     # Load data from S3
     try:
         df = read_excel_from_s3(S3_BUCKET_NAME, "catafactuapp.xlsx")
+        st.write("DataFrame Columns:", list(df.columns))  # Debugging statement
     except Exception as e:
         st.error(f"Failed to load data from S3: {e}")
         return
@@ -63,20 +64,24 @@ def main():
         filtered_df = df[df['Denomination'].str.contains(search_term, case=False, na=False, regex=False)]
         st.write(filtered_df)
         
-        selected_item = st.selectbox("Select an item", filtered_df['Denomination'])
-        quantity = st.number_input("Quantity", min_value=1, value=1)
-        
-        if st.button("Add Item"):
-            selected_row = filtered_df[filtered_df['Denomination'] == selected_item].squeeze()
-            item_dict = {
-                "Denomination": selected_row['Denomination'],
-                "Quantity": quantity,
-                "Price": selected_row[price_type]
-            }
-            if 'items' not in st.session_state:
-                st.session_state['items'] = []
-            st.session_state['items'].append(item_dict)
-            st.success("Item added!")
+        if not filtered_df.empty:
+            selected_item = st.selectbox("Select an item", filtered_df['Denomination'])
+            quantity = st.number_input("Quantity", min_value=1, value=1)
+            
+            if st.button("Add Item"):
+                selected_row = filtered_df[filtered_df['Denomination'] == selected_item].squeeze()
+                if price_type in selected_row.index:
+                    item_dict = {
+                        "Denomination": selected_row['Denomination'],
+                        "Quantity": quantity,
+                        "Price": selected_row[price_type]
+                    }
+                    if 'items' not in st.session_state:
+                        st.session_state['items'] = []
+                    st.session_state['items'].append(item_dict)
+                    st.success("Item added!")
+                else:
+                    st.error(f"Price type '{price_type}' not found in data.")
     
     # Display selected items
     if 'items' in st.session_state and st.session_state['items']:
