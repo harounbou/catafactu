@@ -9,12 +9,13 @@ from io import BytesIO
 AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
 AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
 S3_BUCKET_NAME = "cartafactu1"  # Bucket containing Excel files
-INVOICE_BUCKET_NAME = "proforma-invoices1"  # Bucket for storing generated 
+INVOICE_BUCKET_NAME = "proforma-invoices1"  # Bucket for storing generated invoices
 
 # Initialize S3 client
 s3 = boto3.client("s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
 
-# Function to read Excel file from S3
+# Cache the data loading process
+@st.cache_data
 def read_excel_from_s3(bucket_name, file_key):
     response = s3.get_object(Bucket=bucket_name, Key=file_key)
     return pd.read_excel(BytesIO(response['Body'].read()))
@@ -58,7 +59,8 @@ def main():
     # Search for item
     search_term = st.text_input("Search for an item by Denomination")
     if search_term:
-        filtered_df = df[df['Denomination'].str.contains(search_term, case=False, na=False)]
+        # Use regex=False for faster string matching
+        filtered_df = df[df['Denomination'].str.contains(search_term, case=False, na=False, regex=False)]
         st.write(filtered_df)
         
         selected_item = st.selectbox("Select an item", filtered_df['Denomination'])
