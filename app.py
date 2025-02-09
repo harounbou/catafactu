@@ -9,7 +9,7 @@ from io import BytesIO
 AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
 AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
 S3_BUCKET_NAME = "cartafactu1"  # Bucket containing Excel files
-INVOICE_BUCKET_NAME = "proforma-invoices1"  # Bucket for storing generated invoices
+INVOICE_BUCKET_NAME = "proforma-invoices1"  # Bucket for storing generated 
 
 # Initialize S3 client
 s3 = boto3.client("s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
