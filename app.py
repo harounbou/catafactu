@@ -1,29 +1,43 @@
 import streamlit as st
 import pandas as pd
 from fpdf import FPDF
-import boto3
 import os
 from io import BytesIO
 from num2words import num2words
 from datetime import datetime
 import random
+import gdown
 
-# AWS S3 Configuration
-AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
-AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
-S3_BUCKET_NAME = "cartafactu1"  # Bucket containing Excel files
-INVOICE_BUCKET_NAME = "proforma-invoices1"  # Bucket for storing generated invoices
+# Google Drive folder and file IDs
+GOOGLE_DRIVE_FOLDER_ID = "1ElAUnwNUjnoaVUxH1yZKpNaAqcy9y3r3"
+CATAFACTUAPP_FILE_ID = "1a5PgsZNj7fsfUtWHGpDgBQUBRLLlaun1"  # Replace with the actual file ID
+PROFORMA_INVOICES_FILE_ID = "1FR0XjHqCJ98-hbMBCeh7ikzUgIqNEWSO"  # Replace with the actual file ID
 
-# Initialize S3 client
-s3 = boto3.client("s3", aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
+# Function to download a file from Google Drive
+def download_file_from_google_drive(file_id, output):
+    """
+    Download a file from Google Drive using its file ID.
+    """
+    try:
+        url = f"https://drive.google.com/uc?id={file_id}"
+        gdown.download(url, output, quiet=False)
+        return True
+    except Exception as e:
+        st.error(f"Failed to download file from Google Drive: {e}")
+        return False
 
 # Cache the data loading process
 @st.cache_data
-def read_excel_from_s3(bucket_name, file_key):
-    response = s3.get_object(Bucket=bucket_name, Key=file_key)
-    df = pd.read_excel(BytesIO(response['Body'].read()))
-    df.columns = df.columns.str.strip()  # Strip leading/trailing spaces from column names
-    return df
+def read_excel_from_google_drive(file_id, output_filename):
+    """
+    Download and read the Excel file from Google Drive.
+    """
+    if download_file_from_google_drive(file_id, output_filename):
+        df = pd.read_excel(output_filename)
+        df.columns = df.columns.str.strip()  # Strip leading/trailing spaces from column names
+        return df
+    else:
+        return None
 
 # Function to sanitize text for FPDF
 def sanitize_text(text):
@@ -36,7 +50,7 @@ def sanitize_text(text):
     return text
 
 # Function to generate and upload PDF invoice
-def generate_and_upload_pdf(items, price_type, client_info, transaction_info, apply_tva, discount_type, discount_value):
+def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, discount_type, discount_value):
     pdf = FPDF()
     pdf.add_page()
     
@@ -139,30 +153,24 @@ def generate_and_upload_pdf(items, price_type, client_info, transaction_info, ap
     pdf.set_text_color(0, 0, 0)  # Black color
     pdf.cell(200, 10, txt=sanitize_text(f"Arrêter la présente facture proforma à la somme de : {total_amount_words} dinars."), ln=True)
     
-    # Save PDF
+    # Save PDF to a temporary file
     pdf_filename = "proforma_invoice.pdf"
     pdf.output(pdf_filename)
     
-    # Upload to S3
-    s3.upload_file(pdf_filename, INVOICE_BUCKET_NAME, pdf_filename)
-    
-    # Generate a pre-signed URL for the uploaded file
-    presigned_url = s3.generate_presigned_url(
-        'get_object',
-        Params={'Bucket': INVOICE_BUCKET_NAME, 'Key': pdf_filename},
-        ExpiresIn=3600  # URL expires in 1 hour
-    )
-    return presigned_url
+    return pdf_filename
 
 # Main app
 def main():
     st.title("Proforma Invoice Generator")
     
-    # Load data from S3
+    # Load data from Google Drive
     try:
-        df = read_excel_from_s3(S3_BUCKET_NAME, "catafactuapp.xlsx")
+        df = read_excel_from_google_drive(CATAFACTUAPP_FILE_ID, "catafactuapp1.xlsx")
+        if df is None:
+            st.error("Failed to load data from Google Drive.")
+            return
     except Exception as e:
-        st.error(f"Failed to load data from S3: {e}")
+        st.error(f"Failed to load data from Google Drive: {e}")
         return
     
     # Select price type
@@ -250,9 +258,18 @@ def main():
             if not all(client_info.values()):
                 st.error("Please fill in all client information fields.")
             else:
-                pdf_url = generate_and_upload_pdf(st.session_state['items'], price_type, client_info, transaction_info, apply_tva, discount_type, discount_value)
-                st.success(f"Proforma Invoice Generated! Download [here]({pdf_url}).")
-        
+                pdf_filename = generate_pdf(st.session_state['items'], price_type, client_info, transaction_info, apply_tva, discount_type, discount_value)
+                
+                # Provide a download link for the PDF
+                with open(pdf_filename, "rb") as file:
+                    btn = st.download_button(
+                        label="Download Proforma Invoice",
+                        data=file,
+                        file_name=pdf_filename,
+                        mime="application/pdf"
+                    )
+                st.success("Proforma Invoice Generated! Click the button above to download.")
+
         if st.button("Clear Items"):
             st.session_state['items'] = []
             st.success("Items cleared!")
