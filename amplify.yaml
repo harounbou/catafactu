@@ -1,15 +1,17 @@
 version: 1
-frontend:
-  phases:
-    preBuild:
-      commands:
-        - pip install -r requirements.txt
-    build:
-      commands:
-        - nohup streamlit run app.py --server.port=8080 --server.address=0.0.0.0 &
-  artifacts:
-    baseDirectory: /
-    files:
-      - "**/*"
-  cache:
-    paths: []
+applications:
+  - frontend:
+      phases:
+        preBuild:
+          commands:
+            - pip install -r requirements.txt
+        build:
+          commands:
+            - streamlit run app.py --server.port=80 --server.enableCORS=false
+      artifacts:
+        baseDirectory: /
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - ~/.cache/pip
