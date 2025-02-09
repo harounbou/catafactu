@@ -42,7 +42,14 @@ def generate_and_upload_pdf(items, price_type):
     
     # Upload to S3
     s3.upload_file(pdf_filename, INVOICE_BUCKET_NAME, pdf_filename)
-    return pdf_filename
+    
+    # Generate a pre-signed URL for the uploaded file
+    presigned_url = s3.generate_presigned_url(
+        'get_object',
+        Params={'Bucket': INVOICE_BUCKET_NAME, 'Key': pdf_filename},
+        ExpiresIn=3600  # URL expires in 1 hour
+    )
+    return presigned_url
 
 # Main app
 def main():
@@ -66,10 +73,17 @@ def main():
         
         if not filtered_df.empty:
             selected_item = st.selectbox("Select an item", filtered_df['Denomination'])
+            selected_row = filtered_df[filtered_df['Denomination'] == selected_item].squeeze()
+            
+            # Display the price of the selected item
+            if price_type in selected_row.index:
+                st.write(f"**Price ({price_type}):** {selected_row[price_type]}")
+            else:
+                st.error(f"Price type '{price_type}' not found for this item.")
+            
             quantity = st.number_input("Quantity", min_value=1, value=1)
             
             if st.button("Add Item"):
-                selected_row = filtered_df[filtered_df['Denomination'] == selected_item].squeeze()
                 if price_type in selected_row.index:
                     item_dict = {
                         "Denomination": selected_row['Denomination'],
@@ -91,8 +105,8 @@ def main():
         
         # Generate and upload PDF
         if st.button("Generate Proforma Invoice"):
-            pdf_filename = generate_and_upload_pdf(st.session_state['items'], price_type)
-            st.success(f"Proforma Invoice Generated! Download [here](https://{INVOICE_BUCKET_NAME}.s3.amazonaws.com/{pdf_filename}).")
+            pdf_url = generate_and_upload_pdf(st.session_state['items'], price_type)
+            st.success(f"Proforma Invoice Generated! Download [here]({pdf_url}).")
         
         if st.button("Clear Items"):
             st.session_state['items'] = []
