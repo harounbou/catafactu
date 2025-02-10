@@ -7,11 +7,21 @@ from num2words import num2words
 from datetime import datetime
 import random
 import gdown
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 
 # Google Drive folder and file IDs
 GOOGLE_DRIVE_FOLDER_ID = "1ElAUnwNUjnoaVUxH1yZKpNaAqcy9y3r3"
 CATAFACTUAPP_FILE_ID = "1a5PgsZNj7fsfUtWHGpDgBQUBRLLlaun1"  # Replace with the actual file ID
 PROFORMA_INVOICES_FILE_ID = "1FR0XjHqCJ98-hbMBCeh7ikzUgIqNEWSO"  # Replace with the actual file ID
+
+# Email configuration (replace with your email credentials)
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USER = "your_email@gmail.com"
+EMAIL_PASSWORD = "your_email_password"
 
 # Function to download a file from Google Drive
 def download_file_from_google_drive(file_id, output):
@@ -23,7 +33,7 @@ def download_file_from_google_drive(file_id, output):
         gdown.download(url, output, quiet=False)
         return True
     except Exception as e:
-        st.error(f"Failed to download file from Google Drive: {e}")
+        st.error(f"Échec du téléchargement du fichier depuis Google Drive : {e}")
         return False
 
 # Cache the data loading process
@@ -50,7 +60,7 @@ def sanitize_text(text):
     return text
 
 # Function to generate and upload PDF invoice
-def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, discount_type, discount_value):
+def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, discount_type, discount_value, show_onama, delivery_days):
     pdf = FPDF()
     pdf.add_page()
     
@@ -59,46 +69,51 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     
     # Set font for the header
     pdf.set_font("Arial", size=24, style='B')
-    pdf.cell(200, 15, txt=sanitize_text("Takideco Proforma Invoice"), ln=True, align='C')
+    pdf.cell(200, 15, txt=sanitize_text("Facture Proforma Takideco"), ln=True, align='C')
     pdf.ln(10)
     
     # Add issuer information
     pdf.set_font("Arial", size=10)
     pdf.cell(200, 5, txt=sanitize_text("Taki Deco"), ln=True, align='C')
-    pdf.cell(200, 5, txt=sanitize_text("0542310057 | 0542918226 | 0698077751"), ln=True, align='C')
+    if show_onama:
+        pdf.cell(200, 5, txt=sanitize_text("0542310057 | 0542918226 | 0698077751"), ln=True, align='C')
+    else:
+        pdf.cell(200, 5, txt=sanitize_text("0542918226 | 0698077751"), ln=True, align='C')
     pdf.cell(200, 5, txt=sanitize_text("www.takideco.com | email: takidecommercial@gmail.com"), ln=True, align='C')
     pdf.ln(10)
     
     # Add client and transaction information side by side
     pdf.set_font("Arial", size=12)
-    pdf.cell(100, 10, txt=sanitize_text(f"Nom de client: {client_info['nom_client']}"), ln=0)
-    pdf.cell(90, 10, txt=sanitize_text(f"N° De transaction: {transaction_info['transaction_number']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Nom de l’entreprise: {client_info['nom_entreprise']}"), ln=0)
-    pdf.cell(90, 10, txt=sanitize_text(f"Date de transaction: {transaction_info['transaction_date']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Adresse: {client_info['adresse']}"), ln=0)
-    pdf.cell(90, 10, txt=sanitize_text(f"ID Client: {transaction_info['client_id']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Telephone: {client_info['telephone']}"), ln=1)
+    pdf.cell(100, 10, txt=sanitize_text(f"Nom de client : {client_info['nom_client']}"), ln=0)
+    pdf.cell(90, 10, txt=sanitize_text(f"N° De transaction : {transaction_info['transaction_number']}"), ln=1, align='R')
+    pdf.cell(100, 10, txt=sanitize_text(f"Nom de l’entreprise : {client_info['nom_entreprise']}"), ln=0)
+    pdf.cell(90, 10, txt=sanitize_text(f"Date de transaction : {transaction_info['transaction_date']}"), ln=1, align='R')
+    pdf.cell(100, 10, txt=sanitize_text(f"Adresse : {client_info['adresse']}"), ln=0)
+    pdf.cell(90, 10, txt=sanitize_text(f"ID Client : {transaction_info['client_id']}"), ln=1, align='R')
+    pdf.cell(100, 10, txt=sanitize_text(f"Téléphone : {client_info['telephone']}"), ln=1)
     pdf.ln(10)
     
     # Add items table
     pdf.set_font("Arial", size=12, style='B')
-    pdf.cell(100, 10, txt=sanitize_text("Item"), border=1)
-    pdf.cell(30, 10, txt=sanitize_text("Quantity"), border=1)
-    pdf.cell(30, 10, txt=sanitize_text("Price"), border=1)
+    pdf.cell(80, 10, txt=sanitize_text("Article"), border=1)
+    pdf.cell(30, 10, txt=sanitize_text("Référence"), border=1)
+    pdf.cell(30, 10, txt=sanitize_text("Quantité"), border=1)
+    pdf.cell(30, 10, txt=sanitize_text("Prix"), border=1)
     pdf.cell(30, 10, txt=sanitize_text("Total"), border=1, ln=True)
     
     pdf.set_font("Arial", size=12)
     total_amount = 0
     for item in items:
         item_total = item['Quantity'] * item['Price']
-        pdf.cell(100, 10, txt=sanitize_text(item['Denomination']), border=1)
+        pdf.cell(80, 10, txt=sanitize_text(item['Denomination']), border=1)
+        pdf.cell(30, 10, txt=sanitize_text(item['Reference']), border=1)
         pdf.cell(30, 10, txt=sanitize_text(str(item['Quantity'])), border=1)
         pdf.cell(30, 10, txt=sanitize_text(f"{item['Price']:.2f}"), border=1)
         pdf.cell(30, 10, txt=sanitize_text(f"{item_total:.2f}"), border=1, ln=True)
         total_amount += item_total
     
     # Apply discount
-    if discount_type == "Percentage":
+    if discount_type == "Pourcentage":
         discount_amount = total_amount * (discount_value / 100)
     else:
         discount_amount = discount_value
@@ -115,16 +130,16 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     
     # Add total amount, discount, and TVA details
     pdf.ln(10)
-    pdf.cell(160, 10, txt=sanitize_text("Total Amount (HT):"), border=0)
+    pdf.cell(160, 10, txt=sanitize_text("Montant Total (HT) :"), border=0)
     pdf.cell(30, 10, txt=sanitize_text(f"{total_amount:.2f}"), border=1, ln=True)
-    pdf.cell(160, 10, txt=sanitize_text(f"Discount ({discount_value}{'%' if discount_type == 'Percentage' else 'DZD'}):"), border=0)
+    pdf.cell(160, 10, txt=sanitize_text(f"Remise ({discount_value}{'%' if discount_type == 'Pourcentage' else 'DZD'}) :"), border=0)
     pdf.cell(30, 10, txt=sanitize_text(f"{discount_amount:.2f}"), border=1, ln=True)
-    pdf.cell(160, 10, txt=sanitize_text("Total Amount After Discount (HT):"), border=0)
+    pdf.cell(160, 10, txt=sanitize_text("Montant Total Après Remise (HT) :"), border=0)
     pdf.cell(30, 10, txt=sanitize_text(f"{total_amount_after_discount:.2f}"), border=1, ln=True)
     if apply_tva:
-        pdf.cell(160, 10, txt=sanitize_text("TVA (19%):"), border=0)
+        pdf.cell(160, 10, txt=sanitize_text("TVA (19%) :"), border=0)
         pdf.cell(30, 10, txt=sanitize_text(f"{tva_amount:.2f}"), border=1, ln=True)
-        pdf.cell(160, 10, txt=sanitize_text("Total Amount (TTC):"), border=0)
+        pdf.cell(160, 10, txt=sanitize_text("Montant Total (TTC) :"), border=0)
         pdf.cell(30, 10, txt=sanitize_text(f"{total_amount_with_tva:.2f}"), border=1, ln=True)
     
     # Add additional text at the bottom
@@ -137,7 +152,7 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
         "Acompte :\n"
         "Un acompte de 50 % est exigé au moment de placer la commande. La commande ne sera traitée qu’après réception de cet acompte.\n"
         "Délai de réalisation :\n"
-        "La commande sera prête dans un délai de 7 à 10 jours à compter de la date de réception de l’acompte.\n"
+        f"{'La commande sera prête dans un délai de ' + str(delivery_days) + ' jours à compter de la date de réception de l’acompte.' if delivery_days > 0 else 'La commande sera prête dans un délai de 7 à 10 jours à compter de la date de réception de l’acompte.'}\n"
         "Frais d’expédition :\n"
         "Les frais d’expédition sont à la charge du client. L’expédition peut être organisée par le client ou coordonnée par notre société, avec les frais facturés séparément."
     ))
@@ -154,79 +169,136 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf.cell(200, 10, txt=sanitize_text(f"Arrêter la présente facture proforma à la somme de : {total_amount_words} dinars."), ln=True)
     
     # Save PDF to a temporary file
-    pdf_filename = "proforma_invoice.pdf"
+    pdf_filename = f"Proforma-{client_info['nom_client'] if client_info['nom_client'] else 'Client'}-{datetime.now().strftime('%d%m%Y')}.pdf"
     pdf.output(pdf_filename)
     
     return pdf_filename
 
-# Main app
-def main():
-    st.title("Proforma Invoice Generator")
+# Function to send email with PDF attachment
+def send_email_with_pdf(email_to, pdf_filename, client_name):
+    try:
+        # Create the email
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_USER
+        msg['To'] = email_to
+        msg['Subject'] = f"Facture Proforma pour {client_name}"
+        
+        # Email body
+        body = f"""
+        Bonjour,
+
+        Veuillez trouver ci-joint la facture proforma pour {client_name}.
+
+        Cordialement,
+        Taki Deco
+        """
+        msg.attach(MIMEMultipart(body))
+        
+        # Attach the PDF
+        with open(pdf_filename, "rb") as attachment:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header(
+                "Content-Disposition",
+                f"attachment; filename={pdf_filename}",
+            )
+            msg.attach(part)
+        
+        # Send the email
+        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
+            server.starttls()
+            server.login(EMAIL_USER, EMAIL_PASSWORD)
+            server.sendmail(EMAIL_USER, email_to, msg.as_string())
+        
+        return True
+    except Exception as e:
+        st.error(f"Échec de l'envoi de l'email : {e}")
+        return False
+
+# Proforma Invoice Page
+def proforma_page():
+    st.title("Générateur de Facture Proforma")
     
     # Load data from Google Drive
     try:
         df = read_excel_from_google_drive(CATAFACTUAPP_FILE_ID, "catafactuapp1.xlsx")
         if df is None:
-            st.error("Failed to load data from Google Drive.")
+            st.error("Échec du chargement des données depuis Google Drive.")
             return
     except Exception as e:
-        st.error(f"Failed to load data from Google Drive: {e}")
+        st.error(f"Échec du chargement des données depuis Google Drive : {e}")
         return
     
     # Select price type
-    price_type = st.radio("Select Price Type", ["prix-super-gros", "prix-gros", "prix-detaille"])
+    price_type = st.radio("Sélectionnez le type de prix", ["prix-super-gros", "prix-gros", "prix-détail"])
     
     # Add TVA option
-    apply_tva = st.checkbox("Apply TVA (19%)", value=False)
+    apply_tva = st.checkbox("Appliquer la TVA (19%)", value=False)
+    
+    # Add "Basculer à L'Onama" option
+    show_onama = st.checkbox("Basculer à L'Onama", value=False)
     
     # Add discount option
-    discount_type = st.radio("Discount Type", ["Percentage", "Fixed Amount"])
-    discount_value = st.number_input("Discount Value", min_value=0.0, value=0.0)
+    discount_type = st.radio("Type de remise", ["Pourcentage", "Montant fixe"])
+    discount_value = st.number_input("Valeur de la remise", min_value=0.0, value=0.0)
     
-    # Search for item
-    search_term = st.text_input("Search for an item by Denomination")
+    # Add delivery days option
+    delivery_days = st.selectbox("Délai de livraison (jours)", list(range(0, 31)))
+    
+    # Search for item with autocomplete
+    search_term = st.text_input("Rechercher un article par Dénomination")
     if search_term:
         # Use regex=False for faster string matching
         filtered_df = df[df['Denomination'].str.contains(search_term, case=False, na=False, regex=False)]
         
         if not filtered_df.empty:
-            selected_item = st.selectbox("Select an item", filtered_df['Denomination'])
+            selected_item = st.selectbox("Sélectionnez un article", filtered_df['Denomination'])
             selected_row = filtered_df[filtered_df['Denomination'] == selected_item].squeeze()
             
             # Display the price of the selected item
             if price_type in selected_row.index:
-                st.write(f"**Price ({price_type}):** {selected_row[price_type]}")
+                st.write(f"**Prix ({price_type}) :** {selected_row[price_type]}")
             else:
-                st.error(f"Price type '{price_type}' not found for this item.")
+                st.error(f"Type de prix '{price_type}' non trouvé pour cet article.")
             
-            quantity = st.number_input("Quantity", min_value=1, value=1)
+            quantity = st.number_input("Quantité", min_value=1, value=1)
             
-            if st.button("Add Item"):
+            if st.button("Ajouter l'article"):
                 if price_type in selected_row.index:
                     item_dict = {
                         "Denomination": selected_row['Denomination'],
+                        "Reference": selected_row['Reference'],  # Add reference from the Excel file
                         "Quantity": quantity,
                         "Price": selected_row[price_type]
                     }
                     if 'items' not in st.session_state:
                         st.session_state['items'] = []
                     st.session_state['items'].append(item_dict)
-                    st.success("Item added!")
+                    st.success("Article ajouté !")
                 else:
-                    st.error(f"Price type '{price_type}' not found in data. Available columns: {list(selected_row.index)}")
+                    st.error(f"Type de prix '{price_type}' non trouvé dans les données. Colonnes disponibles : {list(selected_row.index)}")
     
-    # Display selected items
+    # Display selected items with remove option
     if 'items' in st.session_state and st.session_state['items']:
-        st.write("### Selected Items")
-        for item in st.session_state['items']:
-            st.write(f"{item['Denomination']} - {item['Quantity']} x {item['Price']}")
+        st.write("### Articles sélectionnés")
+        for i, item in enumerate(st.session_state['items']):
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.write(f"{item['Denomination']} - {item['Reference']} - {item['Quantity']} x {item['Price']}")
+            with col2:
+                if st.button(f"Supprimer {i+1}"):
+                    st.session_state['items'].pop(i)
+                    st.success("Article supprimé !")
+                    st.rerun()  # Use st.rerun() instead of st.experimental_rerun()
         
-        # Prompt for client information
-        st.write("### Client Information")
-        nom_client = st.text_input("Nom de client")
+        # Prompt for client information (optional)
+        st.write("### Informations du client (optionnel)")
+        nom_client = st.text_input("Nom du client")
         nom_entreprise = st.text_input("Nom de l’entreprise")
         adresse = st.text_input("Adresse")
-        telephone = st.text_input("Telephone")
+        telephone = st.text_input("Téléphone")
+        email = st.text_input("Email du client")
         
         client_info = {
             "nom_client": nom_client,
@@ -248,31 +320,74 @@ def main():
         }
         
         # Display transaction information
-        st.write("### Transaction Information")
-        st.write(f"N° De transaction: {transaction_info['transaction_number']}")
-        st.write(f"Date de transaction: {transaction_info['transaction_date']}")
-        st.write(f"ID Client: {transaction_info['client_id']}")
+        st.write("### Informations de la transaction")
+        st.write(f"N° De transaction : {transaction_info['transaction_number']}")
+        st.write(f"Date de transaction : {transaction_info['transaction_date']}")
+        st.write(f"ID Client : {transaction_info['client_id']}")
         
         # Generate and upload PDF
-        if st.button("Generate Proforma Invoice"):
-            if not all(client_info.values()):
-                st.error("Please fill in all client information fields.")
-            else:
-                pdf_filename = generate_pdf(st.session_state['items'], price_type, client_info, transaction_info, apply_tva, discount_type, discount_value)
-                
-                # Provide a download link for the PDF
-                with open(pdf_filename, "rb") as file:
-                    btn = st.download_button(
-                        label="Download Proforma Invoice",
-                        data=file,
-                        file_name=pdf_filename,
-                        mime="application/pdf"
-                    )
-                st.success("Proforma Invoice Generated! Click the button above to download.")
+        if st.button("Générer la facture proforma"):
+            pdf_filename = generate_pdf(st.session_state['items'], price_type, client_info, transaction_info, apply_tva, discount_type, discount_value, show_onama, delivery_days)
+            
+            # Provide a download link for the PDF
+            with open(pdf_filename, "rb") as file:
+                btn = st.download_button(
+                    label="Télécharger la facture proforma",
+                    data=file,
+                    file_name=pdf_filename,
+                    mime="application/pdf"
+                )
+            st.success("Facture proforma générée ! Cliquez sur le bouton ci-dessus pour télécharger.")
+            
+            # Send email with PDF attachment
+            if email:
+                if send_email_with_pdf(email, pdf_filename, client_info['nom_client'] if client_info['nom_client'] else "Client"):
+                    st.success(f"Facture proforma envoyée à {email}.")
+                else:
+                    st.error("Échec de l'envoi de l'email.")
 
-        if st.button("Clear Items"):
+        if st.button("Effacer les articles"):
             st.session_state['items'] = []
-            st.success("Items cleared!")
+            st.success("Articles effacés !")
+
+# Placeholder pages for other functionalities
+def bon_de_commande_page():
+    st.title("Bon de Commande")
+    st.write("Cette page est en cours de développement. Fonctionnalité à venir bientôt !")
+
+def bon_de_versement_page():
+    st.title("Bon de Versement")
+    st.write("Cette page est en cours de développement. Fonctionnalité à venir bientôt !")
+
+def catalogue_page():
+    st.title("Catalogue")
+    st.write("Cette page est en cours de développement. Fonctionnalité à venir bientôt !")
+
+def facture_page():
+    st.title("Facture")
+    st.write("Cette page est en cours de développement. Fonctionnalité à venir bientôt !")
+
+# Main app
+def main():
+    st.sidebar.title("Menu")
+    
+    # Add buttons for navigation
+    page = st.sidebar.radio(
+        "Aller à",
+        ["Proforma", "Bon de Commande", "Bon de Versement", "Catalogue", "Facture"]
+    )
+    
+    # Display the selected page
+    if page == "Proforma":
+        proforma_page()
+    elif page == "Bon de Commande":
+        bon_de_commande_page()
+    elif page == "Bon de Versement":
+        bon_de_versement_page()
+    elif page == "Catalogue":
+        catalogue_page()
+    elif page == "Facture":
+        facture_page()
 
 if __name__ == "__main__":
     main()
