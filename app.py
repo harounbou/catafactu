@@ -17,6 +17,9 @@ GOOGLE_DRIVE_FOLDER_ID = "1ElAUnwNUjnoaVUxH1yZKpNaAqcy9y3r3"
 CATAFACTUAPP_FILE_ID = "1a5PgsZNj7fsfUtWHGpDgBQUBRLLlaun1"  # Replace with the actual file ID
 PROFORMA_INVOICES_FILE_ID = "1FR0XjHqCJ98-hbMBCeh7ikzUgIqNEWSO"  # Replace with the actual file ID
 
+# Local clients file
+CLIENTS_FILE = "clients.xlsx"  # Local file in the same directory as app.py
+
 # Email configuration (replace with your email credentials)
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
@@ -48,6 +51,59 @@ def read_excel_from_google_drive(file_id, output_filename):
         return df
     else:
         return None
+
+# Function to read the local clients.xlsx file
+def read_clients_file():
+    """
+    Read the local clients.xlsx file.
+    """
+    if os.path.exists(CLIENTS_FILE):
+        clients_df = pd.read_excel(CLIENTS_FILE)
+        clients_df.columns = clients_df.columns.str.strip()  # Strip leading/trailing spaces from column names
+        return clients_df
+    else:
+        st.error(f"Le fichier {CLIENTS_FILE} est introuvable dans le répertoire local.")
+        return None
+
+# Function to save the updated clients.xlsx file
+def save_clients_file(clients_df):
+    """
+    Save the updated clients DataFrame to the local clients.xlsx file.
+    """
+    try:
+        clients_df.to_excel(CLIENTS_FILE, index=False)
+        return True
+    except Exception as e:
+        st.error(f"Échec de la sauvegarde du fichier {CLIENTS_FILE} : {e}")
+        return False
+
+# Function to check if a client exists and retrieve their details
+def get_client_info(clients_df, email, telephone):
+    """
+    Check if a client exists in the clients DataFrame based on email or telephone.
+    If found, return their details. Otherwise, return None.
+    """
+    if not clients_df.empty:
+        client = clients_df[(clients_df['Email'] == email) | (clients_df['Telephone'] == telephone)]
+        if not client.empty:
+            return client.iloc[0].to_dict()
+    return None
+
+# Function to add a new client to the clients DataFrame
+def add_new_client(clients_df, client_info):
+    """
+    Add a new client to the clients DataFrame.
+    """
+    # Generate the next available client ID
+    if clients_df.empty:
+        client_id = 1
+    else:
+        client_id = clients_df['ID'].max() + 1
+    client_info['ID'] = client_id
+
+    new_client = pd.DataFrame([client_info])
+    updated_clients_df = pd.concat([clients_df, new_client], ignore_index=True)
+    return updated_clients_df
 
 # Function to sanitize text for FPDF
 def sanitize_text(text):
@@ -90,7 +146,7 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf.cell(90, 10, txt=sanitize_text(f"Date de transaction : {transaction_info['transaction_date']}"), ln=1, align='R')
     pdf.cell(100, 10, txt=sanitize_text(f"Adresse : {client_info['adresse']}"), ln=0)
     pdf.cell(90, 10, txt=sanitize_text(f"ID Client : {transaction_info['client_id']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Téléphone : {client_info['telephone']}"), ln=1)
+    pdf.cell(100, 10, txt=sanitize_text(f"Telephone : {client_info['telephone']}"), ln=1)
     pdf.ln(10)
     
     # Add items table
@@ -220,14 +276,15 @@ def send_email_with_pdf(email_to, pdf_filename, client_name):
 def proforma_page():
     st.title("Générateur de Facture Proforma")
     
-    # Load data from Google Drive
+    # Load data from Google Drive and local file
     try:
         df = read_excel_from_google_drive(CATAFACTUAPP_FILE_ID, "catafactuapp1.xlsx")
-        if df is None:
-            st.error("Échec du chargement des données depuis Google Drive.")
+        clients_df = read_clients_file()  # Read the local clients.xlsx file
+        if df is None or clients_df is None:
+            st.error("Échec du chargement des données.")
             return
     except Exception as e:
-        st.error(f"Échec du chargement des données depuis Google Drive : {e}")
+        st.error(f"Échec du chargement des données : {e}")
         return
     
     # Select price type
@@ -246,38 +303,46 @@ def proforma_page():
     # Add delivery days option
     delivery_days = st.selectbox("Délai de livraison (jours)", list(range(0, 31)))
     
-    # Search for item with autocomplete
+    # --- Article Search Section ---
     search_term = st.text_input("Rechercher un article par Dénomination")
-    if search_term:
-        # Use regex=False for faster string matching
-        filtered_df = df[df['Denomination'].str.contains(search_term, case=False, na=False, regex=False)]
-        
-        if not filtered_df.empty:
-            selected_item = st.selectbox("Sélectionnez un article", filtered_df['Denomination'])
-            selected_row = filtered_df[filtered_df['Denomination'] == selected_item].squeeze()
-            
-            # Display the price of the selected item
-            if price_type in selected_row.index:
-                st.write(f"**Prix ({price_type}) :** {selected_row[price_type]}")
+    if st.button("Rechercher l'article"):
+        if search_term:
+            filtered_df = df[df['Denomination'].str.contains(search_term, case=False, na=False, regex=False)]
+            if not filtered_df.empty:
+                st.session_state['filtered_articles'] = filtered_df
             else:
-                st.error(f"Type de prix '{price_type}' non trouvé pour cet article.")
-            
-            quantity = st.number_input("Quantité", min_value=1, value=1)
-            
-            if st.button("Ajouter l'article"):
-                if price_type in selected_row.index:
-                    item_dict = {
-                        "Denomination": selected_row['Denomination'],
-                        "Reference": selected_row['Reference'],  # Add reference from the Excel file
-                        "Quantity": quantity,
-                        "Price": selected_row[price_type]
-                    }
-                    if 'items' not in st.session_state:
-                        st.session_state['items'] = []
-                    st.session_state['items'].append(item_dict)
-                    st.success("Article ajouté !")
-                else:
-                    st.error(f"Type de prix '{price_type}' non trouvé dans les données. Colonnes disponibles : {list(selected_row.index)}")
+                st.error("Aucun article trouvé pour ce terme de recherche.")
+        else:
+            st.warning("Veuillez entrer un terme de recherche.")
+    
+    # If a search has been performed and filtered articles exist, display selection and addition controls.
+    if 'filtered_articles' in st.session_state:
+        filtered_df = st.session_state['filtered_articles']
+        selected_item = st.selectbox("Sélectionnez un article", filtered_df['Denomination'], key="selected_item")
+        selected_row = filtered_df[filtered_df['Denomination'] == selected_item].squeeze()
+        
+        if price_type in selected_row.index:
+            st.write(f"**Prix ({price_type}) :** {selected_row[price_type]}")
+        else:
+            st.error(f"Type de prix '{price_type}' non trouvé pour cet article.")
+        
+        quantity = st.number_input("Quantité", min_value=1, value=1, key="quantity")
+        if st.button("Ajouter l'article", key="ajouter_article"):
+            if price_type in selected_row.index:
+                item_dict = {
+                    "Denomination": selected_row['Denomination'],
+                    "Reference": selected_row['Reference'],  # Add reference from the Excel file
+                    "Quantity": quantity,
+                    "Price": selected_row[price_type]
+                }
+                if 'items' not in st.session_state:
+                    st.session_state['items'] = []
+                st.session_state['items'].append(item_dict)
+                st.success("Article ajouté !")
+                # Optionally clear the filtered articles after adding
+                del st.session_state['filtered_articles']
+            else:
+                st.error(f"Type de prix '{price_type}' non trouvé dans les données. Colonnes disponibles : {list(selected_row.index)}")
     
     # Display selected items with remove option
     if 'items' in st.session_state and st.session_state['items']:
@@ -297,15 +362,22 @@ def proforma_page():
         nom_client = st.text_input("Nom du client")
         nom_entreprise = st.text_input("Nom de l’entreprise")
         adresse = st.text_input("Adresse")
-        telephone = st.text_input("Téléphone")
+        telephone = st.text_input("Telephone")
         email = st.text_input("Email du client")
         
-        client_info = {
-            "nom_client": nom_client,
-            "nom_entreprise": nom_entreprise,
-            "adresse": adresse,
-            "telephone": telephone
-        }
+        # Check if client exists; if not, add new client and retrieve its ID from clients.xlsx
+        client_info = get_client_info(clients_df, email, telephone)
+        if client_info is None:
+            client_info = {
+                "nom_client": nom_client,
+                "nom_entreprise": nom_entreprise,
+                "adresse": adresse,
+                "telephone": telephone,
+                "email": email
+            }
+            clients_df = add_new_client(clients_df, client_info)
+            client_info = clients_df.iloc[-1].to_dict()  # Retrieve the new client info including the ID
+            st.success("Nouveau client ajouté !")
         
         # Automatically generate transaction information
         if 'transaction_number' not in st.session_state:
@@ -316,7 +388,7 @@ def proforma_page():
         transaction_info = {
             "transaction_number": st.session_state['transaction_number'],
             "transaction_date": datetime.now().strftime("%d/%m/%Y"),  # Current date
-            "client_id": random.randint(1000, 9999)  # Random client ID for now
+            "client_id": client_info.get("ID", random.randint(1000, 9999))  # Use existing ID or generate a new one
         }
         
         # Display transaction information
@@ -327,11 +399,21 @@ def proforma_page():
         
         # Generate and upload PDF
         if st.button("Générer la facture proforma"):
-            pdf_filename = generate_pdf(st.session_state['items'], price_type, client_info, transaction_info, apply_tva, discount_type, discount_value, show_onama, delivery_days)
+            pdf_filename = generate_pdf(
+                st.session_state['items'],
+                price_type,
+                client_info,
+                transaction_info,
+                apply_tva,
+                discount_type,
+                discount_value,
+                show_onama,
+                delivery_days
+            )
             
             # Provide a download link for the PDF
             with open(pdf_filename, "rb") as file:
-                btn = st.download_button(
+                st.download_button(
                     label="Télécharger la facture proforma",
                     data=file,
                     file_name=pdf_filename,
@@ -339,7 +421,14 @@ def proforma_page():
                 )
             st.success("Facture proforma générée ! Cliquez sur le bouton ci-dessus pour télécharger.")
             
-            # Send email with PDF attachment
+            # Save the updated clients.xlsx file
+            if client_info.get("ID") is None:
+                if save_clients_file(clients_df):
+                    st.success("Clients.xlsx mis à jour localement.")
+                else:
+                    st.error("Échec de la mise à jour de clients.xlsx.")
+            
+            # Send email with PDF attachment if an email is provided
             if email:
                 if send_email_with_pdf(email, pdf_filename, client_info['nom_client'] if client_info['nom_client'] else "Client"):
                     st.success(f"Facture proforma envoyée à {email}.")
