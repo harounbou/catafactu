@@ -6,66 +6,26 @@ from io import BytesIO
 from num2words import num2words
 from datetime import datetime
 import random
-import gdown
 
-# Google Drive folder and file IDs
-GOOGLE_DRIVE_FOLDER_ID = "1ElAUnwNUjnoaVUxH1yZKpNaAqcy9y3r3"
-CATAFACTUAPP_FILE_ID = "1a5PgsZNj7fsfUtWHGpDgBQUBRLLlaun1"  # Replace with the actual file ID
-PROFORMA_INVOICES_FILE_ID = "1FR0XjHqCJ98-hbMBCeh7ikzUgIqNEWSO"  # Replace with the actual file ID
-
-# Local clients file
-CLIENTS_FILE = "clients.xlsx"  # Local file in the same directory as app.py
+# Local files
+CLIENTS_FILE = "clients.xlsx"  # Local clients file
+PRODUCTS_FILE = "catafactuapp1.xlsx"  # Local products file
 
 # ------------------------------------------
-# Utility functions for file download and Excel loading
+# Utility functions for file loading
 # ------------------------------------------
 
-def download_file_from_google_drive(file_id, output):
+def read_local_excel(file_path):
     """
-    Download a file from Google Drive using its file ID.
+    Read a local Excel file.
     """
     try:
-        url = f"https://drive.google.com/uc?id={file_id}"
-        gdown.download(url, output, quiet=False)
-        return True
-    except Exception as e:
-        st.error(f"Échec du téléchargement du fichier depuis Google Drive : {e}")
-        return False
-
-@st.cache_data
-def read_excel_from_google_drive(file_id, output_filename):
-    """
-    Download and read the Excel file from Google Drive.
-    """
-    if download_file_from_google_drive(file_id, output_filename):
-        df = pd.read_excel(output_filename)
+        df = pd.read_excel(file_path)
         df.columns = df.columns.str.strip()  # Strip leading/trailing spaces from column names
         return df
-    else:
-        return None
-
-def read_clients_file():
-    """
-    Read the local clients.xlsx file.
-    """
-    if os.path.exists(CLIENTS_FILE):
-        clients_df = pd.read_excel(CLIENTS_FILE)
-        clients_df.columns = clients_df.columns.str.strip()  # Strip spaces
-        return clients_df
-    else:
-        st.error(f"Le fichier {CLIENTS_FILE} est introuvable dans le répertoire local.")
-        return None
-
-def save_clients_file(clients_df):
-    """
-    Save the updated clients DataFrame to the local clients.xlsx file.
-    """
-    try:
-        clients_df.to_excel(CLIENTS_FILE, index=False)
-        return True
     except Exception as e:
-        st.error(f"Échec de la sauvegarde du fichier {CLIENTS_FILE} : {e}")
-        return False
+        st.error(f"Échec de la lecture du fichier Excel local : {e}")
+        return None
 
 # ------------------------------------------
 # Client Functions
@@ -128,6 +88,17 @@ def add_new_client(clients_df, client_info):
         return clients_df
     return None
 
+def save_clients_file(clients_df):
+    """
+    Save the updated clients DataFrame to the local clients.xlsx file.
+    """
+    try:
+        clients_df.to_excel(CLIENTS_FILE, index=False)
+        return True
+    except Exception as e:
+        st.error(f"Échec de la sauvegarde du fichier {CLIENTS_FILE} : {e}")
+        return False
+
 # ------------------------------------------
 # PDF Generation
 # ------------------------------------------
@@ -136,7 +107,7 @@ def sanitize_text(text):
     """
     Replace unsupported characters in the text with supported ones.
     """
-    text = text.replace("’", "'")
+    text = text.replace("’", "'") if pd.notna(text) else ""
     return text
 
 def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, discount_type, discount_value, show_onama, delivery_days):
@@ -162,13 +133,13 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     
     # Client and transaction information
     pdf.set_font("Arial", size=12)
-    pdf.cell(100, 10, txt=sanitize_text(f"Nom de client : {client_info['nom_client']}"), ln=0)
+    pdf.cell(100, 10, txt=sanitize_text(f"Nom de client : {client_info.get('nom_client', '')}"), ln=0)
     pdf.cell(90, 10, txt=sanitize_text(f"N° De transaction : {transaction_info['transaction_number']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Nom de l’entreprise : {client_info['nom_entreprise']}"), ln=0)
+    pdf.cell(100, 10, txt=sanitize_text(f"Nom de l’entreprise : {client_info.get('entreprise_client', '')}"), ln=0)
     pdf.cell(90, 10, txt=sanitize_text(f"Date de transaction : {transaction_info['transaction_date']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Adresse : {client_info['adresse']}"), ln=0)
+    pdf.cell(100, 10, txt=sanitize_text(f"Adresse : {client_info.get('address_client', '')}"), ln=0)
     pdf.cell(90, 10, txt=sanitize_text(f"ID Client : {transaction_info['client_id']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Telephone : {client_info['telephone']}"), ln=1)
+    pdf.cell(100, 10, txt=sanitize_text(f"Telephone : {client_info.get('telephone_client', '')}"), ln=1)
     pdf.ln(10)
     
     # Items table header
@@ -242,7 +213,7 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf.set_text_color(0, 0, 0)
     pdf.cell(200, 10, txt=sanitize_text(f"Arrêter la présente facture proforma à la somme de : {total_amount_words} dinars."), ln=True)
     
-    pdf_filename = f"Proforma-{client_info['nom_client'] if client_info['nom_client'] else 'Client'}-{datetime.now().strftime('%d%m%Y')}.pdf"
+    pdf_filename = f"Proforma-{client_info.get('nom_client', 'Client')}-{datetime.now().strftime('%d%m%Y')}.pdf"
     pdf.output(pdf_filename)
     
     return pdf_filename
@@ -254,10 +225,10 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
 def proforma_page():
     st.title("Générateur de Facture Proforma")
     
-    # Load data from Google Drive and local clients file
+    # Load data from local files
     try:
-        df = read_excel_from_google_drive(CATAFACTUAPP_FILE_ID, "catafactuapp1.xlsx")
-        clients_df = read_clients_file()
+        df = read_local_excel(PRODUCTS_FILE)
+        clients_df = read_local_excel(CLIENTS_FILE)
         if df is None or clients_df is None:
             st.error("Échec du chargement des données.")
             return
@@ -266,12 +237,12 @@ def proforma_page():
         return
     
     # Price type, TVA, discount, and delivery days options
-    price_type = st.radio("Sélectionnez le type de prix", ["prix-super-gros", "prix-gros", "prix-détail"])
-    apply_tva = st.checkbox("Appliquer la TVA (19%)", value=False)
-    show_onama = st.checkbox("Basculer à L'Onama", value=False)
-    discount_type = st.radio("Type de remise", ["Pourcentage", "Montant fixe"])
-    discount_value = st.number_input("Valeur de la remise", min_value=0.0, value=0.0)
-    delivery_days = st.selectbox("Délai de livraison (jours)", list(range(0, 31)))
+    price_type = st.radio("Sélectionnez le type de prix", ["prix-super-gros", "prix-gros", "prix-détail"], key='price_type')
+    apply_tva = st.checkbox("Appliquer la TVA (19%)", value=False, key='apply_tva')
+    show_onama = st.checkbox("Basculer à L'Onama", value=False, key='show_onama')
+    discount_type = st.radio("Type de remise", ["Pourcentage", "Montant fixe"], key='discount_type')
+    discount_value = st.number_input("Valeur de la remise", min_value=0.0, value=0.0, key='discount_value')
+    delivery_days = st.selectbox("Délai de livraison (jours)", list(range(0, 31)), key='delivery_days')
     
     # --- Article Search Section ---
     search_term = st.text_input("Rechercher un article par Dénomination")
@@ -331,17 +302,8 @@ def proforma_page():
         if client_search_value:
             client_info = get_client_info(clients_df, client_search_value, client_search_method)
             if client_info:
-                mapped_client_info = {
-                    "ID": client_info.get("id_client"),
-                    "nom_client": client_info.get("nom_client"),
-                    "prenom_client": client_info.get("prenom_client", ""),  # Assuming prenom_client exists
-                    "nom_entreprise": client_info.get("entreprise_client"),
-                    "adresse": client_info.get("address_client"),
-                    "telephone": client_info.get("telephone_client"),
-                    "email": client_info.get("email_client")
-                }
-                st.session_state["client_info_loaded"] = mapped_client_info
-                st.success(f"Client {client_info['nom_client']} chargé !")
+                st.session_state["client_info_loaded"] = client_info
+                st.success(f"Client {client_info.get('nom_client', 'Inconnu')} chargé !")
             else:
                 st.info("Aucun client trouvé.")
         else:
@@ -351,7 +313,8 @@ def proforma_page():
         client_info = st.session_state["client_info_loaded"]
         st.write("### Informations du client chargé")
         for key, value in client_info.items():
-            st.write(f"{key}: {value}")
+            if pd.notna(value):  # Check if the value is not NaN
+                st.write(f"{key}: {value}")
     else:
         st.write("### Ajouter un nouveau client")
         new_nom_client = st.text_input("Nom du client", key="new_nom_client")
@@ -371,61 +334,70 @@ def proforma_page():
             }
             clients_df = add_new_client(clients_df, new_client_info)
             if clients_df is not None:
+                # Directly use the newly added client for proforma without searching
                 client_info = clients_df.iloc[-1].to_dict()
-                mapped_client_info = {
-                    "ID": client_info.get("id_client"),
-                    "nom_client": client_info.get("nom_client"),
-                    "prenom_client": client_info.get("prenom_client", ""),
-                    "nom_entreprise": client_info.get("entreprise_client"),
-                    "adresse": client_info.get("address_client"),
-                    "telephone": client_info.get("telephone_client"),
-                    "email": client_info.get("email_client")
-                }
-                st.session_state["client_info_loaded"] = mapped_client_info
+                st.session_state["client_info_loaded"] = client_info
                 st.success("Nouveau client ajouté et clients.xlsx mis à jour !")
             else:
                 st.error("Échec de l'ajout du nouveau client.")
     
+    # Ensure 'items' in session_state is initialized
+    if 'items' not in st.session_state:
+        st.session_state['items'] = []
+
     # Transaction information
     if 'transaction_number' not in st.session_state:
         st.session_state['transaction_number'] = 1000
     else:
         st.session_state['transaction_number'] += 1
 
-    if "client_info_loaded" in st.session_state:
-        client_info = st.session_state["client_info_loaded"]
-        transaction_info = {
-            "transaction_number": st.session_state['transaction_number'],
-            "transaction_date": datetime.now().strftime("%d/%m/%Y"),
-            "client_id": client_info.get("ID", random.randint(1000, 9999))
-        }
-        st.write("### Informations de la transaction")
-        st.write(f"N° De transaction : {transaction_info['transaction_number']}")
-        st.write(f"Date de transaction : {transaction_info['transaction_date']}")
-        st.write(f"ID Client : {transaction_info['client_id']}")
+    # Client information for PDF generation
+    client_info_for_pdf = st.session_state.get("client_info_loaded", {
+        "nom_client": "",
+        "prenom_client": "",
+        "entreprise_client": "",
+        "address_client": "",
+        "telephone_client": "",
+        "email_client": ""
+    })
+
+    transaction_info = {
+        "transaction_number": st.session_state['transaction_number'],
+        "transaction_date": datetime.now().strftime("%d/%m/%Y"),
+        "client_id": client_info_for_pdf.get("id_client", random.randint(1000, 9999))
+    }
+
+    # Show transaction info regardless of client info
+    st.write("### Informations de la transaction")
+    st.write(f"N° De transaction : {transaction_info['transaction_number']}")
+    st.write(f"Date de transaction : {transaction_info['transaction_date']}")
+    st.write(f"ID Client : {transaction_info['client_id']}")
+    
+    if st.button("Générer la facture proforma"):
+        # Generate PDF with potentially empty client info
+        pdf_filename = generate_pdf(
+            st.session_state['items'],
+            price_type,
+            client_info_for_pdf,
+            transaction_info,
+            apply_tva,
+            discount_type,
+            discount_value,
+            show_onama,
+            delivery_days
+        )
         
-        if st.button("Générer la facture proforma"):
-            pdf_filename = generate_pdf(
-                st.session_state['items'],
-                price_type,
-                client_info,
-                transaction_info,
-                apply_tva,
-                discount_type,
-                discount_value,
-                show_onama,
-                delivery_days
+        with open(pdf_filename, "rb") as file:
+            st.download_button(
+                label="Télécharger la facture proforma",
+                data=file,
+                file_name=pdf_filename,
+                mime="application/pdf"
             )
-            with open(pdf_filename, "rb") as file:
-                st.download_button(
-                    label="Télécharger la facture proforma",
-                    data=file,
-                    file_name=pdf_filename,
-                    mime="application/pdf"
-                )
-            st.success("Facture proforma générée ! Cliquez sur le bouton ci-dessus pour télécharger.")
-            
-            # Clear client info after transaction
+        st.success("Facture proforma générée ! Cliquez sur le bouton ci-dessus pour télécharger.")
+        
+        # Clear client info after transaction if it was loaded
+        if "client_info_loaded" in st.session_state:
             del st.session_state["client_info_loaded"]
             st.success("Client details cleared for next transaction.")
 
