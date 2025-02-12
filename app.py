@@ -7,10 +7,6 @@ from num2words import num2words
 from datetime import datetime
 import random
 import gdown
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
 
 # Google Drive folder and file IDs
 GOOGLE_DRIVE_FOLDER_ID = "1ElAUnwNUjnoaVUxH1yZKpNaAqcy9y3r3"
@@ -20,13 +16,10 @@ PROFORMA_INVOICES_FILE_ID = "1FR0XjHqCJ98-hbMBCeh7ikzUgIqNEWSO"  # Replace with 
 # Local clients file
 CLIENTS_FILE = "clients.xlsx"  # Local file in the same directory as app.py
 
-# Email configuration (replace with your email credentials)
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_USER = "your_email@gmail.com"
-EMAIL_PASSWORD = "your_email_password"
+# ------------------------------------------
+# Utility functions for file download and Excel loading
+# ------------------------------------------
 
-# Function to download a file from Google Drive
 def download_file_from_google_drive(file_id, output):
     """
     Download a file from Google Drive using its file ID.
@@ -39,7 +32,6 @@ def download_file_from_google_drive(file_id, output):
         st.error(f"Échec du téléchargement du fichier depuis Google Drive : {e}")
         return False
 
-# Cache the data loading process
 @st.cache_data
 def read_excel_from_google_drive(file_id, output_filename):
     """
@@ -52,20 +44,18 @@ def read_excel_from_google_drive(file_id, output_filename):
     else:
         return None
 
-# Function to read the local clients.xlsx file
 def read_clients_file():
     """
     Read the local clients.xlsx file.
     """
     if os.path.exists(CLIENTS_FILE):
         clients_df = pd.read_excel(CLIENTS_FILE)
-        clients_df.columns = clients_df.columns.str.strip()  # Strip leading/trailing spaces from column names
+        clients_df.columns = clients_df.columns.str.strip()  # Strip spaces
         return clients_df
     else:
         st.error(f"Le fichier {CLIENTS_FILE} est introuvable dans le répertoire local.")
         return None
 
-# Function to save the updated clients.xlsx file
 def save_clients_file(clients_df):
     """
     Save the updated clients DataFrame to the local clients.xlsx file.
@@ -77,58 +67,90 @@ def save_clients_file(clients_df):
         st.error(f"Échec de la sauvegarde du fichier {CLIENTS_FILE} : {e}")
         return False
 
-# Function to check if a client exists and retrieve their details
-def get_client_info(clients_df, email, telephone):
+# ------------------------------------------
+# Client Functions
+# ------------------------------------------
+
+def get_client_info(clients_df, search_value, search_method):
     """
-    Check if a client exists in the clients DataFrame based on email or telephone.
-    If found, return their details. Otherwise, return None.
+    Check if a client exists based on the search method.
     """
     if not clients_df.empty:
-        client = clients_df[(clients_df['Email'] == email) | (clients_df['Telephone'] == telephone)]
+        if search_method == "Nom du client":
+            client = clients_df[clients_df['nom_client'].astype(str).str.contains(search_value, case=False, na=False)]
+        elif search_method == "ID Client":
+            try:
+                client_id = int(search_value)
+                client = clients_df[clients_df['id_client'] == client_id]
+            except ValueError:
+                return None
         if not client.empty:
             return client.iloc[0].to_dict()
     return None
 
-# Function to add a new client to the clients DataFrame
+def get_next_available_row(clients_df):
+    """
+    Find the next available row where all client details are empty.
+    """
+    required_fields = ["nom_client", "prenom_client", "telephone_client", "address_client", "email_client", "entreprise_client"]
+    for idx, row in clients_df.iterrows():
+        if all(pd.isna(row[field]) for field in required_fields):
+            return idx
+    return len(clients_df)  # If no empty row, append to the end
+
 def add_new_client(clients_df, client_info):
     """
-    Add a new client to the clients DataFrame.
+    Add a new client to the clients DataFrame at the first available empty row or append if none are available.
     """
-    # Generate the next available client ID
-    if clients_df.empty:
-        client_id = 1
+    next_row = get_next_available_row(clients_df)
+    if 'id_client' in client_info:
+        client_info['id_client'] = int(client_info['id_client'])
     else:
-        client_id = clients_df['ID'].max() + 1
-    client_info['ID'] = client_id
+        # If ID is not provided, find the next available ID
+        existing_ids = clients_df['id_client'].dropna().astype(int)
+        if existing_ids.empty:
+            client_info['id_client'] = 2000
+        else:
+            client_info['id_client'] = existing_ids.max() + 1
+    
+    # Ensure ID is within the range 2000-5000
+    if client_info['id_client'] > 5000:
+        client_info['id_client'] = 2000  # Reset to 2000 if we've exceeded 5000
 
-    new_client = pd.DataFrame([client_info])
-    updated_clients_df = pd.concat([clients_df, new_client], ignore_index=True)
-    return updated_clients_df
+    if next_row < len(clients_df):
+        # Insert into an existing empty row
+        clients_df.loc[next_row, client_info.keys()] = client_info.values()
+    else:
+        # Append a new row
+        clients_df = pd.concat([clients_df, pd.DataFrame([client_info])], ignore_index=True)
+    
+    if save_clients_file(clients_df):
+        return clients_df
+    return None
 
-# Function to sanitize text for FPDF
+# ------------------------------------------
+# PDF Generation
+# ------------------------------------------
+
 def sanitize_text(text):
     """
     Replace unsupported characters in the text with supported ones.
     """
-    # Replace curly apostrophes with straight ones
     text = text.replace("’", "'")
-    # Add more replacements if needed (e.g., for other special characters)
     return text
 
-# Function to generate and upload PDF invoice
 def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, discount_type, discount_value, show_onama, delivery_days):
     pdf = FPDF()
     pdf.add_page()
     
-    # Add logo
-    pdf.image("logo.png", x=10, y=8, w=30)  # Replace "logo.png" with the path to your logo
+    # Add logo (adjust path as needed)
+    pdf.image("logo.png", x=10, y=8, w=30)
     
-    # Set font for the header
     pdf.set_font("Arial", size=24, style='B')
     pdf.cell(200, 15, txt=sanitize_text("Facture Proforma Takideco"), ln=True, align='C')
     pdf.ln(10)
     
-    # Add issuer information
+    # Issuer information
     pdf.set_font("Arial", size=10)
     pdf.cell(200, 5, txt=sanitize_text("Taki Deco"), ln=True, align='C')
     if show_onama:
@@ -138,7 +160,7 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf.cell(200, 5, txt=sanitize_text("www.takideco.com | email: takidecommercial@gmail.com"), ln=True, align='C')
     pdf.ln(10)
     
-    # Add client and transaction information side by side
+    # Client and transaction information
     pdf.set_font("Arial", size=12)
     pdf.cell(100, 10, txt=sanitize_text(f"Nom de client : {client_info['nom_client']}"), ln=0)
     pdf.cell(90, 10, txt=sanitize_text(f"N° De transaction : {transaction_info['transaction_number']}"), ln=1, align='R')
@@ -149,7 +171,7 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf.cell(100, 10, txt=sanitize_text(f"Telephone : {client_info['telephone']}"), ln=1)
     pdf.ln(10)
     
-    # Add items table
+    # Items table header
     pdf.set_font("Arial", size=12, style='B')
     pdf.cell(80, 10, txt=sanitize_text("Article"), border=1)
     pdf.cell(30, 10, txt=sanitize_text("Référence"), border=1)
@@ -173,10 +195,8 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
         discount_amount = total_amount * (discount_value / 100)
     else:
         discount_amount = discount_value
-    
     total_amount_after_discount = total_amount - discount_amount
     
-    # Calculate TVA if applicable
     if apply_tva:
         tva_amount = total_amount_after_discount * 0.19
         total_amount_with_tva = total_amount_after_discount + tva_amount
@@ -184,11 +204,10 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
         tva_amount = 0
         total_amount_with_tva = total_amount_after_discount
     
-    # Add total amount, discount, and TVA details
     pdf.ln(10)
     pdf.cell(160, 10, txt=sanitize_text("Montant Total (HT) :"), border=0)
     pdf.cell(30, 10, txt=sanitize_text(f"{total_amount:.2f}"), border=1, ln=True)
-    pdf.cell(160, 10, txt=sanitize_text(f"Remise ({discount_value}{'%' if discount_type == 'Pourcentage' else 'DZD'}) :"), border=0)
+    pdf.cell(160, 10, txt=sanitize_text(f"Remise ({discount_value}{'%' if discount_type=='Pourcentage' else 'DZD'}) :"), border=0)
     pdf.cell(30, 10, txt=sanitize_text(f"{discount_amount:.2f}"), border=1, ln=True)
     pdf.cell(160, 10, txt=sanitize_text("Montant Total Après Remise (HT) :"), border=0)
     pdf.cell(30, 10, txt=sanitize_text(f"{total_amount_after_discount:.2f}"), border=1, ln=True)
@@ -198,88 +217,47 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
         pdf.cell(160, 10, txt=sanitize_text("Montant Total (TTC) :"), border=0)
         pdf.cell(30, 10, txt=sanitize_text(f"{total_amount_with_tva:.2f}"), border=1, ln=True)
     
-    # Add additional text at the bottom
     pdf.ln(10)
-    pdf.set_font("Arial", size=8)  # Smaller font size for this section
-    pdf.set_text_color(0, 0, 128)  # Navy blue color
+    pdf.set_font("Arial", size=8)
+    pdf.set_text_color(0, 0, 128)
     pdf.multi_cell(0, 5, txt=sanitize_text(
         "Mode de règlement :\n"
         "Espèces, Virement bancaire ou Chèque (à remettre par le client à nos bureaux de Constantine dans un délai maximum de 48 heures suivant la commande).\n"
         "Acompte :\n"
         "Un acompte de 50 % est exigé au moment de placer la commande. La commande ne sera traitée qu’après réception de cet acompte.\n"
-        "Délai de réalisation :\n"
-        f"{'La commande sera prête dans un délai de ' + str(delivery_days) + ' jours à compter de la date de réception de l’acompte.' if delivery_days > 0 else 'La commande sera prête dans un délai de 7 à 10 jours à compter de la date de réception de l’acompte.'}\n"
-        "Frais d’expédition :\n"
+        "Délai de réalisation :\n" +
+        (f"La commande sera prête dans un délai de {delivery_days} jours à compter de la date de réception de l’acompte."
+         if delivery_days > 0 else "La commande sera prête dans un délai de 7 à 10 jours à compter de la date de réception de l’acompte.") +
+        "\nFrais d’expédition :\n"
         "Les frais d’expédition sont à la charge du client. L’expédition peut être organisée par le client ou coordonnée par notre société, avec les frais facturés séparément."
     ))
     
-    # Convert total amount to words
     try:
-        total_amount_words = num2words(int(total_amount_with_tva), lang='fr')  # Convert to French words
+        total_amount_words = num2words(int(total_amount_with_tva), lang='fr')
     except OverflowError:
-        total_amount_words = "Montant très élevé"  # Fallback for very large numbers
+        total_amount_words = "Montant très élevé"
     
     pdf.ln(10)
     pdf.set_font("Arial", size=10, style='I')
-    pdf.set_text_color(0, 0, 0)  # Black color
+    pdf.set_text_color(0, 0, 0)
     pdf.cell(200, 10, txt=sanitize_text(f"Arrêter la présente facture proforma à la somme de : {total_amount_words} dinars."), ln=True)
     
-    # Save PDF to a temporary file
     pdf_filename = f"Proforma-{client_info['nom_client'] if client_info['nom_client'] else 'Client'}-{datetime.now().strftime('%d%m%Y')}.pdf"
     pdf.output(pdf_filename)
     
     return pdf_filename
 
-# Function to send email with PDF attachment
-def send_email_with_pdf(email_to, pdf_filename, client_name):
-    try:
-        # Create the email
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
-        msg['To'] = email_to
-        msg['Subject'] = f"Facture Proforma pour {client_name}"
-        
-        # Email body
-        body = f"""
-        Bonjour,
+# ------------------------------------------
+# Main Proforma Invoice Page
+# ------------------------------------------
 
-        Veuillez trouver ci-joint la facture proforma pour {client_name}.
-
-        Cordialement,
-        Taki Deco
-        """
-        msg.attach(MIMEMultipart(body))
-        
-        # Attach the PDF
-        with open(pdf_filename, "rb") as attachment:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment.read())
-            encoders.encode_base64(part)
-            part.add_header(
-                "Content-Disposition",
-                f"attachment; filename={pdf_filename}",
-            )
-            msg.attach(part)
-        
-        # Send the email
-        with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASSWORD)
-            server.sendmail(EMAIL_USER, email_to, msg.as_string())
-        
-        return True
-    except Exception as e:
-        st.error(f"Échec de l'envoi de l'email : {e}")
-        return False
-
-# Proforma Invoice Page
 def proforma_page():
     st.title("Générateur de Facture Proforma")
     
-    # Load data from Google Drive and local file
+    # Load data from Google Drive and local clients file
     try:
         df = read_excel_from_google_drive(CATAFACTUAPP_FILE_ID, "catafactuapp1.xlsx")
-        clients_df = read_clients_file()  # Read the local clients.xlsx file
+        clients_df = read_clients_file()
         if df is None or clients_df is None:
             st.error("Échec du chargement des données.")
             return
@@ -287,20 +265,12 @@ def proforma_page():
         st.error(f"Échec du chargement des données : {e}")
         return
     
-    # Select price type
+    # Price type, TVA, discount, and delivery days options
     price_type = st.radio("Sélectionnez le type de prix", ["prix-super-gros", "prix-gros", "prix-détail"])
-    
-    # Add TVA option
     apply_tva = st.checkbox("Appliquer la TVA (19%)", value=False)
-    
-    # Add "Basculer à L'Onama" option
     show_onama = st.checkbox("Basculer à L'Onama", value=False)
-    
-    # Add discount option
     discount_type = st.radio("Type de remise", ["Pourcentage", "Montant fixe"])
     discount_value = st.number_input("Valeur de la remise", min_value=0.0, value=0.0)
-    
-    # Add delivery days option
     delivery_days = st.selectbox("Délai de livraison (jours)", list(range(0, 31)))
     
     # --- Article Search Section ---
@@ -315,23 +285,20 @@ def proforma_page():
         else:
             st.warning("Veuillez entrer un terme de recherche.")
     
-    # If a search has been performed and filtered articles exist, display selection and addition controls.
     if 'filtered_articles' in st.session_state:
         filtered_df = st.session_state['filtered_articles']
         selected_item = st.selectbox("Sélectionnez un article", filtered_df['Denomination'], key="selected_item")
         selected_row = filtered_df[filtered_df['Denomination'] == selected_item].squeeze()
-        
         if price_type in selected_row.index:
             st.write(f"**Prix ({price_type}) :** {selected_row[price_type]}")
         else:
             st.error(f"Type de prix '{price_type}' non trouvé pour cet article.")
-        
         quantity = st.number_input("Quantité", min_value=1, value=1, key="quantity")
         if st.button("Ajouter l'article", key="ajouter_article"):
             if price_type in selected_row.index:
                 item_dict = {
                     "Denomination": selected_row['Denomination'],
-                    "Reference": selected_row['Reference'],  # Add reference from the Excel file
+                    "Reference": selected_row['Reference'],
                     "Quantity": quantity,
                     "Price": selected_row[price_type]
                 }
@@ -339,12 +306,11 @@ def proforma_page():
                     st.session_state['items'] = []
                 st.session_state['items'].append(item_dict)
                 st.success("Article ajouté !")
-                # Optionally clear the filtered articles after adding
                 del st.session_state['filtered_articles']
             else:
-                st.error(f"Type de prix '{price_type}' non trouvé dans les données. Colonnes disponibles : {list(selected_row.index)}")
+                st.error(f"Type de prix '{price_type}' non trouvé dans les données.")
     
-    # Display selected items with remove option
+    # Display selected items
     if 'items' in st.session_state and st.session_state['items']:
         st.write("### Articles sélectionnés")
         for i, item in enumerate(st.session_state['items']):
@@ -355,49 +321,89 @@ def proforma_page():
                 if st.button(f"Supprimer {i+1}"):
                     st.session_state['items'].pop(i)
                     st.success("Article supprimé !")
-                    st.rerun()  # Use st.rerun() instead of st.experimental_rerun()
-        
-        # Prompt for client information (optional)
-        st.write("### Informations du client (optionnel)")
-        nom_client = st.text_input("Nom du client")
-        nom_entreprise = st.text_input("Nom de l’entreprise")
-        adresse = st.text_input("Adresse")
-        telephone = st.text_input("Telephone")
-        email = st.text_input("Email du client")
-        
-        # Check if client exists; if not, add new client and retrieve its ID from clients.xlsx
-        client_info = get_client_info(clients_df, email, telephone)
-        if client_info is None:
-            client_info = {
-                "nom_client": nom_client,
-                "nom_entreprise": nom_entreprise,
-                "adresse": adresse,
-                "telephone": telephone,
-                "email": email
-            }
-            clients_df = add_new_client(clients_df, client_info)
-            client_info = clients_df.iloc[-1].to_dict()  # Retrieve the new client info including the ID
-            st.success("Nouveau client ajouté !")
-        
-        # Automatically generate transaction information
-        if 'transaction_number' not in st.session_state:
-            st.session_state['transaction_number'] = 1000  # Start from 1000
+                    st.rerun()
+    
+    # --- Client Search / Creation Section ---
+    st.write("### Recherche de client")
+    client_search_method = st.radio("Rechercher par", ["Nom du client", "ID Client"], key="client_search_method")
+    client_search_value = st.text_input("Entrez la valeur de recherche", key="client_search_value")
+    if st.button("Rechercher client"):
+        if client_search_value:
+            client_info = get_client_info(clients_df, client_search_value, client_search_method)
+            if client_info:
+                mapped_client_info = {
+                    "ID": client_info.get("id_client"),
+                    "nom_client": client_info.get("nom_client"),
+                    "prenom_client": client_info.get("prenom_client", ""),  # Assuming prenom_client exists
+                    "nom_entreprise": client_info.get("entreprise_client"),
+                    "adresse": client_info.get("address_client"),
+                    "telephone": client_info.get("telephone_client"),
+                    "email": client_info.get("email_client")
+                }
+                st.session_state["client_info_loaded"] = mapped_client_info
+                st.success(f"Client {client_info['nom_client']} chargé !")
+            else:
+                st.info("Aucun client trouvé.")
         else:
-            st.session_state['transaction_number'] += 1  # Increment for each new transaction
-        
+            st.warning("Veuillez entrer une valeur de recherche.")
+
+    if "client_info_loaded" in st.session_state:
+        client_info = st.session_state["client_info_loaded"]
+        st.write("### Informations du client chargé")
+        for key, value in client_info.items():
+            st.write(f"{key}: {value}")
+    else:
+        st.write("### Ajouter un nouveau client")
+        new_nom_client = st.text_input("Nom du client", key="new_nom_client")
+        new_prenom_client = st.text_input("Prénom du client", key="new_prenom_client")
+        new_nom_entreprise = st.text_input("Nom de l’entreprise", key="new_nom_entreprise")
+        new_adresse = st.text_input("Adresse", key="new_adresse")
+        new_telephone = st.text_input("Telephone", key="new_telephone")
+        new_email = st.text_input("Email du client", key="new_email")
+        if st.button("Ajouter nouveau client", key="add_new_client"):
+            new_client_info = {
+                "nom_client": new_nom_client,
+                "prenom_client": new_prenom_client,
+                "entreprise_client": new_nom_entreprise,
+                "address_client": new_adresse,
+                "telephone_client": new_telephone,
+                "email_client": new_email
+            }
+            clients_df = add_new_client(clients_df, new_client_info)
+            if clients_df is not None:
+                client_info = clients_df.iloc[-1].to_dict()
+                mapped_client_info = {
+                    "ID": client_info.get("id_client"),
+                    "nom_client": client_info.get("nom_client"),
+                    "prenom_client": client_info.get("prenom_client", ""),
+                    "nom_entreprise": client_info.get("entreprise_client"),
+                    "adresse": client_info.get("address_client"),
+                    "telephone": client_info.get("telephone_client"),
+                    "email": client_info.get("email_client")
+                }
+                st.session_state["client_info_loaded"] = mapped_client_info
+                st.success("Nouveau client ajouté et clients.xlsx mis à jour !")
+            else:
+                st.error("Échec de l'ajout du nouveau client.")
+    
+    # Transaction information
+    if 'transaction_number' not in st.session_state:
+        st.session_state['transaction_number'] = 1000
+    else:
+        st.session_state['transaction_number'] += 1
+
+    if "client_info_loaded" in st.session_state:
+        client_info = st.session_state["client_info_loaded"]
         transaction_info = {
             "transaction_number": st.session_state['transaction_number'],
-            "transaction_date": datetime.now().strftime("%d/%m/%Y"),  # Current date
-            "client_id": client_info.get("ID", random.randint(1000, 9999))  # Use existing ID or generate a new one
+            "transaction_date": datetime.now().strftime("%d/%m/%Y"),
+            "client_id": client_info.get("ID", random.randint(1000, 9999))
         }
-        
-        # Display transaction information
         st.write("### Informations de la transaction")
         st.write(f"N° De transaction : {transaction_info['transaction_number']}")
         st.write(f"Date de transaction : {transaction_info['transaction_date']}")
         st.write(f"ID Client : {transaction_info['client_id']}")
         
-        # Generate and upload PDF
         if st.button("Générer la facture proforma"):
             pdf_filename = generate_pdf(
                 st.session_state['items'],
@@ -410,8 +416,6 @@ def proforma_page():
                 show_onama,
                 delivery_days
             )
-            
-            # Provide a download link for the PDF
             with open(pdf_filename, "rb") as file:
                 st.download_button(
                     label="Télécharger la facture proforma",
@@ -421,25 +425,21 @@ def proforma_page():
                 )
             st.success("Facture proforma générée ! Cliquez sur le bouton ci-dessus pour télécharger.")
             
-            # Save the updated clients.xlsx file
-            if client_info.get("ID") is None:
-                if save_clients_file(clients_df):
-                    st.success("Clients.xlsx mis à jour localement.")
-                else:
-                    st.error("Échec de la mise à jour de clients.xlsx.")
-            
-            # Send email with PDF attachment if an email is provided
-            if email:
-                if send_email_with_pdf(email, pdf_filename, client_info['nom_client'] if client_info['nom_client'] else "Client"):
-                    st.success(f"Facture proforma envoyée à {email}.")
-                else:
-                    st.error("Échec de l'envoi de l'email.")
+            # Clear client info after transaction
+            del st.session_state["client_info_loaded"]
+            st.success("Client details cleared for next transaction.")
 
-        if st.button("Effacer les articles"):
-            st.session_state['items'] = []
-            st.success("Articles effacés !")
+    # Clear all session state for a fresh start
+    if st.button("Effacer tous les détails"):
+        for key in ['items', 'client_info_loaded', 'filtered_articles']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.success("Tous les détails ont été effacés !")
 
-# Placeholder pages for other functionalities
+# ------------------------------------------
+# Placeholder Pages
+# ------------------------------------------
+
 def bon_de_commande_page():
     st.title("Bon de Commande")
     st.write("Cette page est en cours de développement. Fonctionnalité à venir bientôt !")
@@ -456,17 +456,13 @@ def facture_page():
     st.title("Facture")
     st.write("Cette page est en cours de développement. Fonctionnalité à venir bientôt !")
 
-# Main app
+# ------------------------------------------
+# Main App
+# ------------------------------------------
+
 def main():
     st.sidebar.title("Menu")
-    
-    # Add buttons for navigation
-    page = st.sidebar.radio(
-        "Aller à",
-        ["Proforma", "Bon de Commande", "Bon de Versement", "Catalogue", "Facture"]
-    )
-    
-    # Display the selected page
+    page = st.sidebar.radio("Aller à", ["Proforma", "Bon de Commande", "Bon de Versement", "Catalogue", "Facture"])
     if page == "Proforma":
         proforma_page()
     elif page == "Bon de Commande":
