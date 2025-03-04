@@ -15,9 +15,8 @@ PRODUCTS_FILE = "catafactuapp1.xlsx"  # Local products file
 # Utility Functions
 # ------------------------------------------
 
-@st.cache_data
 def read_local_excel(file_path):
-    """Read a local Excel file and cache the result."""
+    """Read a local Excel file without caching."""
     try:
         df = pd.read_excel(file_path)
         df.columns = df.columns.str.strip()  # Strip leading/trailing spaces from column names
@@ -34,6 +33,19 @@ def sanitize_text(text):
 # ------------------------------------------
 # Client Management Functions
 # ------------------------------------------
+
+def initialize_clients_df():
+    """Initialize or load the clients DataFrame into session state."""
+    if 'clients_df' not in st.session_state:
+        clients_df = read_local_excel(CLIENTS_FILE)
+        if clients_df is not None:
+            st.session_state['clients_df'] = clients_df
+        else:
+            # Create an empty DataFrame with expected columns if file doesn't exist
+            st.session_state['clients_df'] = pd.DataFrame(columns=[
+                "id_client", "nom_client", "prenom_client", "telephone_client",
+                "address_client", "email_client", "entreprise_client"
+            ])
 
 def get_client_info(clients_df, search_value, search_method):
     """Check if a client exists based on the search method and return their info with index."""
@@ -74,7 +86,7 @@ def add_new_client(clients_df, client_info):
     else:
         clients_df = pd.concat([clients_df, pd.DataFrame([client_info])], ignore_index=True)
     
-    return clients_df if save_clients_file(clients_df) else None
+    return clients_df
 
 def save_clients_file(clients_df):
     """Save the updated clients DataFrame to the local file."""
@@ -200,17 +212,18 @@ def initialize_session_state():
         st.session_state['items'] = []
     if 'transaction_number' not in st.session_state:
         st.session_state['transaction_number'] = 1000
+    initialize_clients_df()  # Initialize clients DataFrame
 
 def proforma_page():
     st.title("Générateur de Facture Proforma")
     initialize_session_state()
 
-    # Load data
+    # Load products data (still cached for performance)
     df = read_local_excel(PRODUCTS_FILE)
-    clients_df = read_local_excel(CLIENTS_FILE)
-    if df is None or clients_df is None:
-        st.error("Échec du chargement des données.")
+    if df is None:
+        st.error("Échec du chargement des données produits.")
         return
+    clients_df = st.session_state['clients_df']  # Use in-memory DataFrame
 
     # --- Options Section ---
     with st.expander("Options de la facture", expanded=True):
@@ -303,11 +316,12 @@ def proforma_page():
                         "email_client": new_email
                     }
                     clients_df = add_new_client(clients_df, new_client_info)
-                    if clients_df is not None:
+                    if clients_df is not None and save_clients_file(clients_df):
+                        st.session_state['clients_df'] = clients_df  # Update in-memory DataFrame
                         client_info = clients_df.iloc[-1].to_dict()
                         st.session_state["client_info_loaded"] = client_info
                         st.session_state["client_index"] = len(clients_df) - 1
-                        st.success("Nouveau client ajouté !")
+                        st.success("Nouveau client ajouté et chargé !")
                     else:
                         st.error("Échec de l'ajout du client.")
                 else:
@@ -336,6 +350,7 @@ def proforma_page():
                     client_index = st.session_state["client_index"]
                     clients_df.loc[client_index, updated_client_info.keys()] = updated_client_info.values()
                     if save_clients_file(clients_df):
+                        st.session_state['clients_df'] = clients_df  # Update in-memory DataFrame
                         st.session_state["client_info_loaded"] = updated_client_info
                         st.success("Client modifié avec succès !")
                     else:
@@ -389,7 +404,7 @@ def proforma_page():
                         file_name=pdf_filename,
                         mime="application/pdf"
                     )
-                st.session_state['transaction_number'] += 1  # Increment only on successful generation
+                st.session_state['transaction_number'] += 1
                 st.success("Facture générée !")
                 if "client_info_loaded" in st.session_state:
                     del st.session_state["client_info_loaded"]
