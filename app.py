@@ -15,33 +15,9 @@ PRODUCTS_FILE = "catafactuapp1.xlsx"  # Local products file
 # Image folder path
 IMAGE_FOLDER = os.path.join(os.path.dirname(__file__), "images")
 
-# Company information for footer
-COMPANY_INFO = {
-    "name": "Taki Deco",
-    "address": "123 Rue Principale, Constantine, Algérie",
-    "phone": "0542918226 | 0698077751",
-    "email": "takidecommercial@gmail.com",
-    "website": "www.takideco.com"
-}
-
 # Regex for email and phone validation
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\d{10}$'  # Adjust based on your phone number format (e.g., 10 digits)
-
-# Custom FPDF class to handle footers
-class CustomFPDF(FPDF):
-    def footer(self):
-        # Position at 30 mm from bottom
-        self.set_y(-30)
-        self.set_font("Arial", size=8)
-        self.set_text_color(128, 128, 128)
-        footer_text = (
-            f"{COMPANY_INFO['name']} - {COMPANY_INFO['address']} - "
-            f"Tél: {COMPANY_INFO['phone']} - Email: {COMPANY_INFO['email']} - "
-            f"Site: {COMPANY_INFO['website']}"
-        )
-        self.cell(0, 5, txt=sanitize_text(footer_text), ln=True, align='C')
-        self.cell(0, 5, txt="Signature: ______________________________", ln=True, align='C')
 
 # ------------------------------------------
 # Utility Functions
@@ -193,7 +169,7 @@ def save_clients_file(clients_df):
 # ------------------------------------------
 
 def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, discount_type, discount_value, show_onama, delivery_days):
-    pdf = CustomFPDF()  # Use the custom FPDF class with footer support
+    pdf = FPDF()  # Use standard FPDF class (footer removed)
     pdf.add_page()
     
     # Add logo
@@ -223,7 +199,7 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf.cell(100, 10, txt=sanitize_text(f"Telephone : {client_info.get('telephone_client', '')}"), ln=1)
     pdf.ln(10)
     
-    # Calculate totals for summary table
+    # Calculate totals (still needed for the detailed totals section at the bottom)
     total_amount = sum(item['Quantity'] * item['Price'] for item in items)
     if discount_type == "Pourcentage":
         discount_amount = total_amount * (discount_value / 100)
@@ -238,21 +214,6 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
         tva_amount = 0
         total_amount_with_tva = total_amount_after_discount
 
-    # Totals summary table at the top
-    pdf.set_font("Arial", size=12, style='B')
-    pdf.cell(160, 10, txt="Résumé des Totaux", border=1, ln=1)
-    pdf.set_font("Arial", size=12)
-    pdf.cell(120, 8, txt=sanitize_text("Montant Total (HT) :"), border=1)
-    pdf.cell(40, 8, txt=sanitize_text(f"{total_amount:.2f} DZD"), border=1, ln=1)
-    pdf.cell(120, 8, txt=sanitize_text(f"Remise ({discount_value}{'%' if discount_type=='Pourcentage' else 'DZD'}) :"), border=1)
-    pdf.cell(40, 8, txt=sanitize_text(f"{discount_amount:.2f} DZD"), border=1, ln=1)
-    if apply_tva:
-        pdf.cell(120, 8, txt=sanitize_text("TVA (19%) :"), border=1)
-        pdf.cell(40, 8, txt=sanitize_text(f"{tva_amount:.2f} DZD"), border=1, ln=1)
-    pdf.cell(120, 8, txt=sanitize_text("Montant Total (TTC) :"), border=1)
-    pdf.cell(40, 8, txt=sanitize_text(f"{total_amount_with_tva:.2f} DZD"), border=1, ln=1)
-    pdf.ln(10)
-
     # Group items by category
     items_by_category = {}
     for item in items:
@@ -261,7 +222,7 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
             items_by_category[category] = []
         items_by_category[category].append(item)
 
-    # Items table with Image and Dimension Image columns
+    # Items table with Image column (Dim Image column removed)
     for category, category_items in sorted(items_by_category.items()):
         # Category header
         pdf.set_font("Arial", size=14, style='B')
@@ -270,14 +231,14 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
 
         # Table header
         pdf.set_font("Arial", size=12, style='B')
-        col_widths = [40, 30, 30, 20, 20, 20, 30]  # Article, Image, Dim Image, Référence, Quantité, Prix, Total
-        headers = ["Article", "Image", "Dim Image", "Référence", "Quantité", "Prix", "Total"]
+        col_widths = [60, 30, 30, 30, 30, 30]  # Article, Image, Référence, Quantité, Prix, Total
+        headers = ["Article", "Image", "Référence", "Quantité", "Prix", "Total"]
         for w, h in zip(col_widths, headers):
             pdf.cell(w, 10, txt=h, border=1)
         pdf.ln()
 
         pdf.set_font("Arial", size=12)
-        row_height = 30  # Set row height to accommodate the images
+        row_height = 30  # Set row height to accommodate the image
 
         for item in category_items:
             # Calculate item total
@@ -305,39 +266,23 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
             # Move to the next column
             pdf.set_xy(x_image + col_widths[1], y_before)
             
-            # Dimension Image column
-            x_dim_image = pdf.get_x()
-            dim_image_path = item.get('Dimension Image')
-            if dim_image_path:
-                try:
-                    pdf.image(dim_image_path, x=x_dim_image, y=y_before, w=col_widths[2])
-                except Exception as e:
-                    pdf.set_xy(x_dim_image, y_before)
-                    pdf.cell(col_widths[2], row_height, txt="Dim non disponible", border=1)
-            else:
-                pdf.set_xy(x_dim_image, y_before)
-                pdf.cell(col_widths[2], row_height, txt="Dim non disponible", border=1)
-            
-            # Move to the next column
-            pdf.set_xy(x_dim_image + col_widths[2], y_before)
-            
             # Référence column
-            pdf.cell(col_widths[3], row_height, txt=sanitize_text(item['reference']), border=1)
+            pdf.cell(col_widths[2], row_height, txt=sanitize_text(item['reference']), border=1)
             
             # Quantité column
-            pdf.cell(col_widths[4], row_height, txt=str(item['Quantity']), border=1)
+            pdf.cell(col_widths[3], row_height, txt=str(item['Quantity']), border=1)
             
             # Prix column
-            pdf.cell(col_widths[5], row_height, txt=f"{item['Price']:.2f}", border=1)
+            pdf.cell(col_widths[4], row_height, txt=f"{item['Price']:.2f}", border=1)
             
             # Total column
-            pdf.cell(col_widths[6], row_height, txt=f"{item_total:.2f}", border=1)
+            pdf.cell(col_widths[5], row_height, txt=f"{item_total:.2f}", border=1)
             
             pdf.ln(row_height)  # Move to the next row
         
         pdf.ln(5)  # Space between categories
 
-    # Detailed totals (same as before, for reference)
+    # Detailed totals at the bottom
     pdf.ln(10)
     pdf.set_font("Arial", size=12)
     pdf.cell(160, 10, txt=sanitize_text("Montant Total (HT) :"), border=0)
@@ -456,33 +401,18 @@ def proforma_page():
                     selected_color = None
                     st.warning("Aucune couleur disponible pour cet article.")
                 
-                # Find image paths
+                # Find image path (only main image)
                 image_path = None
-                dim_image_path = None
                 if selected_color:
                     image_path_rel = find_image_path_for_color(selected_row['images'], selected_color)
                     if image_path_rel:
                         image_path = get_full_image_path(image_path_rel)
-                    
-                    # Check if photos-dim column exists
-                    if 'photos-dim' in selected_row.index:
-                        dim_image_path_rel = find_image_path_for_color(selected_row['photos-dim'], selected_color)
-                        if dim_image_path_rel:
-                            dim_image_path = get_full_image_path(dim_image_path_rel)
                 
-                # Display images side by side
-                if image_path or dim_image_path:
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if image_path:
-                            st.image(image_path, caption=f"Aperçu de l'article ({selected_color})", width=150, use_container_width=False)
-                        else:
-                            st.warning("Image non disponible pour la couleur sélectionnée.")
-                    with col2:
-                        if dim_image_path:
-                            st.image(dim_image_path, caption=f"Dimensions ({selected_color})", width=150, use_container_width=False)
-                        elif 'photos-dim' in selected_row.index:
-                            st.warning("Image de dimensions non disponible.")
+                # Display only the main image (dimension image removed)
+                if image_path:
+                    st.image(image_path, caption=f"Aperçu de l'article ({selected_color})", width=150, use_container_width=False)
+                else:
+                    st.warning("Image non disponible pour la couleur sélectionnée.")
                 
                 quantity = st.number_input("Quantité", min_value=1, value=1, key="quantity")
                 
@@ -504,7 +434,6 @@ def proforma_page():
                         "Price": selected_row[price_type],
                         "Color": selected_color,
                         "Image": image_path,
-                        "Dimension Image": dim_image_path,
                         "category": selected_row.get('category', 'Sans Catégorie')
                     }
                     st.session_state['items'].append(item_dict)
@@ -519,13 +448,8 @@ def proforma_page():
                 col1, col2 = st.columns([4, 1])
                 with col1:
                     st.write(f"{item['denomination']} - {item['reference']} - Couleur: {item['Color']} - {item['Quantity']} x {item['Price']}")
-                    image_col1, image_col2 = st.columns(2)
-                    with image_col1:
-                        if item.get('Image'):
-                            st.image(item['Image'], caption=f"Image ({item['Color']})", width=100, use_container_width=False)
-                    with image_col2:
-                        if item.get('Dimension Image'):
-                            st.image(item['Dimension Image'], caption=f"Dimensions ({item['Color']})", width=100, use_container_width=False)
+                    if item.get('Image'):
+                        st.image(item['Image'], caption=f"Image ({item['Color']})", width=100, use_container_width=False)
                 with col2:
                     if st.button(f"Supprimer {i+1}", key=f"delete_item_{i}"):
                         st.session_state['items'].pop(i)
