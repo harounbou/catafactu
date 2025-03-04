@@ -14,9 +14,6 @@ PRODUCTS_FILE = "catafactuapp1.xlsx"  # Local products file
 # Image folder path
 IMAGE_FOLDER = os.path.join(os.path.dirname(__file__), "images")
 
-# Note: Ensure you've resolved the PyFPDF/fpdf2 conflict by running:
-# pip uninstall --yes PyFPDF && pip install --upgrade fpdf2
-
 # ------------------------------------------
 # Utility Functions
 # ------------------------------------------
@@ -33,20 +30,33 @@ def read_local_excel(file_path):
 
 def sanitize_text(text):
     """Replace unsupported characters in the text with supported ones."""
-    text = text.replace("’", "'") if pd.notna(text) else ""
-    return text
+    return text.replace("’", "'") if pd.notna(text) else ""
 
 def get_full_image_path(image_path):
-    """Construct the full path to an image file."""
+    """Construct the full path to an image file with extension fallback."""
     if pd.notna(image_path):
-        # Normalize the path by removing leading '/', './', and 'images/'
+        # Normalize path and remove problematic prefixes
         image_path = image_path.lstrip('/').lstrip('./').lstrip('images/').strip()
-        # Join with the image folder path
-        full_path = os.path.join(IMAGE_FOLDER, image_path)
-        if os.path.exists(full_path):
-            return full_path
-        else:
-            st.warning(f"Image path not found: {full_path}")
+        
+        # Split into path components
+        base_path = os.path.join(IMAGE_FOLDER, image_path)
+        base, ext = os.path.splitext(base_path)
+        
+        # Check for various extensions if original not found
+        extensions_to_try = [ext.lower(), '.png', '.jpg', '.jpeg', '.webp']
+        for extension in extensions_to_try:
+            test_path = f"{base}{extension}"
+            if os.path.exists(test_path):
+                return test_path
+        
+        # If none found, try case-insensitive search
+        dir_path, file_name = os.path.split(base_path)
+        if os.path.exists(dir_path):
+            for f in os.listdir(dir_path):
+                if f.lower().startswith(os.path.splitext(file_name)[0].lower()):
+                    return os.path.join(dir_path, f)
+        
+        st.warning(f"Image path not found: {base_path}*")
     return None
 
 def find_image_path_for_color(images_str, selected_color):
@@ -163,40 +173,58 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf.cell(100, 10, txt=sanitize_text(f"Telephone : {client_info.get('telephone_client', '')}"), ln=1)
     pdf.ln(10)
     
-    # Items table header (removed Image column)
+    # Items table header with Image column
     pdf.set_font("Arial", size=12, style='B')
-    pdf.cell(60, 10, txt=sanitize_text("Article"), border=1)
-    pdf.cell(40, 10, txt=sanitize_text("Référence"), border=1)
-    pdf.cell(30, 10, txt=sanitize_text("Quantité"), border=1)
-    pdf.cell(30, 10, txt=sanitize_text("Prix"), border=1)
-    pdf.cell(30, 10, txt=sanitize_text("Total"), border=1, ln=True)
+    col_widths = [45, 30, 35, 30, 30, 30]  # Adjusted widths: Article, Image, Référence, Quantité, Prix, Total
+    headers = ["Article", "Image", "Référence", "Quantité", "Prix", "Total"]
+    for w, h in zip(col_widths, headers):
+        pdf.cell(w, 10, txt=h, border=1)
+    pdf.ln()
     
     pdf.set_font("Arial", size=12)
     total_amount = 0
+    row_height = 30  # Set row height to accommodate the image (30mm tall)
+    
     for item in items:
+        # Calculate item total
         item_total = item['Quantity'] * item['Price']
-        # Table row
-        pdf.cell(60, 10, txt=sanitize_text(item['denomination']), border=1)
-        pdf.cell(40, 10, txt=sanitize_text(item['reference']), border=1)
-        pdf.cell(30, 10, txt=sanitize_text(str(item['Quantity'])), border=1)
-        pdf.cell(30, 10, txt=sanitize_text(f"{item['Price']:.2f}"), border=1)
-        pdf.cell(30, 10, txt=sanitize_text(f"{item_total:.2f}"), border=1, ln=True)
         total_amount += item_total
         
-        # Add the image below the table row
-        image_path = item.get('Image', None)
+        # Store current Y position to align all cells in the row
+        y_before = pdf.get_y()
+        
+        # Article column
+        pdf.cell(col_widths[0], row_height, txt=sanitize_text(item['denomination']), border=1)
+        
+        # Image column
+        x_image = pdf.get_x()  # Get X position for the image
+        image_path = item.get('Image')
         if image_path:
-            pdf.ln(5)  # Small space before the image
-            pdf.set_font("Arial", size=10, style='I')
-            pdf.cell(0, 5, txt=sanitize_text(f"Image de l'article: {item['denomination']} - {item['Color']}"), ln=True, align='C')
             try:
-                pdf.image(image_path, x=80, y=pdf.get_y(), w=50)  # Centered, larger image (50mm wide)
-                pdf.ln(50)  # Space after the image (adjust based on image height)
+                pdf.image(image_path, x=x_image, y=y_before, w=col_widths[1])  # Image width matches column width (30mm)
             except Exception as e:
-                pdf.set_font("Arial", size=10)
-                pdf.cell(0, 10, txt="Image non disponible", ln=True, align='C')
-                pdf.ln(10)
-            pdf.ln(5)  # Additional space after the image section
+                pdf.set_xy(x_image, y_before)
+                pdf.cell(col_widths[1], row_height, txt="Image non disponible", border=1)
+        else:
+            pdf.set_xy(x_image, y_before)
+            pdf.cell(col_widths[1], row_height, txt="Image non disponible", border=1)
+        
+        # Move to the next column
+        pdf.set_xy(x_image + col_widths[1], y_before)
+        
+        # Référence column
+        pdf.cell(col_widths[2], row_height, txt=sanitize_text(item['reference']), border=1)
+        
+        # Quantité column
+        pdf.cell(col_widths[3], row_height, txt=str(item['Quantity']), border=1)
+        
+        # Prix column
+        pdf.cell(col_widths[4], row_height, txt=f"{item['Price']:.2f}", border=1)
+        
+        # Total column
+        pdf.cell(col_widths[5], row_height, txt=f"{item_total:.2f}", border=1)
+        
+        pdf.ln(row_height)  # Move to the next row
     
     # Calculate totals
     if discount_type == "Pourcentage":
@@ -265,7 +293,7 @@ def initialize_session_state():
         st.session_state['items'] = []
     if 'transaction_number' not in st.session_state:
         st.session_state['transaction_number'] = 1000
-    initialize_clients_df()  # Initialize clients DataFrame
+    initialize_clients_df()
 
 def proforma_page():
     st.title("Générateur de Facture Proforma")
@@ -276,7 +304,7 @@ def proforma_page():
     if df is None:
         st.error("Échec du chargement des données produits.")
         return
-    clients_df = st.session_state['clients_df']  # Use in-memory DataFrame
+    clients_df = st.session_state['clients_df']
 
     # --- Options Section ---
     with st.expander("Options de la facture", expanded=True):
@@ -307,7 +335,7 @@ def proforma_page():
             if price_type in selected_row.index:
                 st.write(f"**Prix ({price_type}) :** {selected_row[price_type]}")
                 
-                # Parse available colors from couleurs-dispo-usine
+                # Parse available colors
                 colors = []
                 if pd.notna(selected_row['couleurs-dispo-usine']):
                     colors = [color.strip() for color in selected_row['couleurs-dispo-usine'].split(',')]
@@ -318,16 +346,19 @@ def proforma_page():
                     selected_color = None
                     st.warning("Aucune couleur disponible pour cet article.")
                 
-                # Find the image path for the selected color
+                # Find image path
                 image_path = None
                 if selected_color:
                     image_path_rel = find_image_path_for_color(selected_row['images'], selected_color)
                     if image_path_rel:
                         image_path = get_full_image_path(image_path_rel)
                 
-                # Display the image in the UI
+                # Display image preview
                 if image_path:
-                    st.image(image_path, caption=f"Aperçu de l'article ({selected_color})", width=300, use_column_width=False)
+                    st.image(image_path, 
+                           caption=f"Aperçu de l'article ({selected_color})", 
+                           width=150,
+                           use_container_width=False)
                 else:
                     st.warning("Image non disponible pour la couleur sélectionnée.")
                 
@@ -354,7 +385,10 @@ def proforma_page():
                 with col1:
                     st.write(f"{item['denomination']} - {item['reference']} - Couleur: {item['Color']} - {item['Quantity']} x {item['Price']}")
                     if item.get('Image'):
-                        st.image(item['Image'], caption=f"Image de l'article ({item['Color']})", width=150, use_column_width=False)
+                        st.image(item['Image'], 
+                               caption=f"Image de l'article ({item['Color']})", 
+                               width=100,
+                               use_container_width=False)
                 with col2:
                     if st.button(f"Supprimer {i+1}", key=f"delete_item_{i}"):
                         st.session_state['items'].pop(i)
@@ -388,7 +422,7 @@ def proforma_page():
             new_telephone = st.text_input("Telephone", key="new_telephone")
             new_email = st.text_input("Email du client", key="new_email")
             if st.button("Ajouter nouveau client", key="add_new_client"):
-                if new_nom_client:  # Basic validation
+                if new_nom_client:
                     new_client_info = {
                         "nom_client": new_nom_client,
                         "prenom_client": new_prenom_client,
@@ -399,7 +433,7 @@ def proforma_page():
                     }
                     clients_df = add_new_client(clients_df, new_client_info)
                     if clients_df is not None and save_clients_file(clients_df):
-                        st.session_state['clients_df'] = clients_df  # Update in-memory DataFrame
+                        st.session_state['clients_df'] = clients_df
                         client_info = clients_df.iloc[-1].to_dict()
                         st.session_state["client_info_loaded"] = client_info
                         st.session_state["client_index"] = len(clients_df) - 1
@@ -419,7 +453,7 @@ def proforma_page():
             edit_email = st.text_input("Email du client", value=client_info.get("email_client", ""), key="edit_email")
             
             if st.button("Sauvegarder les modifications", key="save_edit_client"):
-                if edit_nom_client:  # Basic validation
+                if edit_nom_client:
                     updated_client_info = {
                         "id_client": client_info["id_client"],
                         "nom_client": edit_nom_client,
@@ -432,7 +466,7 @@ def proforma_page():
                     client_index = st.session_state["client_index"]
                     clients_df.loc[client_index, updated_client_info.keys()] = updated_client_info.values()
                     if save_clients_file(clients_df):
-                        st.session_state['clients_df'] = clients_df  # Update in-memory DataFrame
+                        st.session_state['clients_df'] = clients_df
                         st.session_state["client_info_loaded"] = updated_client_info
                         st.success("Client modifié avec succès !")
                     else:
@@ -526,6 +560,7 @@ def facture_page():
 def main():
     st.sidebar.title("Menu")
     page = st.sidebar.radio("Aller à", ["Proforma", "Bon de Commande", "Bon de Versement", "Catalogue", "Facture"])
+    
     if page == "Proforma":
         proforma_page()
     elif page == "Bon de Commande":
