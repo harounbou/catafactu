@@ -11,6 +11,9 @@ import random
 CLIENTS_FILE = "clients.xlsx"  # Local clients file
 PRODUCTS_FILE = "catafactuapp1.xlsx"  # Local products file
 
+# Image folder path
+IMAGE_FOLDER = os.path.join(os.path.dirname(__file__), "images")
+
 # ------------------------------------------
 # Utility Functions
 # ------------------------------------------
@@ -29,6 +32,16 @@ def sanitize_text(text):
     """Replace unsupported characters in the text with supported ones."""
     text = text.replace("’", "'") if pd.notna(text) else ""
     return text
+
+def get_full_image_path(image_path):
+    """Construct the full path to an image file."""
+    if pd.notna(image_path):
+        # Remove leading slash if present and join with image folder path
+        image_path = image_path.lstrip('/')
+        full_path = os.path.join(IMAGE_FOLDER, image_path)
+        if os.path.exists(full_path):
+            return full_path
+    return None
 
 # ------------------------------------------
 # Client Management Functions
@@ -105,11 +118,13 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf = FPDF()
     pdf.add_page()
     
+    # Add logo
     pdf.image("logo.png", x=10, y=8, w=30)
     pdf.set_font("Arial", size=24, style='B')
     pdf.cell(200, 15, txt=sanitize_text("Facture Proforma Takideco"), ln=True, align='C')
     pdf.ln(10)
     
+    # Issuer information
     pdf.set_font("Arial", size=10)
     pdf.cell(200, 5, txt=sanitize_text("Taki Deco"), ln=True, align='C')
     if show_onama:
@@ -119,6 +134,7 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf.cell(200, 5, txt=sanitize_text("www.takideco.com | email: takidecommercial@gmail.com"), ln=True, align='C')
     pdf.ln(10)
     
+    # Client and transaction information
     pdf.set_font("Arial", size=12)
     pdf.cell(100, 10, txt=sanitize_text(f"Nom de client : {client_info.get('nom_client', '')}"), ln=0)
     pdf.cell(90, 10, txt=sanitize_text(f"N° De transaction : {transaction_info['transaction_number']}"), ln=1, align='R')
@@ -129,8 +145,10 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf.cell(100, 10, txt=sanitize_text(f"Telephone : {client_info.get('telephone_client', '')}"), ln=1)
     pdf.ln(10)
     
+    # Items table header with image column
     pdf.set_font("Arial", size=12, style='B')
-    pdf.cell(80, 10, txt=sanitize_text("Article"), border=1)
+    pdf.cell(30, 10, txt=sanitize_text("Image"), border=1)  # New column for image
+    pdf.cell(50, 10, txt=sanitize_text("Article"), border=1)
     pdf.cell(30, 10, txt=sanitize_text("Référence"), border=1)
     pdf.cell(30, 10, txt=sanitize_text("Quantité"), border=1)
     pdf.cell(30, 10, txt=sanitize_text("Prix"), border=1)
@@ -140,13 +158,30 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     total_amount = 0
     for item in items:
         item_total = item['Quantity'] * item['Price']
-        pdf.cell(80, 10, txt=sanitize_text(item['Denomination']), border=1)
-        pdf.cell(30, 10, txt=sanitize_text(item['Reference']), border=1)
-        pdf.cell(30, 10, txt=sanitize_text(str(item['Quantity'])), border=1)
-        pdf.cell(30, 10, txt=sanitize_text(f"{item['Price']:.2f}"), border=1)
-        pdf.cell(30, 10, txt=sanitize_text(f"{item_total:.2f}"), border=1, ln=True)
+        # Set the Y position before adding the row
+        y_before = pdf.get_y()
+        
+        # Image cell (30mm wide)
+        image_path = item.get('Image', None)
+        if image_path:
+            try:
+                pdf.image(image_path, x=10, y=pdf.get_y(), w=30, h=30)
+            except Exception as e:
+                pdf.cell(30, 10, txt="Image non disponible", border=1)
+        else:
+            pdf.cell(30, 10, txt="", border=1)
+        
+        # Adjust the Y position for text cells to align with image bottom
+        pdf.set_y(y_before)
+        pdf.set_x(40)  # Move to the next column after image
+        pdf.cell(50, 30, txt=sanitize_text(item['denomination']), border=1)  # Updated to denomination
+        pdf.cell(30, 30, txt=sanitize_text(item['reference']), border=1)  # Updated to reference
+        pdf.cell(30, 30, txt=sanitize_text(str(item['Quantity'])), border=1)
+        pdf.cell(30, 30, txt=sanitize_text(f"{item['Price']:.2f}"), border=1)
+        pdf.cell(30, 30, txt=sanitize_text(f"{item_total:.2f}"), border=1, ln=True)
         total_amount += item_total
     
+    # Calculate totals
     if discount_type == "Pourcentage":
         discount_amount = total_amount * (discount_value / 100)
     else:
@@ -218,7 +253,7 @@ def proforma_page():
     st.title("Générateur de Facture Proforma")
     initialize_session_state()
 
-    # Load products data (still cached for performance)
+    # Load products data
     df = read_local_excel(PRODUCTS_FILE)
     if df is None:
         st.error("Échec du chargement des données produits.")
@@ -239,7 +274,8 @@ def proforma_page():
         search_term = st.text_input("Rechercher un article par Dénomination", key="article_search")
         if st.button("Rechercher l'article"):
             if search_term:
-                filtered_df = df[df['Denomination'].str.contains(search_term, case=False, na=False, regex=False)]
+                # Updated to use denomination (lowercase)
+                filtered_df = df[df['denomination'].str.contains(search_term, case=False, na=False, regex=False)]
                 if not filtered_df.empty:
                     st.session_state['filtered_articles'] = filtered_df
                 else:
@@ -249,17 +285,26 @@ def proforma_page():
 
         if 'filtered_articles' in st.session_state:
             filtered_df = st.session_state['filtered_articles']
-            selected_item = st.selectbox("Sélectionnez un article", filtered_df['Denomination'], key="selected_item")
-            selected_row = filtered_df[filtered_df['Denomination'] == selected_item].squeeze()
+            selected_item = st.selectbox("Sélectionnez un article", filtered_df['denomination'], key="selected_item")
+            selected_row = filtered_df[filtered_df['denomination'] == selected_item].squeeze()
             if price_type in selected_row.index:
                 st.write(f"**Prix ({price_type}) :** {selected_row[price_type]}")
+                
+                # Display the item image in the UI
+                image_path = get_full_image_path(selected_row.get('images', None))  # Updated to images (lowercase)
+                if image_path:
+                    st.image(image_path, caption="Aperçu de l'article", width=200)
+                else:
+                    st.warning("Image non disponible pour cet article.")
+                
                 quantity = st.number_input("Quantité", min_value=1, value=1, key="quantity")
                 if st.button("Ajouter l'article", key="add_article"):
                     item_dict = {
-                        "Denomination": selected_row['Denomination'],
-                        "Reference": selected_row['Reference'],
+                        "denomination": selected_row['denomination'],  # Updated to denomination
+                        "reference": selected_row['reference'],  # Updated to reference
                         "Quantity": quantity,
-                        "Price": selected_row[price_type]
+                        "Price": selected_row[price_type],
+                        "Image": image_path  # Add image path for PDF
                     }
                     st.session_state['items'].append(item_dict)
                     st.success("Article ajouté !")
@@ -272,7 +317,9 @@ def proforma_page():
             for i, item in enumerate(st.session_state['items']):
                 col1, col2 = st.columns([4, 1])
                 with col1:
-                    st.write(f"{item['Denomination']} - {item['Reference']} - {item['Quantity']} x {item['Price']}")
+                    st.write(f"{item['denomination']} - {item['reference']} - {item['Quantity']} x {item['Price']}")
+                    if item.get('Image'):
+                        st.image(item['Image'], caption="Image de l'article", width=100)
                 with col2:
                     if st.button(f"Supprimer {i+1}", key=f"delete_item_{i}"):
                         st.session_state['items'].pop(i)
