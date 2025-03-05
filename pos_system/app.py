@@ -1,5 +1,6 @@
 # pos_system/app.py
 import streamlit as st
+import pandas as pd  # Added for pd.notna()
 from datetime import datetime
 from modules.client_management import initialize_clients_df, get_client_info, add_new_client, save_clients
 from modules.product_management import load_products, update_stock, restock_product
@@ -8,12 +9,42 @@ from modules.pdf_generator import generate_receipt_pdf
 from modules.proforma import proforma_page
 from modules.utils import validate_email, validate_phone
 
+# Global CSS styling for the app
 st.markdown(
     """
     <style>
-    .stApp { background-color: #f0f0f0; }
-    button[kind="primary"] { background-color: #90EE90 !important; color: black !important; }
-    button[kind="secondary"] { background-color: #90EE90 !important; color: black !important; }
+    .stApp { 
+        background-color: #f0f0f0; /* Default background for all pages */
+    }
+    button[kind="primary"] { 
+        background-color: #90EE90 !important; 
+        color: black !important; 
+    }
+    button[kind="secondary"] { 
+        background-color: #90EE90 !important; 
+        color: black !important; 
+    }
+    /* Style all text inputs globally */
+    div[data-baseweb="input"] > div {
+        background-color: #e6e6e6; /* Light gray background */
+        border: 1px solid #333; /* Dark border */
+        border-radius: 4px;
+    }
+    /* Style all select boxes globally */
+    div[data-baseweb="select"] > div {
+        background-color: #e6e6e6; /* Light gray background */
+        border: 1px solid #333; /* Dark border */
+        border-radius: 4px;
+    }
+    /* Style placeholder text */
+    input::placeholder {
+        color: #555; /* Darker gray */
+        opacity: 1;
+    }
+    /* Ensure text is black */
+    input, div[data-baseweb="select"] {
+        color: #000 !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -48,7 +79,7 @@ def pos_page():
                             st.success(f"Client {client_name} chargé !")
         elif client_action == "Rechercher un client":
             client_search_method = st.radio("Rechercher par", ["Nom du client", "ID Client"], key="pos_client_search_method")
-            client_search_value = st.text_input("Valeur de recherche", key="pos_client_search_value")
+            client_search_value = st.text_input("Valeur de recherche", placeholder="Tapez le nom du client ou ID", key="pos_client_search_value")
             if st.button("Rechercher client", key="pos_search_client"):
                 if client_search_value:
                     client_info = get_client_info(clients_df, client_search_value, client_search_method)
@@ -59,12 +90,12 @@ def pos_page():
                     else:
                         st.info("Aucun client trouvé.")
         elif client_action == "Ajouter un nouveau client":
-            new_nom_client = st.text_input("Nom du client", key="pos_new_nom_client")
-            new_prenom_client = st.text_input("Prénom du client", key="pos_new_prenom_client")
-            new_nom_entreprise = st.text_input("Nom de l’entreprise", key="pos_new_nom_entreprise")
-            new_adresse = st.text_input("Adresse", key="pos_new_adresse")
-            new_telephone = st.text_input("Telephone", key="pos_new_telephone")
-            new_email = st.text_input("Email du client", key="pos_new_email")
+            new_nom_client = st.text_input("Nom du client", placeholder="Tapez le nom du client", key="pos_new_nom_client")
+            new_prenom_client = st.text_input("Prénom du client", placeholder="Tapez le prénom", key="pos_new_prenom_client")
+            new_nom_entreprise = st.text_input("Nom de l’entreprise", placeholder="Tapez le nom de l’entreprise", key="pos_new_nom_entreprise")
+            new_adresse = st.text_input("Adresse", placeholder="Tapez l’adresse", key="pos_new_adresse")
+            new_telephone = st.text_input("Telephone", placeholder="Tapez le numéro de téléphone", key="pos_new_telephone")
+            new_email = st.text_input("Email du client", placeholder="Tapez l’email", key="pos_new_email")
             if new_email and not validate_email(new_email):
                 st.error("Format d'email invalide.")
             if new_telephone and not validate_phone(new_telephone):
@@ -89,12 +120,12 @@ def pos_page():
                         st.success("Nouveau client ajouté et chargé !")
         elif client_action == "Modifier un client chargé" and "client_info_loaded" in st.session_state:
             client_info = st.session_state["client_info_loaded"]
-            edit_nom_client = st.text_input("Nom du client", value=client_info.get("nom_client", ""), key="pos_edit_nom_client")
-            edit_prenom_client = st.text_input("Prénom du client", value=client_info.get("prenom_client", ""), key="pos_edit_prenom_client")
-            edit_nom_entreprise = st.text_input("Nom de l’entreprise", value=client_info.get("entreprise_client", ""), key="pos_edit_nom_entreprise")
-            edit_adresse = st.text_input("Adresse", value=client_info.get("address_client", ""), key="pos_edit_adresse")
-            edit_telephone = st.text_input("Telephone", value=client_info.get("telephone_client", ""), key="pos_edit_telephone")
-            edit_email = st.text_input("Email du client", value=client_info.get("email_client", ""), key="pos_edit_email")
+            edit_nom_client = st.text_input("Nom du client", value=client_info.get("nom_client", ""), placeholder="Tapez le nom du client", key="pos_edit_nom_client")
+            edit_prenom_client = st.text_input("Prénom du client", value=client_info.get("prenom_client", ""), placeholder="Tapez le prénom", key="pos_edit_prenom_client")
+            edit_nom_entreprise = st.text_input("Nom de l’entreprise", value=client_info.get("entreprise_client", ""), placeholder="Tapez le nom de l’entreprise", key="pos_edit_nom_entreprise")
+            edit_adresse = st.text_input("Adresse", value=client_info.get("address_client", ""), placeholder="Tapez l’adresse", key="pos_edit_adresse")
+            edit_telephone = st.text_input("Telephone", value=client_info.get("telephone_client", ""), placeholder="Tapez le numéro de téléphone", key="pos_edit_telephone")
+            edit_email = st.text_input("Email du client", value=client_info.get("email_client", ""), placeholder="Tapez l’email", key="pos_edit_email")
             if st.button("Sauvegarder les modifications", key="pos_save_edit_client"):
                 updated_client_info = {
                     "id_client": client_info["id_client"],
@@ -120,7 +151,7 @@ def pos_page():
     with st.expander("Articles", expanded=True):
         if 'pos_items' not in st.session_state:
             st.session_state['pos_items'] = []
-        search_term = st.text_input("Rechercher un article", key="pos_search")
+        search_term = st.text_input("Rechercher un article", placeholder="Tapez le nom de l'article", key="pos_search")
         if st.button("Rechercher"):
             filtered_df = products_df[products_df['denomination'].str.contains(search_term, case=False, na=False)]
             if not filtered_df.empty:
@@ -150,26 +181,45 @@ def pos_page():
     with st.expander("Paiement", expanded=True):
         total_amount = sum(item['Quantity'] * item['Price'] for item in st.session_state['pos_items'])
         st.write(f"Total : {total_amount:.2f} DZD")
-        if st.button("Process Sale"):
-            client_info = st.session_state.get("client_info_loaded", None)
-            if not client_info:
-                st.error("Chargez un client !")
-            elif not st.session_state['pos_items']:
-                st.error("Ajoutez des articles !")
-            else:
-                if update_stock(products_df, st.session_state['pos_items']):
-                    transaction_id = record_transaction(client_info, st.session_state['pos_items'], "Full Payment", total_amount, total_amount, status="completed")
-                    transaction_info = {"transaction_number": transaction_id, "transaction_date": datetime.now().strftime("%d/%m/%Y"), "client_id": client_info['id_client']}
-                    pdf_filename = generate_receipt_pdf(transaction_info, st.session_state['pos_items'], total_amount)
-                    with open(pdf_filename, "rb") as file:
-                        st.download_button("Télécharger le reçu", file, pdf_filename, mime="application/pdf")
-                    st.success("Vente terminée !")
-                    st.session_state['pos_items'] = []
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Process Sale"):
+                client_info = st.session_state.get("client_info_loaded", None)
+                if not client_info:
+                    st.error("Chargez un client !")
+                elif not st.session_state['pos_items']:
+                    st.error("Ajoutez des articles !")
+                else:
+                    if update_stock(products_df, st.session_state['pos_items']):
+                        transaction_id = record_transaction(client_info, st.session_state['pos_items'], "Full Payment", total_amount, total_amount, status="completed")
+                        transaction_info = {"transaction_number": transaction_id, "transaction_date": datetime.now().strftime("%d/%m/%Y"), "client_id": client_info['id_client']}
+                        pdf_filename = generate_receipt_pdf(transaction_info, st.session_state['pos_items'], total_amount)
+                        with open(pdf_filename, "rb") as file:
+                            st.download_button("Télécharger le reçu", file, pdf_filename, mime="application/pdf")
+                        st.success("Vente terminée !")
+                        # Reset POS page after sale
+                        if 'pos_items' in st.session_state:
+                            del st.session_state['pos_items']
+                        if 'pos_filtered' in st.session_state:
+                            del st.session_state['pos_filtered']
+                        if 'client_info_loaded' in st.session_state:
+                            del st.session_state['client_info_loaded']
+                        st.rerun()
+        with col2:
+            if st.button("Effacer tout"):
+                if 'pos_items' in st.session_state:
+                    del st.session_state['pos_items']
+                if 'pos_filtered' in st.session_state:
+                    del st.session_state['pos_filtered']
+                if 'client_info_loaded' in st.session_state:
+                    del st.session_state['client_info_loaded']
+                st.success("Tout effacé !")
+                st.rerun()
 
 def restock_page():
     st.title("Re-stocking")
     products_df = load_products()
-    reference = st.text_input("Référence du produit")
+    reference = st.text_input("Référence du produit", placeholder="Tapez la référence", key="restock_reference")
     quantity = st.number_input("Quantité à ajouter", min_value=1)
     cost_per_unit = st.number_input("Coût par unité (DZD)", min_value=0.0)
     if st.button("Restock"):
@@ -178,16 +228,16 @@ def restock_page():
 
 def expenditure_page():
     st.title("Dépenses")
-    assistant_name = st.text_input("Nom de l’assistant")
+    assistant_name = st.text_input("Nom de l’assistant", placeholder="Tapez le nom de l’assistant", key="exp_assistant_name")
     amount = st.number_input("Montant (DZD)", min_value=0.0)
-    description = st.text_area("Description")
+    description = st.text_area("Description", placeholder="Tapez une description")
     if st.button("Enregistrer la dépense"):
         record_expenditure(assistant_name, amount, description)
         st.success("Dépense enregistrée !")
 
 def staff_payment_page():
     st.title("Paiements du personnel")
-    staff_name = st.text_input("Nom du personnel")
+    staff_name = st.text_input("Nom du personnel", placeholder="Tapez le nom du personnel", key="staff_name")
     amount = st.number_input("Montant (DZD)", min_value=0.0)
     if st.button("Enregistrer le paiement"):
         record_staff_payment(staff_name, amount)

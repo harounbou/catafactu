@@ -1,6 +1,6 @@
 # pos_system/modules/proforma.py
 import streamlit as st
-import pandas as pd  # Added for pd.notna()
+import pandas as pd
 from .client_management import get_client_info, add_new_client, save_clients
 from .transaction_management import record_transaction
 from .pdf_generator import generate_proforma_pdf
@@ -9,6 +9,25 @@ from datetime import datetime
 
 def proforma_page(products_df, clients_df):
     st.title("Générateur de Facture Proforma")
+
+    # Override app background and style download button
+    st.markdown(
+        """
+        <style>
+        .stApp { 
+            background-color: #f5f5f5; /* Lighter background for Proforma */
+        }
+        /* Target the download button specifically */
+        div[data-testid="stDownloadButton"] button {
+            background-color: #d4a373 !important; /* Light brown */
+            color: white !important;
+            border: none;
+            border-radius: 4px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
     with st.expander("Options de la facture", expanded=True):
         price_type = st.radio("Type de prix", ["prix-super-gros", "prix-gros", "prix-détail"], key='price_type')
@@ -23,7 +42,7 @@ def proforma_page(products_df, clients_df):
             st.session_state['items'] = []
         categories = ['Toutes'] + sorted(products_df['category'].dropna().unique().tolist())
         selected_category = st.selectbox("Filtrer par catégorie", categories, key="category_filter")
-        search_term = st.text_input("Rechercher un article par Dénomination", key="article_search")
+        search_term = st.text_input("Rechercher un article par Dénomination", placeholder="Tapez le nom de l'article", key="article_search")
         col1, col2 = st.columns([1, 10])
         with col1:
             pass  # No icon displayed
@@ -103,7 +122,7 @@ def proforma_page(products_df, clients_df):
                             st.success(f"Client {client_name} chargé !")
         elif client_action == "Rechercher un client":
             client_search_method = st.radio("Rechercher par", ["Nom du client", "ID Client"], key="client_search_method")
-            client_search_value = st.text_input("Valeur de recherche", key="client_search_value")
+            client_search_value = st.text_input("Valeur de recherche", placeholder="Tapez le nom du client ou ID", key="client_search_value")
             if st.button("Rechercher client"):
                 if client_search_value:
                     client_info = get_client_info(clients_df, client_search_value, client_search_method)
@@ -114,12 +133,12 @@ def proforma_page(products_df, clients_df):
                     else:
                         st.info("Aucun client trouvé.")
         elif client_action == "Ajouter un nouveau client":
-            new_nom_client = st.text_input("Nom du client", key="new_nom_client")
-            new_prenom_client = st.text_input("Prénom du client", key="new_prenom_client")
-            new_nom_entreprise = st.text_input("Nom de l’entreprise", key="new_nom_entreprise")
-            new_adresse = st.text_input("Adresse", key="new_adresse")
-            new_telephone = st.text_input("Telephone", key="new_telephone")
-            new_email = st.text_input("Email du client", key="new_email")
+            new_nom_client = st.text_input("Nom du client", placeholder="Tapez le nom du client", key="new_nom_client")
+            new_prenom_client = st.text_input("Prénom du client", placeholder="Tapez le prénom", key="new_prenom_client")
+            new_nom_entreprise = st.text_input("Nom de l’entreprise", placeholder="Tapez le nom de l’entreprise", key="new_nom_entreprise")
+            new_adresse = st.text_input("Adresse", placeholder="Tapez l’adresse", key="new_adresse")
+            new_telephone = st.text_input("Telephone", placeholder="Tapez le numéro de téléphone", key="new_telephone")
+            new_email = st.text_input("Email du client", placeholder="Tapez l’email", key="new_email")
             if new_email and not validate_email(new_email):
                 st.error("Format d'email invalide.")
             if new_telephone and not validate_phone(new_telephone):
@@ -144,12 +163,12 @@ def proforma_page(products_df, clients_df):
                         st.success("Nouveau client ajouté et chargé !")
         elif client_action == "Modifier un client chargé" and "client_info_loaded" in st.session_state:
             client_info = st.session_state["client_info_loaded"]
-            edit_nom_client = st.text_input("Nom du client", value=client_info.get("nom_client", ""), key="edit_nom_client")
-            edit_prenom_client = st.text_input("Prénom du client", value=client_info.get("prenom_client", ""), key="edit_prenom_client")
-            edit_nom_entreprise = st.text_input("Nom de l’entreprise", value=client_info.get("entreprise_client", ""), key="edit_nom_entreprise")
-            edit_adresse = st.text_input("Adresse", value=client_info.get("address_client", ""), key="edit_adresse")
-            edit_telephone = st.text_input("Telephone", value=client_info.get("telephone_client", ""), key="edit_telephone")
-            edit_email = st.text_input("Email du client", value=client_info.get("email_client", ""), key="edit_email")
+            edit_nom_client = st.text_input("Nom du client", value=client_info.get("nom_client", ""), placeholder="Tapez le nom du client", key="edit_nom_client")
+            edit_prenom_client = st.text_input("Prénom du client", value=client_info.get("prenom_client", ""), placeholder="Tapez le prénom", key="edit_prenom_client")
+            edit_nom_entreprise = st.text_input("Nom de l’entreprise", value=client_info.get("entreprise_client", ""), placeholder="Tapez le nom de l’entreprise", key="edit_nom_entreprise")
+            edit_adresse = st.text_input("Adresse", value=client_info.get("address_client", ""), placeholder="Tapez l’adresse", key="edit_adresse")
+            edit_telephone = st.text_input("Telephone", value=client_info.get("telephone_client", ""), placeholder="Tapez le numéro de téléphone", key="edit_telephone")
+            edit_email = st.text_input("Email du client", value=client_info.get("email_client", ""), placeholder="Tapez l’email", key="edit_email")
             if st.button("Sauvegarder les modifications", key="save_edit_client"):
                 updated_client_info = {
                     "id_client": client_info["id_client"],
@@ -173,6 +192,22 @@ def proforma_page(products_df, clients_df):
                     st.write(f"{key}: {value}")
 
     with st.expander("Générer la facture", expanded=True):
+        # Show "Effacer tout" only if proforma hasn't been generated yet
+        if not st.session_state.get('proforma_generated', False):
+            if st.button("Effacer tout", key="clear_all_before_generate"):
+                if 'items' in st.session_state:
+                    del st.session_state['items']
+                if 'filtered_articles' in st.session_state:
+                    del st.session_state['filtered_articles']
+                if 'client_info_loaded' in st.session_state:
+                    del st.session_state['client_info_loaded']
+                if 'proforma_generated' in st.session_state:
+                    del st.session_state['proforma_generated']
+                if 'pdf_filename' in st.session_state:
+                    del st.session_state['pdf_filename']
+                st.success("Tout effacé !")
+                st.rerun()
+
         client_info = st.session_state.get("client_info_loaded", {
             "nom_client": "", "prenom_client": "", "entreprise_client": "", "address_client": "", "telephone_client": "", "email_client": "", "id_client": "N/A"
         })
@@ -184,20 +219,47 @@ def proforma_page(products_df, clients_df):
         st.write(f"N° De transaction : {transaction_info['transaction_number']}")
         st.write(f"Date de transaction : {transaction_info['transaction_date']}")
         st.write(f"ID Client : {transaction_info['client_id']}")
-        if st.button("Générer la facture proforma"):
-            if st.session_state['items'] and "client_info_loaded" in st.session_state:
-                total_amount = sum(item['Quantity'] * item['Price'] for item in st.session_state['items'])
-                transaction_id = record_transaction(client_info, st.session_state['items'], "Proforma", 0, total_amount)
-                transaction_info["transaction_number"] = transaction_id
-                pdf_filename = generate_proforma_pdf(
-                    st.session_state['items'], price_type, client_info, transaction_info,
-                    apply_tva, discount_type, discount_value, show_onama, delivery_days
-                )
-                with open(pdf_filename, "rb") as file:
-                    st.download_button("Télécharger la facture proforma", file, pdf_filename, mime="application/pdf")
-                st.session_state['transaction_number'] = transaction_id + 1
-                st.success("Facture générée !")
-                del st.session_state["client_info_loaded"]
-                st.session_state['items'] = []
-            else:
-                st.error("Ajoutez des articles et chargez un client !")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Générer la facture proforma"):
+                if st.session_state['items'] and "client_info_loaded" in st.session_state:
+                    total_amount = sum(item['Quantity'] * item['Price'] for item in st.session_state['items'])
+                    transaction_id = record_transaction(client_info, st.session_state['items'], "Proforma", 0, total_amount)
+                    transaction_info["transaction_number"] = transaction_id
+                    pdf_filename = generate_proforma_pdf(
+                        st.session_state['items'], price_type, client_info, transaction_info,
+                        apply_tva, discount_type, discount_value, show_onama, delivery_days
+                    )
+                    st.session_state['pdf_filename'] = pdf_filename
+                    st.session_state['transaction_number'] = transaction_id + 1
+                    st.session_state['proforma_generated'] = True
+                    st.success("Facture générée !")
+                else:
+                    st.error("Ajoutez des articles et chargez un client !")
+
+        # Show download and reset buttons only after generation
+        if st.session_state.get('proforma_generated', False):
+            with col1:
+                with open(st.session_state['pdf_filename'], "rb") as file:
+                    st.download_button(
+                        label="Télécharger la facture proforma",
+                        data=file,
+                        file_name=st.session_state['pdf_filename'],
+                        mime="application/pdf",
+                        key="download_proforma"
+                    )
+            with col2:
+                if st.button("Commencer une nouvelle proforma", key="reset_after_download"):
+                    if 'items' in st.session_state:
+                        del st.session_state['items']
+                    if 'filtered_articles' in st.session_state:
+                        del st.session_state['filtered_articles']
+                    if 'client_info_loaded' in st.session_state:
+                        del st.session_state['client_info_loaded']
+                    if 'proforma_generated' in st.session_state:
+                        del st.session_state['proforma_generated']
+                    if 'pdf_filename' in st.session_state:
+                        del st.session_state['pdf_filename']
+                    st.success("Nouvelle proforma commencée !")
+                    st.rerun()

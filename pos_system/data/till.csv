@@ -1,2 +1,21 @@
 date,amount,direction,description,balance
 05/03/2025,6000,in,proforma Transaction 1000,6000
+05/03/2025,6000,in,proforma Transaction 1001,12000
+05/03/2025,6400,in,proforma Transaction 1002,18400
+05/03/2025,6400,in,proforma Transaction 1003,24800
+05/03/2025,6400,in,proforma Transaction 1004,31200
+05/03/2025,11000,in,proforma Transaction 1005,42200
+05/03/2025,6000,in,proforma Transaction 1006,48200
+05/03/2025,6000,in,proforma Transaction 1007,54200
+05/03/2025,17000,in,proforma Transaction 1008,71200
+05/03/2025,68500,in,proforma Transaction 1009,139700
+05/03/2025,68500,in,proforma Transaction 1010,208200
+05/03/2025,73500,in,proforma Transaction 1011,281700
+05/03/2025,11000,in,proforma Transaction 1012,292700
+05/03/2025,11000,in,proforma Transaction 1013,303700
+05/03/2025,17000,in,proforma Transaction 1014,320700
+05/03/2025,17000,in,proforma Transaction 1015,337700
+05/03/2025,17000,in,proforma Transaction 1016,354700
+05/03/2025,11000,in,proforma Transaction 1017,365700
+05/03/2025,6000,in,proforma Transaction 1018,371700
+05/03/2025,11000,in,proforma Transaction 1019,382700
