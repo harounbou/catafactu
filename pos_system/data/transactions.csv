@@ -1,0 +1,2 @@
+transaction_id,date,client_id,items,total_amount,status,payment_type,deposit_amount,remaining_amount
+1000,05/03/2025,2014,"[{""denomination"": ""CHAISE NAPOLEON"", ""reference"": ""FR0005"", ""Quantity"": 1, ""Price"": 6000, ""Color"": ""golden"", ""Image"": ""/Users/h.boukhalfa/Desktop/catafactuappfull/catafactu/pos_system/images/CHAIR/CHAISE_NAPOLEON/FR0005_GOLDEN.jpg"", ""category"": ""CHAIR""}]",6000,proforma,Proforma,0,0
