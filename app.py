@@ -17,7 +17,7 @@ PRODUCTS_FILE = "catafactuapp1.xlsx"  # Local products file
 IMAGE_FOLDER = os.path.join(os.path.dirname(__file__), "images")
 
 # Regex for email and phone validation
-EMAIL_REGEX = r'^[a-zA-Z0.9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\d{10}$'  # Adjust based on your phone number format (e.g., 10 digits)
 
 # Set grey background and light green buttons with custom CSS
@@ -57,6 +57,13 @@ def read_local_excel(file_path):
 def sanitize_text(text):
     """Replace unsupported characters in the text with supported ones."""
     return text.replace("’", "'") if pd.notna(text) else ""
+
+def truncate_text(text, max_length=14):
+    """Truncate text to max_length characters and append ellipsis if longer than max_length + 1."""
+    text = str(text)  # Ensure text is a string
+    if len(text) >= 15:
+        return text[:max_length] + "..."
+    return text
 
 def get_full_image_path(image_path):
     """Construct the full path to an image file with extension fallback."""
@@ -192,11 +199,11 @@ def get_next_available_row(clients_df):
 def add_new_client(clients_df, client_info):
     """Add a new client to the clients DataFrame with the next available id_client."""
     next_row = get_next_available_row(clients_df)
-    # Get the maximum id_client and increment by 1
+    # Get the maximum id_client and increment by 1, ensuring it starts from 2000 if empty
     if 'id_client' not in client_info:
         existing_ids = clients_df['id_client'].dropna().astype(int)
         if existing_ids.empty:
-            client_info['id_client'] = 1  # Start with 1 if no IDs exist
+            client_info['id_client'] = 2000  # Start with 2000 if no IDs exist
         else:
             client_info['id_client'] = int(existing_ids.max()) + 1
 
@@ -311,8 +318,9 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
             # Store current Y position to align all cells in the row
             y_before = pdf.get_y()
             
-            # Article column
-            pdf.cell(col_widths[0], row_height, txt=sanitize_text(item['denomination']), border=1)
+            # Article column with truncation
+            article_text = truncate_text(item['denomination'])
+            pdf.cell(col_widths[0], row_height, txt=sanitize_text(article_text), border=1)
             
             # Image column
             x_image = pdf.get_x()
@@ -327,16 +335,17 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
                     pdf.image(image_path, x=x_image + x_offset, y=y_before + y_offset, w=scaled_width_mm, h=scaled_height_mm)
                 except Exception as e:
                     pdf.set_xy(x_image, y_before)
-                    pdf.cell(col_widths[1], row_height, txt="Image non disponible", border=1)
+                    pdf.cell(col_widths[1], row_height, txt="Pas d'Image", border=1)
             else:
                 pdf.set_xy(x_image, y_before)
-                pdf.cell(col_widths[1], row_height, txt="Image non disponible", border=1)
+                pdf.cell(col_widths[1], row_height, txt="Pas d'Image", border=1)
             
             # Move to the next column
             pdf.set_xy(x_image + col_widths[1], y_before)
             
-            # Référence column
-            pdf.cell(col_widths[2], row_height, txt=sanitize_text(item['reference']), border=1)
+            # Référence column with truncation
+            reference_text = truncate_text(item['reference'])
+            pdf.cell(col_widths[2], row_height, txt=sanitize_text(reference_text), border=1)
             
             # Quantité column
             pdf.cell(col_widths[3], row_height, txt=str(item['Quantity']), border=1)
@@ -550,7 +559,7 @@ def proforma_page():
                         client_info['index'] = client.index[0]  # Add the index key
                         client_name = client_info.get('nom_client', 'Inconnu')
                         if st.button(f"Charger {client_name} (ID: {client_id})", key=f"recent_{client_id}"):
-                            st.session_state["client_info_loaded"] = {k: v for k, v in client_info.items() if k != 'index'}
+                            st.session_state["client_info_loaded"] = client_info
                             st.session_state["client_index"] = client_info['index']
                             st.success(f"Client {client_name} chargé !")
                             st.write(f"Loaded client ID from recent: {st.session_state['client_info_loaded'].get('id_client')}")  # Debug log
@@ -562,7 +571,7 @@ def proforma_page():
                 if client_search_value:
                     client_info = get_client_info(clients_df, client_search_value, client_search_method)
                     if client_info:
-                        st.session_state["client_info_loaded"] = {k: v for k, v in client_info.items() if k != 'index'}
+                        st.session_state["client_info_loaded"] = client_info
                         st.session_state["client_index"] = client_info['index']
                         st.success(f"Client {client_info.get('nom_client', 'Inconnu')} chargé !")
                         st.write(f"Loaded client ID from search: {st.session_state['client_info_loaded'].get('id_client')}")  # Debug log
@@ -676,7 +685,7 @@ def proforma_page():
             "address_client": "",
             "telephone_client": "",
             "email_client": "",
-            "id_client": "N/A"
+            "id_client": "N/A"  # This should now be overwritten by the actual id_client
         })
         transaction_info = {
             "transaction_number": st.session_state['transaction_number'],
@@ -690,29 +699,33 @@ def proforma_page():
 
         if st.button("Générer la facture proforma"):
             if st.session_state['items']:
-                pdf_filename = generate_pdf(
-                    st.session_state['items'],
-                    price_type,
-                    client_info_for_pdf,
-                    transaction_info,
-                    apply_tva,
-                    discount_type,
-                    discount_value,
-                    show_onama,
-                    delivery_days
-                )
-                with open(pdf_filename, "rb") as file:
-                    st.download_button(
-                        label="Télécharger la facture proforma",
-                        data=file,
-                        file_name=pdf_filename,
-                        mime="application/pdf"
+                # Ensure a client is loaded before generating the PDF
+                if "client_info_loaded" not in st.session_state:
+                    st.error("Veuillez charger un client avant de générer la facture.")
+                else:
+                    pdf_filename = generate_pdf(
+                        st.session_state['items'],
+                        price_type,
+                        client_info_for_pdf,
+                        transaction_info,
+                        apply_tva,
+                        discount_type,
+                        discount_value,
+                        show_onama,
+                        delivery_days
                     )
-                st.session_state['transaction_number'] += 1
-                st.success("Facture générée !")
-                # Clear client info after PDF generation
-                if "client_info_loaded" in st.session_state:
-                    del st.session_state["client_info_loaded"]
+                    with open(pdf_filename, "rb") as file:
+                        st.download_button(
+                            label="Télécharger la facture proforma",
+                            data=file,
+                            file_name=pdf_filename,
+                            mime="application/pdf"
+                        )
+                    st.session_state['transaction_number'] += 1
+                    st.success("Facture générée !")
+                    # Clear client info after PDF generation
+                    if "client_info_loaded" in st.session_state:
+                        del st.session_state["client_info_loaded"]
             else:
                 st.error("Ajoutez au moins un article avant de générer la facture.")
 
@@ -740,7 +753,11 @@ def catalogue_page():
 
 def facture_page():
     st.title("Facture")
-    st.write("Cette page is en cours de développement.")
+    st.write("Cette page est en cours de développement.")
+
+def pos_page():
+    st.title("POS")
+    st.write("Cette page est en cours de développement.")
 
 # ------------------------------------------
 # Main App
@@ -748,7 +765,7 @@ def facture_page():
 
 def main():
     st.sidebar.title("Menu")
-    page = st.sidebar.radio("Aller à", ["Proforma", "Bon de Commande", "Bon de Versement", "Catalogue", "Facture"])
+    page = st.sidebar.radio("Aller à", ["Proforma", "Bon de Commande", "Bon de Versement", "Catalogue", "Facture", "POS"])
     
     if page == "Proforma":
         proforma_page()
@@ -760,6 +777,8 @@ def main():
         catalogue_page()
     elif page == "Facture":
         facture_page()
+    elif page == "POS":
+        pos_page()
 
 if __name__ == "__main__":
     main()
