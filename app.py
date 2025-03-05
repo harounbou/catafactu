@@ -1,12 +1,13 @@
 import streamlit as st
 import pandas as pd
-from fpdf.fpdf import FPDF  # Updated import for fpdf2
+from fpdf.fpdf import FPDF
 import os
 from io import BytesIO
 from num2words import num2words
 from datetime import datetime
 import random
 import re
+from PIL import Image  # For handling image dimensions
 
 # Local files
 CLIENTS_FILE = "clients.xlsx"  # Local clients file
@@ -16,8 +17,28 @@ PRODUCTS_FILE = "catafactuapp1.xlsx"  # Local products file
 IMAGE_FOLDER = os.path.join(os.path.dirname(__file__), "images")
 
 # Regex for email and phone validation
-EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+EMAIL_REGEX = r'^[a-zA-Z0.9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\d{10}$'  # Adjust based on your phone number format (e.g., 10 digits)
+
+# Set grey background and light green buttons with custom CSS
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #f0f0f0;  /* Light grey background */
+    }
+    button[kind="primary"] {
+        background-color: #90EE90 !important;  /* Light green for primary buttons */
+        color: black !important;
+    }
+    button[kind="secondary"] {
+        background-color: #90EE90 !important;  /* Light green for secondary buttons */
+        color: black !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # ------------------------------------------
 # Utility Functions
@@ -76,6 +97,40 @@ def find_image_path_for_color(images_str, selected_color):
                 return path
     return None
 
+def get_image_dimensions(image_path):
+    """Get the dimensions of an image in pixels."""
+    try:
+        with Image.open(image_path) as img:
+            width, height = img.size
+        return width, height
+    except Exception as e:
+        st.warning(f"Could not get dimensions for image {image_path}: {e}")
+        return None, None
+
+def calculate_image_dimensions(image_path, max_width_mm, max_height_mm):
+    """Calculate scaled image dimensions in mm while maintaining aspect ratio."""
+    # Convert max dimensions from mm to pixels (FPDF DPI is approximately 72)
+    DPI = 72
+    MM_PER_INCH = 25.4
+    max_width_px = (max_width_mm / MM_PER_INCH) * DPI
+    max_height_px = (max_height_mm / MM_PER_INCH) * DPI
+
+    # Get original dimensions
+    width_px, height_px = get_image_dimensions(image_path)
+    if width_px is None or height_px is None:
+        return max_width_mm, max_height_mm  # Fallback to max dimensions
+
+    # Calculate scaling factor to fit within max dimensions while maintaining aspect ratio
+    width_scaling = max_width_px / width_px
+    height_scaling = max_height_px / height_px
+    scaling_factor = min(width_scaling, height_scaling)
+
+    # Calculate new dimensions in mm
+    new_width_mm = (width_px * scaling_factor) * MM_PER_INCH / DPI
+    new_height_mm = (height_px * scaling_factor) * MM_PER_INCH / DPI
+
+    return new_width_mm, new_height_mm
+
 def validate_email(email):
     """Validate email format using regex."""
     if not email:
@@ -111,7 +166,8 @@ def get_client_info(clients_df, search_value, search_method):
     """Check if a client exists based on the search method and return their info with index."""
     if not clients_df.empty:
         if search_method == "Nom du client":
-            client = clients_df[clients_df['nom_client'].astype(str).str.contains(search_value, case=False, na=False)]
+            # Use exact match for name to avoid picking the wrong client
+            client = clients_df[clients_df['nom_client'].astype(str).str.lower() == search_value.lower()]
         elif search_method == "ID Client":
             try:
                 client_id = int(search_value)
@@ -121,6 +177,7 @@ def get_client_info(clients_df, search_value, search_method):
         if not client.empty:
             client_info = client.iloc[0].to_dict()
             client_info['index'] = client.index[0]  # Store the index
+            st.write(f"Retrieved client info: {client_info}")  # Debug log
             return client_info
     return None
 
@@ -133,13 +190,15 @@ def get_next_available_row(clients_df):
     return len(clients_df)
 
 def add_new_client(clients_df, client_info):
-    """Add a new client to the clients DataFrame."""
+    """Add a new client to the clients DataFrame with the next available id_client."""
     next_row = get_next_available_row(clients_df)
+    # Get the maximum id_client and increment by 1
     if 'id_client' not in client_info:
         existing_ids = clients_df['id_client'].dropna().astype(int)
-        client_info['id_client'] = 2000 if existing_ids.empty else existing_ids.max() + 1
-    if client_info['id_client'] > 5000:
-        client_info['id_client'] = 2000
+        if existing_ids.empty:
+            client_info['id_client'] = 1  # Start with 1 if no IDs exist
+        else:
+            client_info['id_client'] = int(existing_ids.max()) + 1
 
     if next_row < len(clients_df):
         clients_df.loc[next_row, client_info.keys()] = client_info.values()
@@ -148,6 +207,7 @@ def add_new_client(clients_df, client_info):
     
     # Add to recent clients
     client_id = client_info['id_client']
+    st.write(f"Assigned new client ID: {client_id}")  # Debug log
     if client_id not in st.session_state['recent_clients']:
         st.session_state['recent_clients'].insert(0, client_id)
         if len(st.session_state['recent_clients']) > 5:  # Keep only the 5 most recent
@@ -169,8 +229,12 @@ def save_clients_file(clients_df):
 # ------------------------------------------
 
 def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, discount_type, discount_value, show_onama, delivery_days):
-    pdf = FPDF()  # Use standard FPDF class (footer removed)
+    pdf = FPDF()
     pdf.add_page()
+    
+    # Debug log
+    st.write(f"Generating PDF with client info: {client_info}")
+    st.write(f"Transaction info: {transaction_info}")
     
     # Add logo
     pdf.image("logo.png", x=10, y=8, w=30)
@@ -199,7 +263,7 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf.cell(100, 10, txt=sanitize_text(f"Telephone : {client_info.get('telephone_client', '')}"), ln=1)
     pdf.ln(10)
     
-    # Calculate totals (still needed for the detailed totals section at the bottom)
+    # Calculate totals (for the detailed totals section at the bottom)
     total_amount = sum(item['Quantity'] * item['Price'] for item in items)
     if discount_type == "Pourcentage":
         discount_amount = total_amount * (discount_value / 100)
@@ -222,7 +286,7 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
             items_by_category[category] = []
         items_by_category[category].append(item)
 
-    # Items table with Image column (Dim Image column removed)
+    # Items table with Image column
     for category, category_items in sorted(items_by_category.items()):
         # Category header
         pdf.set_font("Arial", size=14, style='B')
@@ -255,7 +319,12 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
             image_path = item.get('Image')
             if image_path:
                 try:
-                    pdf.image(image_path, x=x_image, y=y_before, w=col_widths[1])
+                    # Calculate scaled dimensions to fit within 30mm x 30mm while maintaining aspect ratio
+                    scaled_width_mm, scaled_height_mm = calculate_image_dimensions(image_path, col_widths[1], row_height)
+                    # Center the image within the cell
+                    x_offset = (col_widths[1] - scaled_width_mm) / 2
+                    y_offset = (row_height - scaled_height_mm) / 2
+                    pdf.image(image_path, x=x_image + x_offset, y=y_before + y_offset, w=scaled_width_mm, h=scaled_height_mm)
                 except Exception as e:
                     pdf.set_xy(x_image, y_before)
                     pdf.cell(col_widths[1], row_height, txt="Image non disponible", border=1)
@@ -279,6 +348,7 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
             pdf.cell(col_widths[5], row_height, txt=f"{item_total:.2f}", border=1)
             
             pdf.ln(row_height)  # Move to the next row
+            pdf.ln(3)  # Add 3mm padding between rows
         
         pdf.ln(5)  # Space between categories
 
@@ -291,12 +361,26 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
     pdf.cell(30, 10, txt=sanitize_text(f"{discount_amount:.2f}"), border=1, ln=True)
     pdf.cell(160, 10, txt=sanitize_text("Montant Total Après Remise (HT) :"), border=0)
     pdf.cell(30, 10, txt=sanitize_text(f"{total_amount_after_discount:.2f}"), border=1, ln=True)
+    
+    # Add TVA and Total TTC (if applicable)
     if apply_tva:
         pdf.cell(160, 10, txt=sanitize_text("TVA (19%) :"), border=0)
         pdf.cell(30, 10, txt=sanitize_text(f"{tva_amount:.2f}"), border=1, ln=True)
         pdf.cell(160, 10, txt=sanitize_text("Montant Total (TTC) :"), border=0)
         pdf.cell(30, 10, txt=sanitize_text(f"{total_amount_with_tva:.2f}"), border=1, ln=True)
     
+    # Place "Arrêter la présente facture proforma" after Total TTC
+    try:
+        total_amount_words = num2words(int(total_amount_with_tva), lang='fr')
+    except OverflowError:
+        total_amount_words = "Montant très élevé"
+    
+    pdf.ln(10)
+    pdf.set_font("Arial", size=10, style='I')
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(200, 10, txt=sanitize_text(f"Arrêter la présente facture proforma à la somme de : {total_amount_words} dinars."), ln=True)
+    
+    # Terms and conditions
     pdf.ln(10)
     pdf.set_font("Arial", size=8)
     pdf.set_text_color(0, 0, 128)
@@ -311,16 +395,6 @@ def generate_pdf(items, price_type, client_info, transaction_info, apply_tva, di
         "\nFrais d’expédition :\n"
         "Les frais d’expédition sont à la charge du client. L’expédition peut être organisée par le client ou coordonnée par notre société, avec les frais facturés séparément."
     ))
-    
-    try:
-        total_amount_words = num2words(int(total_amount_with_tva), lang='fr')
-    except OverflowError:
-        total_amount_words = "Montant très élevé"
-    
-    pdf.ln(10)
-    pdf.set_font("Arial", size=10, style='I')
-    pdf.set_text_color(0, 0, 0)
-    pdf.cell(200, 10, txt=sanitize_text(f"Arrêter la présente facture proforma à la somme de : {total_amount_words} dinars."), ln=True)
     
     pdf_filename = f"Proforma-{client_info.get('nom_client', 'Client')}-{datetime.now().strftime('%d%m%Y')}.pdf"
     pdf.output(pdf_filename)
@@ -367,17 +441,22 @@ def proforma_page():
         selected_category = st.selectbox("Filtrer par catégorie", categories, key="category_filter")
         
         search_term = st.text_input("Rechercher un article par Dénomination", key="article_search")
-        if st.button("Rechercher l'article"):
-            if search_term:
-                filtered_df = df[df['denomination'].str.contains(search_term, case=False, na=False, regex=False)]
-                if selected_category != 'Toutes':
-                    filtered_df = filtered_df[filtered_df['category'] == selected_category]
-                if not filtered_df.empty:
-                    st.session_state['filtered_articles'] = filtered_df
+        # Add icon next to the search button
+        col1, col2 = st.columns([1, 10])
+        with col1:
+            st.image("armchair.png", width=30)
+        with col2:
+            if st.button("Rechercher l'article"):
+                if search_term:
+                    filtered_df = df[df['denomination'].str.contains(search_term, case=False, na=False, regex=False)]
+                    if selected_category != 'Toutes':
+                        filtered_df = filtered_df[filtered_df['category'] == selected_category]
+                    if not filtered_df.empty:
+                        st.session_state['filtered_articles'] = filtered_df
+                    else:
+                        st.error("Aucun article trouvé.")
                 else:
-                    st.error("Aucun article trouvé.")
-            else:
-                st.warning("Veuillez entrer un terme de recherche.")
+                    st.warning("Veuillez entrer un terme de recherche.")
 
         if 'filtered_articles' in st.session_state:
             filtered_df = st.session_state['filtered_articles']
@@ -408,7 +487,7 @@ def proforma_page():
                     if image_path_rel:
                         image_path = get_full_image_path(image_path_rel)
                 
-                # Display only the main image (dimension image removed)
+                # Display only the main image
                 if image_path:
                     st.image(image_path, caption=f"Aperçu de l'article ({selected_color})", width=150, use_container_width=False)
                 else:
@@ -468,13 +547,13 @@ def proforma_page():
                     client = clients_df[clients_df['id_client'] == client_id]
                     if not client.empty:
                         client_info = client.iloc[0].to_dict()
+                        client_info['index'] = client.index[0]  # Add the index key
                         client_name = client_info.get('nom_client', 'Inconnu')
                         if st.button(f"Charger {client_name} (ID: {client_id})", key=f"recent_{client_id}"):
                             st.session_state["client_info_loaded"] = {k: v for k, v in client_info.items() if k != 'index'}
                             st.session_state["client_index"] = client_info['index']
                             st.success(f"Client {client_name} chargé !")
-            else:
-                st.info("Aucun client récent trouvé.")
+                            st.write(f"Loaded client ID from recent: {st.session_state['client_info_loaded'].get('id_client')}")  # Debug log
 
         elif client_action == "Rechercher un client":
             client_search_method = st.radio("Rechercher par", ["Nom du client", "ID Client"], key="client_search_method")
@@ -486,6 +565,7 @@ def proforma_page():
                         st.session_state["client_info_loaded"] = {k: v for k, v in client_info.items() if k != 'index'}
                         st.session_state["client_index"] = client_info['index']
                         st.success(f"Client {client_info.get('nom_client', 'Inconnu')} chargé !")
+                        st.write(f"Loaded client ID from search: {st.session_state['client_info_loaded'].get('id_client')}")  # Debug log
                     else:
                         st.info("Aucun client trouvé.")
                 else:
@@ -524,9 +604,11 @@ def proforma_page():
                         if clients_df is not None and save_clients_file(clients_df):
                             st.session_state['clients_df'] = clients_df
                             client_info = clients_df.iloc[-1].to_dict()
+                            client_info['index'] = len(clients_df) - 1  # Set the index for the new client
                             st.session_state["client_info_loaded"] = client_info
-                            st.session_state["client_index"] = len(clients_df) - 1
+                            st.session_state["client_index"] = client_info['index']
                             st.success("Nouveau client ajouté et chargé !")
+                            st.write(f"Loaded new client ID: {st.session_state['client_info_loaded'].get('id_client')}")  # Debug log
                         else:
                             st.error("Échec de l'ajout du client.")
                 else:
@@ -567,8 +649,10 @@ def proforma_page():
                         clients_df.loc[client_index, updated_client_info.keys()] = updated_client_info.values()
                         if save_clients_file(clients_df):
                             st.session_state['clients_df'] = clients_df
+                            updated_client_info['index'] = client_index  # Preserve the index
                             st.session_state["client_info_loaded"] = updated_client_info
                             st.success("Client modifié avec succès !")
+                            st.write(f"Updated client ID: {st.session_state['client_info_loaded'].get('id_client')}")  # Debug log
                         else:
                             st.error("Échec de la sauvegarde des modifications.")
                 else:
@@ -582,18 +666,22 @@ def proforma_page():
 
     # --- Transaction and PDF Generation ---
     with st.expander("Générer la facture", expanded=True):
+        # Debug current state
+        st.write(f"Current client_info_loaded: {st.session_state.get('client_info_loaded', 'Not set')}")
+        
         client_info_for_pdf = st.session_state.get("client_info_loaded", {
             "nom_client": "",
             "prenom_client": "",
             "entreprise_client": "",
             "address_client": "",
             "telephone_client": "",
-            "email_client": ""
+            "email_client": "",
+            "id_client": "N/A"
         })
         transaction_info = {
             "transaction_number": st.session_state['transaction_number'],
             "transaction_date": datetime.now().strftime("%d/%m/%Y"),
-            "client_id": client_info_for_pdf.get("id_client", random.randint(1000, 9999))
+            "client_id": client_info_for_pdf.get("id_client", "N/A")
         }
         
         st.write(f"N° De transaction : {transaction_info['transaction_number']}")
@@ -622,6 +710,7 @@ def proforma_page():
                     )
                 st.session_state['transaction_number'] += 1
                 st.success("Facture générée !")
+                # Clear client info after PDF generation
                 if "client_info_loaded" in st.session_state:
                     del st.session_state["client_info_loaded"]
             else:
