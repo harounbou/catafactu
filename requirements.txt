@@ -1,9 +1,0 @@
-streamlit
-pandas
-fpdf
-boto3
-openpyxl
-num2words
-gdown
-numpy
-
