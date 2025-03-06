@@ -76,10 +76,13 @@ def save_users(users_data):
         json.dump(users_data, f)
 
 def login():
-    if 'logged_in' not in st.session_state:
-        st.session_state['logged_in'] = False
-    if 'user' not in st.session_state:
-        st.session_state['user'] = None
+    # Check if already logged in
+    if st.session_state.get('logged_in', False):
+        return True
+
+    # Initialize session state variables
+    st.session_state.setdefault('logged_in', False)
+    st.session_state.setdefault('user', None)
 
     users_data = load_users()
     access_control_enabled = users_data.get("access_control_enabled", False)
@@ -101,7 +104,8 @@ def login():
                 st.session_state['logged_in'] = True
                 st.session_state['user'] = user
                 st.success(f"Bienvenue, {username} !")
-                st.rerun()
+                st.rerun()  # Force full script rerun
+                return True
             else:
                 st.error("Mot de passe incorrect.")
         else:
