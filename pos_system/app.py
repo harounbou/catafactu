@@ -409,7 +409,12 @@ def main():
     user = st.session_state['user']
     menu_options = user["access"]
     st.sidebar.title(f"Menu - {user['username']} ({user['role'].capitalize()})")
+    if st.sidebar.button("Déconnexion"):
+        st.session_state['logged_in'] = False
+        st.session_state['user'] = None
+        st.rerun()
     page = st.sidebar.radio("Aller à", menu_options + ["Changer le mot de passe"])
+    # Rest of main()...
     initialize_session_state()
     products_df = load_products()
     clients_df = st.session_state['clients_df']
