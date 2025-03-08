@@ -116,7 +116,7 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
     pdf.output(pdf_filename)
     return pdf_filename
 
-def generate_receipt_pdf(transaction_info, items, payment_amount):
+def generate_receipt_pdf(transaction_info, items, payment_amount, discount_amount=0.0, payment_details=""):
     pdf = FPDF()
     pdf.add_page()
     pdf.image(get_full_image_path("logo.png"), x=10, y=8, w=30)
@@ -127,10 +127,13 @@ def generate_receipt_pdf(transaction_info, items, payment_amount):
     pdf.set_font("Arial", size=12)
     pdf.cell(0, 10, txt=sanitize_text(f"Transaction ID: {transaction_info['transaction_number']} | Date: {transaction_info['transaction_date']}"), ln=1)
     total_amount = sum(item['Quantity'] * item['Price'] for item in items)
-    pdf.cell(0, 10, txt=sanitize_text(f"Montant Payé: {payment_amount:.2f} DZD | Total: {total_amount:.2f} DZD"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"Montant Total (HT): {total_amount:.2f} DZD"), ln=1)
+    if discount_amount > 0:
+        pdf.cell(0, 10, txt=sanitize_text(f"Remise: {discount_amount:.2f} DZD"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"Montant Payé: {payment_amount:.2f} DZD"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"Mode de paiement: {payment_details}"), ln=1)
     pdf.ln(10)
     
-    # Items table with images
     pdf.set_font("Arial", size=12, style='B')
     col_widths = [60, 30, 30, 30, 30]
     headers = ["Article", "Image", "Référence", "Quantité", "Total"]

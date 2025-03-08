@@ -58,8 +58,8 @@ st.markdown(
 
 # Email sending function
 def send_email(to_email, subject, body, attachment_path=None):
-    sender_email = st.secrets["gmail"]["email"]  # Store in secrets.toml
-    sender_password = st.secrets["gmail"]["password"]  # Use Gmail App Password
+    sender_email = st.secrets["gmail"]["email"]
+    sender_password = st.secrets["gmail"]["password"]
     
     msg = MIMEMultipart()
     msg['From'] = sender_email
@@ -87,7 +87,7 @@ def send_email(to_email, subject, body, attachment_path=None):
 def load_users(force_reset=False):
     default_users = {
         "users": [
-            {"username": "admin", "password": bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode(), "role": "admin", "access": ["Proforma", "POS", "Restock", "Expenditures", "Staff Payments", "Till", "Access Control"]},
+            {"username": "admin", "password": bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode(), "role": "admin", "access": ["Proforma", "POS", "Restock", "Expenditures", "Staff Payments", "Till", "Access Control", "Dashboard", "Invoice History"]},
             {"username": "eulma", "password": bcrypt.hashpw("eulma".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["Proforma", "POS"]},
             {"username": "alger", "password": bcrypt.hashpw("alger".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["Proforma", "POS"]},
             {"username": "constantine", "password": bcrypt.hashpw("constantine".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["Proforma", "POS"]}
@@ -143,7 +143,34 @@ def initialize_session_state():
     if 'transaction_number' not in st.session_state:
         transactions_df = fetch_df_from_db('transactions')
         st.session_state['transaction_number'] = transactions_df["transaction_id"].max() + 1 if not transactions_df.empty else 1000
+    if 'recent_clients' not in st.session_state:
+        st.session_state['recent_clients'] = []
     initialize_clients_df()
+
+def stock_checker_section(products_df, section_key_prefix=""):
+    with st.expander("Vérificateur de Stock", expanded=False):
+        search_term = st.text_input("Rechercher par nom ou référence", placeholder="Tapez le nom ou la référence", key=f"{section_key_prefix}stock_search")
+        if st.button("Vérifier", key=f"{section_key_prefix}stock_check"):
+            filtered_df = products_df[
+                products_df['denomination'].str.contains(search_term, case=False, na=False) |
+                products_df['reference'].str.contains(search_term, case=False, na=False)
+            ]
+            if not filtered_df.empty:
+                for _, row in filtered_df.iterrows():
+                    st.write(f"**{row['denomination']} ({row['reference']})**")
+                    st.write(f"- Stock Total: {int(row['quantite_actuelle'])} unités")
+                    colors = [color.strip() for color in row['couleurs-dispo-usine'].split(',')] if pd.notna(row['couleurs-dispo-usine']) else []
+                    for color in colors:
+                        color_lower = color.lower()
+                        if color_lower in row.index and pd.notna(row[color_lower]):
+                            stock = int(row[color_lower])
+                            st.write(f"- {color}: {stock} unités")
+                            if stock <= 5:
+                                st.warning(f"Alerte: Stock faible pour {color} ({stock} unités restantes)")
+                    if row['quantite_actuelle'] <= 5:
+                        st.warning(f"Alerte: Stock total faible ({int(row['quantite_actuelle'])} unités restantes)")
+            else:
+                st.error("Aucun article trouvé.")
 
 def pos_page():
     st.title("Point de Vente (POS)")
@@ -151,6 +178,8 @@ def pos_page():
     products_df = load_products()
     clients_df = st.session_state['clients_df']
     transactions_df = fetch_df_from_db('transactions')
+
+    stock_checker_section(products_df, "pos_")
 
     with st.expander("Gestion des clients", expanded=True):
         client_action = st.radio("Action", ["Client récent", "Rechercher un client", "Ajouter un nouveau client", "Modifier un client chargé", "Récupérer une proforma"], key="pos_client_action")
@@ -209,6 +238,9 @@ def pos_page():
                         st.session_state["client_info_loaded"] = client_info
                         st.session_state["client_index"] = client_info['index']
                         st.success("Nouveau client ajouté et chargé !")
+                        st.session_state['recent_clients'].insert(0, client_info['id_client'])
+                        if len(st.session_state['recent_clients']) > 5:
+                            st.session_state['recent_clients'].pop()
         elif client_action == "Modifier un client chargé" and "client_info_loaded" in st.session_state:
             client_info = st.session_state["client_info_loaded"]
             edit_nom_client = st.text_input("Nom du client", value=client_info.get("nom_client", ""), placeholder="Tapez le nom du client", key="pos_edit_nom_client")
@@ -257,6 +289,14 @@ def pos_page():
     with st.expander("Articles", expanded=True):
         if 'pos_items' not in st.session_state:
             st.session_state['pos_items'] = []
+        barcode = st.text_input("Scanner ou taper la référence", placeholder="Utilisez un scanner ou entrez la référence", key="pos_barcode")
+        if barcode and st.button("Ajouter par référence"):
+            filtered_df = products_df[products_df['reference'] == barcode]
+            if not filtered_df.empty:
+                st.session_state['pos_filtered'] = filtered_df
+            else:
+                st.error("Référence non trouvée.")
+        
         search_term = st.text_input("Rechercher un article", placeholder="Tapez le nom de l'article", key="pos_search")
         if st.button("Rechercher"):
             filtered_df = products_df[products_df['denomination'].str.contains(search_term, case=False, na=False)]
@@ -274,6 +314,8 @@ def pos_page():
             
             total_stock = selected_row.get('quantite_actuelle', 0)
             st.write(f"**Stock Total Disponible :** {int(total_stock)} unités")
+            if total_stock <= 5:
+                st.warning(f"Alerte: Stock total faible ({int(total_stock)} unités)")
             colors = [color.strip() for color in selected_row['couleurs-dispo-usine'].split(',')] if pd.notna(selected_row['couleurs-dispo-usine']) else []
             selected_color = st.selectbox("Choisissez une couleur", colors, key="pos_color_select") if colors else None
             
@@ -283,6 +325,8 @@ def pos_page():
                 if color_lower in selected_row.index and pd.notna(selected_row[color_lower]):
                     color_stock = int(selected_row[color_lower])
                     st.write(f"**Stock pour {selected_color} :** {color_stock} unités")
+                    if color_stock <= 5:
+                        st.warning(f"Alerte: Stock faible pour {selected_color} ({color_stock} unités)")
                 else:
                     st.warning(f"Stock pour {selected_color} non défini.")
             
@@ -327,25 +371,55 @@ def pos_page():
 
     with st.expander("Paiement", expanded=True):
         total_amount = sum(item['Quantity'] * item['Price'] for item in st.session_state['pos_items'])
-        st.write(f"**Total :** {total_amount:.2f} DZD")
+        discount_type = st.radio("Type de remise", ["Aucune", "Pourcentage", "Montant fixe"], key="pos_discount_type")
+        discount_value = st.number_input("Valeur de la remise", min_value=0.0, value=0.0, key="pos_discount_value") if discount_type != "Aucune" else 0.0
+        discount_amount = total_amount * (discount_value / 100) if discount_type == "Pourcentage" else discount_value
+        final_amount = total_amount - discount_amount
+        st.write(f"**Total avant remise :** {total_amount:.2f} DZD")
+        if discount_amount > 0:
+            st.write(f"**Remise :** {discount_amount:.2f} DZD")
+        st.write(f"**Total à payer :** {final_amount:.2f} DZD")
         
-        payment_type = st.selectbox("Mode de paiement", ["Espèces", "Virement bancaire", "Chèque"], key="pos_payment_type")
+        payment_methods = ["Espèces", "Virement bancaire", "Chèque"]
+        payments = {}
+        remaining = final_amount
+        for method in payment_methods:
+            amount = st.number_input(f"Montant en {method}", min_value=0.0, max_value=remaining, value=0.0, key=f"pos_payment_{method}")
+            if amount > 0:
+                payments[method] = amount
+            remaining -= amount
+        
+        if remaining > 0:
+            st.error(f"Il reste {remaining:.2f} DZD à payer.")
+        
         col1, col2, col3 = st.columns(3)
         
         with col1:
             if st.button("Process Sale"):
-                client_info = st.session_state.get("client_info_loaded", None)
-                if not client_info:
+                if remaining > 0:
+                    st.error("Le paiement est incomplet.")
+                elif not st.session_state.get("client_info_loaded"):
                     st.error("Chargez un client !")
                 elif not st.session_state['pos_items']:
                     st.error("Ajoutez des articles !")
                 else:
                     if update_stock(products_df, st.session_state['pos_items']):
-                        transaction_id = record_transaction(client_info, st.session_state['pos_items'], payment_type, total_amount, total_amount, status="completed")
-                        transaction_info = {"transaction_number": transaction_id, "transaction_date": datetime.now().strftime("%d/%m/%Y"), "client_id": client_info['id_client']}
-                        pdf_filename = generate_receipt_pdf(transaction_info, st.session_state['pos_items'], total_amount)
+                        payment_details = "; ".join([f"{k}: {v:.2f}" for k, v in payments.items()])
+                        transaction_id = record_transaction(
+                            st.session_state['client_info_loaded'], 
+                            st.session_state['pos_items'], 
+                            payment_details, 
+                            final_amount, 
+                            total_amount, 
+                            status="completed"
+                        )
+                        transaction_info = {"transaction_number": transaction_id, "transaction_date": datetime.now().strftime("%d/%m/%Y"), "client_id": st.session_state['client_info_loaded']['id_client']}
+                        pdf_filename = generate_receipt_pdf(transaction_info, st.session_state['pos_items'], final_amount, discount_amount, payment_details)
                         st.session_state['pos_pdf_filename'] = pdf_filename
                         st.session_state['pos_transaction_generated'] = True
+                        st.session_state['recent_clients'].insert(0, st.session_state['client_info_loaded']['id_client'])
+                        if len(st.session_state['recent_clients']) > 5:
+                            st.session_state['recent_clients'].pop()
                         st.success("Vente terminée !")
                         st.rerun()
         
@@ -361,7 +435,7 @@ def pos_page():
             if client_email and validate_email(client_email):
                 if st.button("Envoyer par email", key="pos_email"):
                     subject = f"Reçu de vente #{transaction_info['transaction_number']}"
-                    body = f"Bonjour {client_info.get('nom_client', '')},\n\nVoici votre reçu pour la transaction #{transaction_info['transaction_number']}.\nMontant total: {total_amount:.2f} DZD\n\nCordialement,\nTakideco"
+                    body = f"Bonjour {st.session_state['client_info_loaded'].get('nom_client', '')},\n\nVoici votre reçu pour la transaction #{transaction_info['transaction_number']}.\nMontant total: {final_amount:.2f} DZD\n\nCordialement,\nTakideco"
                     if send_email(client_email, subject, body, pdf_filename):
                         st.success("Reçu envoyé par email !")
         
@@ -380,6 +454,19 @@ def pos_page():
                 st.success("Tout effacé !")
                 st.rerun()
 
+def restock_page():
+    st.title("Re-stocking")
+    products_df = load_products()
+    
+    stock_checker_section(products_df, "restock_")
+    
+    reference = st.text_input("Référence du produit", placeholder="Tapez la référence", key="restock_reference")
+    quantity = st.number_input("Quantité à ajouter", min_value=1)
+    cost_per_unit = st.number_input("Coût par unité (DZD)", min_value=0.0)
+    if st.button("Restock"):
+        total_cost = restock_product(products_df, reference, quantity, cost_per_unit)
+        st.success(f"Produit restocké ! Coût total : {total_cost:.2f} DZD")
+
 def access_control_page():
     st.title("Contrôle d'accès")
     if st.session_state['user']['role'] != "admin":
@@ -389,101 +476,135 @@ def access_control_page():
     users_data = load_users()
     st.write("### Gestion des utilisateurs")
     
-    access_enabled = st.checkbox("Activer le contrôle d'accès", value=users_data.get("access_control_enabled", False), key="toggle_access_control")
-
-    st.write("#### Réinitialiser votre mot de passe (Admin)")
-    new_admin_password = st.text_input("Nouveau mot de passe Admin", type="password", key="new_admin_password")
-    admin_reset = st.button("Réinitialiser mot de passe Admin")
-
-    st.write("#### Gérer les opérateurs")
-    for user in users_data["users"]:
-        if user["role"] == "operator":
-            st.write(f"Opérateur: {user['username']}")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                new_password = st.text_input(f"Nouveau mot de passe pour {user['username']}", type="password", key=f"reset_{user['username']}")
-                if st.button(f"Réinitialiser", key=f"reset_btn_{user['username']}"):
-                    user["password"] = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
-            with col2:
-                access_options = ["Proforma", "POS"]
-                current_access = user.get("access", ["Proforma", "POS"])
-                new_access = st.multiselect(f"Accès pour {user['username']}", access_options, default=current_access, key=f"access_{user['username']}")
-                if st.button(f"Mettre à jour accès", key=f"update_{user['username']}"):
-                    user["access"] = new_access
-            with col3:
-                if st.button(f"Supprimer {user['username']}", key=f"delete_{user['username']}"):
-                    users_data["users"] = [u for u in users_data["users"] if u["username"] != user["username"]]
-
-    st.write("#### Ajouter un nouvel opérateur")
-    new_op_username = st.text_input("Nom d'utilisateur", key="new_op_username")
-    new_op_password = st.text_input("Mot de passe", type="password", key="new_op_password")
-    new_op_access = st.multiselect("Accès", ["Proforma", "POS"], default=["Proforma", "POS"], key="new_op_access")
-    add_op = st.button("Ajouter opérateur")
-
-    if st.button("Sauvegarder les modifications"):
-        users_data["access_control_enabled"] = access_enabled
-        if admin_reset and new_admin_password:
-            for user in users_data["users"]:
-                if user["username"] == "admin":
-                    user["password"] = bcrypt.hashpw(new_admin_password.encode(), bcrypt.gensalt()).decode()
-        if add_op and new_op_username and new_op_password:
-            users_data["users"].append({
-                "username": new_op_username,
-                "password": bcrypt.hashpw(new_op_password.encode(), bcrypt.gensalt()).decode(),
-                "role": "operator",
-                "access": new_op_access
-            })
-        save_users(users_data)
-        st.success("Modifications sauvegardées !")
-        st.rerun()
-
-def change_password_page():
-    st.title("Changer le mot de passe")
-    current_user = st.session_state['user']
-    current_password = st.text_input("Mot de passe actuel", type="password", key="current_password")
-    new_password = st.text_input("Nouveau mot de passe", type="password", key="new_password")
-    if st.button("Changer le mot de passe"):
-        users_data = load_users()
-        for user in users_data["users"]:
-            if user["username"] == current_user["username"] and bcrypt.checkpw(current_password.encode(), user["password"].encode()):
-                user["password"] = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+    access_enabled = st.checkbox("Activer le contrôle d'accès", value=users_data["access_control_enabled"], key="access_control_toggle")
+    users_data["access_control_enabled"] = access_enabled
+    
+    for i, user in enumerate(users_data["users"]):
+        with st.expander(f"Utilisateur: {user['username']} ({user['role']})", expanded=False):
+            new_username = st.text_input("Nom d'utilisateur", value=user["username"], key=f"username_{i}")
+            new_password = st.text_input("Nouveau mot de passe", type="password", key=f"password_{i}")
+            new_role = st.selectbox("Rôle", ["admin", "operator"], index=0 if user["role"] == "admin" else 1, key=f"role_{i}")
+            access_options = ["Proforma", "POS", "Restock", "Expenditures", "Staff Payments", "Till", "Access Control", "Dashboard", "Invoice History"]
+            new_access = st.multiselect("Accès", access_options, default=user["access"], key=f"access_{i}")
+            
+            if st.button("Mettre à jour", key=f"update_{i}"):
+                users_data["users"][i]["username"] = new_username
+                if new_password:
+                    users_data["users"][i]["password"] = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+                users_data["users"][i]["role"] = new_role
+                users_data["users"][i]["access"] = new_access
                 save_users(users_data)
-                st.success("Mot de passe changé avec succès !")
-                break
-        else:
-            st.error("Mot de passe actuel incorrect.")
-
-def restock_page():
-    st.title("Re-stocking")
-    products_df = load_products()
-    reference = st.text_input("Référence du produit", placeholder="Tapez la référence", key="restock_reference")
-    quantity = st.number_input("Quantité à ajouter", min_value=1)
-    cost_per_unit = st.number_input("Coût par unité (DZD)", min_value=0.0)
-    if st.button("Restock"):
-        total_cost = restock_product(products_df, reference, quantity, cost_per_unit)
-        st.success(f"Produit restocké ! Coût total : {total_cost:.2f} DZD")
+                st.success(f"Utilisateur {new_username} mis à jour !")
+            
+            if st.button("Supprimer", key=f"delete_{i}"):
+                if user["username"] != "admin":  # Prevent deleting admin
+                    users_data["users"].pop(i)
+                    save_users(users_data)
+                    st.success(f"Utilisateur supprimé !")
+                    st.rerun()
+                else:
+                    st.error("Impossible de supprimer l'utilisateur admin.")
+    
+    with st.expander("Ajouter un nouvel utilisateur", expanded=False):
+        new_username = st.text_input("Nouveau nom d'utilisateur", key="new_username")
+        new_password = st.text_input("Mot de passe", type="password", key="new_password")
+        new_role = st.selectbox("Rôle", ["admin", "operator"], key="new_role")
+        new_access = st.multiselect("Accès", access_options, key="new_access")
+        if st.button("Ajouter utilisateur", key="add_user"):
+            if new_username and new_password:
+                if any(u["username"] == new_username for u in users_data["users"]):
+                    st.error("Ce nom d'utilisateur existe déjà.")
+                else:
+                    new_user = {
+                        "username": new_username,
+                        "password": bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode(),
+                        "role": new_role,
+                        "access": new_access
+                    }
+                    users_data["users"].append(new_user)
+                    save_users(users_data)
+                    st.success(f"Utilisateur {new_username} ajouté !")
+                    st.rerun()
+            else:
+                st.error("Veuillez remplir tous les champs.")
 
 def expenditure_page():
     st.title("Dépenses")
-    assistant_name = st.text_input("Nom de l’assistant", placeholder="Tapez le nom de l’assistant", key="exp_assistant_name")
+    description = st.text_input("Description de la dépense")
     amount = st.number_input("Montant (DZD)", min_value=0.0)
-    description = st.text_area("Description", placeholder="Tapez une description")
     if st.button("Enregistrer la dépense"):
-        record_expenditure(assistant_name, amount, description)
+        record_expenditure(description, amount)
         st.success("Dépense enregistrée !")
 
 def staff_payment_page():
     st.title("Paiements du personnel")
-    staff_name = st.text_input("Nom du personnel", placeholder="Tapez le nom du personnel", key="staff_name")
+    staff_name = st.text_input("Nom du personnel")
     amount = st.number_input("Montant (DZD)", min_value=0.0)
     if st.button("Enregistrer le paiement"):
         record_staff_payment(staff_name, amount)
-        st.success("Paiement enregistré !")
+        st.success("Paiement du personnel enregistré !")
 
 def till_page():
-    st.title("Caisse")
+    st.title("État de la caisse")
     balance = get_till_balance()
-    st.write(f"Solde actuel de la caisse : {balance:.2f} DZD")
+    st.write(f"**Solde actuel de la caisse :** {balance:.2f} DZD")
+
+def dashboard_page():
+    st.title("Tableau de Bord")
+    transactions_df = fetch_df_from_db('transactions')
+    products_df = load_products()
+    
+    total_sales = transactions_df[transactions_df['status'] == "completed"]['payment_amount'].sum()
+    st.write(f"**Ventes Totales :** {total_sales:.2f} DZD")
+    
+    top_items = pd.DataFrame([json.loads(t['items']) for t in transactions_df[transactions_df['status'] == "completed"]['items']]).explode().groupby('denomination')['Quantity'].sum().nlargest(5)
+    st.write("**Top 5 Articles Vendus :**")
+    st.dataframe(top_items)
+    
+    till_balance = get_till_balance()
+    st.write(f"**Solde de la Caisse :** {till_balance:.2f} DZD")
+
+def invoice_history_page():
+    st.title("Historique des Factures")
+    transactions_df = fetch_df_from_db('transactions')
+    if not transactions_df.empty:
+        selected_transaction = st.selectbox("Sélectionnez une transaction", transactions_df['transaction_id'])
+        transaction = transactions_df[transactions_df['transaction_id'] == selected_transaction].iloc[0]
+        st.write(f"**Client ID :** {transaction['client_id']}")
+        st.write(f"**Date :** {transaction['transaction_date']}")
+        st.write(f"**Montant Payé :** {transaction['payment_amount']:.2f} DZD")
+        st.write(f"**Mode de paiement :** {transaction['payment_details']}")
+        items = json.loads(transaction['items'])
+        st.write("**Articles :**")
+        for item in items:
+            st.write(f"- {item['denomination']} ({item['reference']}) - {item['Quantity']} x {item['Price']:.2f}")
+        pdf_filename = f"Receipt-{selected_transaction}-{transaction['transaction_date'].replace('/', '')}.pdf"
+        if os.path.exists(pdf_filename):
+            with open(pdf_filename, "rb") as file:
+                st.download_button("Télécharger le reçu", file, pdf_filename, mime="application/pdf", key=f"history_download_{selected_transaction}")
+        else:
+            st.warning("Le fichier PDF de cette transaction n'est pas disponible.")
+    else:
+        st.info("Aucune transaction enregistrée.")
+
+def change_password_page():
+    st.title("Changer le mot de passe")
+    current_password = st.text_input("Mot de passe actuel", type="password", key="current_password")
+    new_password = st.text_input("Nouveau mot de passe", type="password", key="new_password")
+    confirm_password = st.text_input("Confirmer le nouveau mot de passe", type="password", key="confirm_password")
+    
+    if st.button("Changer le mot de passe"):
+        users_data = load_users()
+        user = next(u for u in users_data["users"] if u["username"] == st.session_state['user']['username'])
+        if bcrypt.checkpw(current_password.encode(), user["password"].encode()):
+            if new_password == confirm_password:
+                user["password"] = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+                save_users(users_data)
+                st.success("Mot de passe changé avec succès !")
+            else:
+                st.error("Les nouveaux mots de passe ne correspondent pas.")
+        else:
+            st.error("Mot de passe actuel incorrect.")
 
 def main():
     if not login():
@@ -515,6 +636,10 @@ def main():
         till_page()
     elif page == "Access Control":
         access_control_page()
+    elif page == "Dashboard":
+        dashboard_page()
+    elif page == "Invoice History":
+        invoice_history_page()
     elif page == "Changer le mot de passe":
         change_password_page()
 

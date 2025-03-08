@@ -37,6 +37,31 @@ def send_email(to_email, subject, body, attachment_path=None):
         st.error(f"Échec de l'envoi de l'email : {e}")
         return False
 
+def stock_checker_section(products_df, section_key_prefix=""):
+    with st.expander("Vérificateur de Stock", expanded=False):
+        search_term = st.text_input("Rechercher par nom ou référence", placeholder="Tapez le nom ou la référence", key=f"{section_key_prefix}stock_search")
+        if st.button("Vérifier", key=f"{section_key_prefix}stock_check"):
+            filtered_df = products_df[
+                products_df['denomination'].str.contains(search_term, case=False, na=False) |
+                products_df['reference'].str.contains(search_term, case=False, na=False)
+            ]
+            if not filtered_df.empty:
+                for _, row in filtered_df.iterrows():
+                    st.write(f"**{row['denomination']} ({row['reference']})**")
+                    st.write(f"- Stock Total: {int(row['quantite_actuelle'])} unités")
+                    colors = [color.strip() for color in row['couleurs-dispo-usine'].split(',')] if pd.notna(row['couleurs-dispo-usine']) else []
+                    for color in colors:
+                        color_lower = color.lower()
+                        if color_lower in row.index and pd.notna(row[color_lower]):
+                            stock = int(row[color_lower])
+                            st.write(f"- {color}: {stock} unités")
+                            if stock <= 5:
+                                st.warning(f"Alerte: Stock faible pour {color} ({stock} unités restantes)")
+                    if row['quantite_actuelle'] <= 5:
+                        st.warning(f"Alerte: Stock total faible ({int(row['quantite_actuelle'])} unités restantes)")
+            else:
+                st.error("Aucun article trouvé.")
+
 def proforma_page(products_df, clients_df):
     st.title("Générateur de Facture Proforma")
 
@@ -56,6 +81,8 @@ def proforma_page(products_df, clients_df):
         """,
         unsafe_allow_html=True
     )
+
+    stock_checker_section(products_df, "proforma_")
 
     with st.expander("Options de la facture", expanded=True):
         price_type = st.radio("Type de prix", ["prix-super-gros", "prix-gros", "prix-détail"], key='price_type')
@@ -99,6 +126,8 @@ def proforma_page(products_df, clients_df):
             
             total_stock = selected_row.get('quantite_actuelle', 0)
             st.write(f"**Stock Total Disponible :** {int(total_stock)} unités")
+            if total_stock <= 5:
+                st.warning(f"Alerte: Stock total faible ({int(total_stock)} unités)")
             colors = [color.strip() for color in selected_row['couleurs-dispo-usine'].split(',')] if pd.notna(selected_row['couleurs-dispo-usine']) else []
             selected_color = st.selectbox("Choisissez une couleur", colors, key="color_select") if colors else None
             
@@ -108,6 +137,8 @@ def proforma_page(products_df, clients_df):
                 if color_lower in selected_row.index and pd.notna(selected_row[color_lower]):
                     color_stock = int(selected_row[color_lower])
                     st.write(f"**Stock pour {selected_color} :** {color_stock} unités")
+                    if color_stock <= 5:
+                        st.warning(f"Alerte: Stock faible pour {selected_color} ({color_stock} unités)")
                 else:
                     st.warning(f"Stock pour {selected_color} non défini dans la base.")
             
