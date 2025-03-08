@@ -1,40 +1,53 @@
-import pandas as pd
+import sqlite3
 import os
 import re
 from PIL import Image
 import streamlit as st
+import pandas as pd
 
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\d{10}$'
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # Points to pos_system/
+DB_PATH = os.path.join(BASE_DIR, "data", "pos_system.db")
 
-def read_local_excel(file_path):
-    full_path = os.path.join(BASE_DIR, file_path)
+def get_db_connection():
+    """Establish a connection to the SQLite database."""
     try:
-        df = pd.read_excel(full_path)
-        df.columns = df.columns.str.strip()
-        return df
-    except Exception as e:
-        st.error(f"Échec de la lecture du fichier Excel local : {e}")
+        conn = sqlite3.connect(DB_PATH)
+        return conn
+    except sqlite3.Error as e:
+        st.error(f"Database connection failed: {e}")
         return None
 
-def save_excel(df, file_path):
-    full_path = os.path.join(BASE_DIR, file_path)
-    try:
-        df.to_excel(full_path, index=False)
-        return True
-    except Exception as e:
-        st.error(f"Échec de la sauvegarde du fichier {file_path} : {e}")
-        return False
+def fetch_df_from_db(table_name):
+    """Fetch data from a table as a pandas DataFrame."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            df = pd.read_sql_query(f"SELECT * FROM {table_name}", conn)
+            conn.close()
+            return df
+        except sqlite3.Error as e:
+            st.error(f"Failed to fetch data from {table_name}: {e}")
+            conn.close()
+            return pd.DataFrame()
+    return pd.DataFrame()
 
-def read_csv(file_path):
-    full_path = os.path.join(BASE_DIR, file_path)
-    return pd.read_csv(full_path) if os.path.exists(full_path) else pd.DataFrame()
-
-def save_csv(df, file_path):
-    full_path = os.path.join(BASE_DIR, file_path)
-    df.to_csv(full_path, index=False)
+def save_df_to_db(df, table_name):
+    """Save a pandas DataFrame to a SQLite table."""
+    conn = get_db_connection()
+    if conn:
+        try:
+            df.to_sql(table_name, conn, if_exists='replace', index=False)
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.Error as e:
+            st.error(f"Failed to save data to {table_name}: {e}")
+            conn.close()
+            return False
+    return False
 
 def sanitize_text(text):
     return text.replace("’", "'") if pd.notna(text) else ""

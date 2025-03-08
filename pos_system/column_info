@@ -1,0 +1,44 @@
+Clients Table Columns and Data Types:
+ id_client              int64
+nom_client            object
+prenom_client         object
+telephone_client     float64
+address_client        object
+email_client         float64
+entreprise_client     object
+dtype: object
+
+Expenditures Table Columns and Data Types:
+ expenditure_id      int64
+date               object
+assistant_name     object
+amount            float64
+description       float64
+dtype: object
+
+Staff Payments Table Columns and Data Types:
+ payment_id      int64
+date           object
+staff_name     object
+amount        float64
+dtype: object
+
+Till Table Columns and Data Types:
+ date            object
+amount         float64
+direction       object
+description     object
+balance        float64
+dtype: object
+
+Transactions Table Columns and Data Types:
+ transaction_id       int64
+date                object
+client_id            int64
+items               object
+total_amount         int64
+status              object
+payment_type        object
+deposit_amount       int64
+remaining_amount     int64
+dtype: object

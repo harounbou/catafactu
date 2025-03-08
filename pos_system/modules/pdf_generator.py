@@ -1,4 +1,3 @@
-# pos_system/modules/pdf_generator.py
 from fpdf import FPDF
 import streamlit as st
 from .utils import sanitize_text, calculate_image_dimensions, truncate_text, get_full_image_path

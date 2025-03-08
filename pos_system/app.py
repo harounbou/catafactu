@@ -1,16 +1,15 @@
-# pos_system/app.py
 import streamlit as st
 import pandas as pd
 import json
 import os
 import bcrypt
 from datetime import datetime
-from modules.client_management import initialize_clients_df, get_client_info, add_new_client, save_clients
+from modules.client_management import initialize_clients_df, get_client_info, add_new_client, save_clients, update_client
 from modules.product_management import load_products, update_stock, restock_product
 from modules.transaction_management import record_transaction, record_expenditure, record_staff_payment, get_till_balance
 from modules.pdf_generator import generate_receipt_pdf
 from modules.proforma import proforma_page
-from modules.utils import validate_email, validate_phone
+from modules.utils import validate_email, validate_phone, fetch_df_from_db
 
 # Paths
 USERS_FILE = "data/users.json"
@@ -76,11 +75,9 @@ def save_users(users_data):
         json.dump(users_data, f)
 
 def login():
-    # Check if already logged in
     if st.session_state.get('logged_in', False):
         return True
 
-    # Initialize session state variables
     st.session_state.setdefault('logged_in', False)
     st.session_state.setdefault('user', None)
 
@@ -99,22 +96,20 @@ def login():
     
     if st.button("Se connecter"):
         user = next((u for u in users_data["users"] if u["username"] == username), None)
-        if user:
-            if bcrypt.checkpw(password.encode(), user["password"].encode()):
-                st.session_state['logged_in'] = True
-                st.session_state['user'] = user
-                st.success(f"Bienvenue, {username} !")
-                st.rerun()  # Force full script rerun
-                return True
-            else:
-                st.error("Mot de passe incorrect.")
+        if user and bcrypt.checkpw(password.encode(), user["password"].encode()):
+            st.session_state['logged_in'] = True
+            st.session_state['user'] = user
+            st.success(f"Bienvenue, {username} !")
+            st.rerun()
+            return True
         else:
-            st.error("Nom d'utilisateur inconnu.")
+            st.error("Nom d'utilisateur ou mot de passe incorrect.")
     return False
 
 def initialize_session_state():
     if 'transaction_number' not in st.session_state:
-        st.session_state['transaction_number'] = 1000
+        transactions_df = fetch_df_from_db('transactions')
+        st.session_state['transaction_number'] = transactions_df["transaction_id"].max() + 1 if not transactions_df.empty else 1000
     initialize_clients_df()
 
 def pos_page():
@@ -122,7 +117,7 @@ def pos_page():
     initialize_session_state()
     products_df = load_products()
     clients_df = st.session_state['clients_df']
-    transactions_df = pd.read_csv("data/transactions.csv") if os.path.exists("data/transactions.csv") else pd.DataFrame()
+    transactions_df = fetch_df_from_db('transactions')
 
     with st.expander("Gestion des clients", expanded=True):
         client_action = st.radio("Action", ["Client récent", "Rechercher un client", "Ajouter un nouveau client", "Modifier un client chargé", "Récupérer une proforma"], key="pos_client_action")
@@ -206,7 +201,7 @@ def pos_page():
                     st.session_state["client_info_loaded"] = updated_client_info
                     st.success("Client modifié avec succès !")
         elif client_action == "Récupérer une proforma":
-            proforma_ids = transactions_df[transactions_df['status'] == "Proforma"]["transaction_id"].tolist()
+            proforma_ids = transactions_df[transactions_df['status'] == "proforma"]["transaction_id"].tolist()
             if proforma_ids:
                 selected_proforma_id = st.selectbox("Sélectionnez une proforma", proforma_ids, key="pos_proforma_select")
                 if st.button("Charger la proforma", key="pos_load_proforma"):
@@ -301,15 +296,12 @@ def access_control_page():
     users_data = load_users()
     st.write("### Gestion des utilisateurs")
     
-    # Enable/Disable Access Control
     access_enabled = st.checkbox("Activer le contrôle d'accès", value=users_data.get("access_control_enabled", False), key="toggle_access_control")
 
-    # Reset Admin Password
     st.write("#### Réinitialiser votre mot de passe (Admin)")
     new_admin_password = st.text_input("Nouveau mot de passe Admin", type="password", key="new_admin_password")
     admin_reset = st.button("Réinitialiser mot de passe Admin")
 
-    # Manage Operators
     st.write("#### Gérer les opérateurs")
     for user in users_data["users"]:
         if user["role"] == "operator":
@@ -329,14 +321,12 @@ def access_control_page():
                 if st.button(f"Supprimer {user['username']}", key=f"delete_{user['username']}"):
                     users_data["users"] = [u for u in users_data["users"] if u["username"] != user["username"]]
 
-    # Add New Operator
     st.write("#### Ajouter un nouvel opérateur")
     new_op_username = st.text_input("Nom d'utilisateur", key="new_op_username")
     new_op_password = st.text_input("Mot de passe", type="password", key="new_op_password")
     new_op_access = st.multiselect("Accès", ["Proforma", "POS"], default=["Proforma", "POS"], key="new_op_access")
     add_op = st.button("Ajouter opérateur")
 
-    # Save Button
     if st.button("Sauvegarder les modifications"):
         users_data["access_control_enabled"] = access_enabled
         if admin_reset and new_admin_password:
@@ -414,7 +404,6 @@ def main():
         st.session_state['user'] = None
         st.rerun()
     page = st.sidebar.radio("Aller à", menu_options + ["Changer le mot de passe"])
-    # Rest of main()...
     initialize_session_state()
     products_df = load_products()
     clients_df = st.session_state['clients_df']

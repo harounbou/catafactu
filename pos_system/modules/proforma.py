@@ -1,7 +1,6 @@
-# pos_system/modules/proforma.py
 import streamlit as st
 import pandas as pd
-from .client_management import get_client_info, add_new_client, save_clients
+from .client_management import get_client_info, add_new_client, save_clients, update_client
 from .transaction_management import record_transaction
 from .pdf_generator import generate_proforma_pdf
 from .utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path
@@ -10,16 +9,14 @@ from datetime import datetime
 def proforma_page(products_df, clients_df):
     st.title("Générateur de Facture Proforma")
 
-    # Override app background and style download button
     st.markdown(
         """
         <style>
         .stApp { 
-            background-color: #f5f5f5; /* Lighter background for Proforma */
+            background-color: #f5f5f5;
         }
-        /* Target the download button specifically */
         div[data-testid="stDownloadButton"] button {
-            background-color: #d4a373 !important; /* Light brown */
+            background-color: #d4a373 !important;
             color: white !important;
             border: none;
             border-radius: 4px;
@@ -45,7 +42,7 @@ def proforma_page(products_df, clients_df):
         search_term = st.text_input("Rechercher un article par Dénomination", placeholder="Tapez le nom de l'article", key="article_search")
         col1, col2 = st.columns([1, 10])
         with col1:
-            pass  # No icon displayed
+            pass
         with col2:
             if st.button("Rechercher l'article"):
                 if search_term:
@@ -59,36 +56,61 @@ def proforma_page(products_df, clients_df):
                 else:
                     st.warning("Veuillez entrer un terme de recherche.")
 
+
+
         if 'filtered_articles' in st.session_state:
             filtered_df = st.session_state['filtered_articles']
             selected_item = st.selectbox("Sélectionnez un article", filtered_df['denomination'], key="selected_item")
             selected_row = filtered_df[filtered_df['denomination'] == selected_item].squeeze()
-            if price_type in selected_row.index:
-                st.write(f"**Prix ({price_type}) :** {selected_row[price_type]}")
-                available_stock = selected_row.get('quantite_actuelle', 0)
-                st.write(f"**Stock Disponible :** {int(available_stock)} unités")
-                colors = [color.strip() for color in selected_row['couleurs-dispo-usine'].split(',')] if pd.notna(selected_row['couleurs-dispo-usine']) else []
-                selected_color = st.selectbox("Choisissez une couleur", colors, key="color_select") if colors else None
-                image_path = get_full_image_path(find_image_path_for_color(selected_row['images'], selected_color)) if selected_color else None
-                if image_path:
-                    st.image(image_path, caption=f"Aperçu ({selected_color})", width=150)
-                quantity = st.number_input("Quantité", min_value=1, value=1, key="quantity")
-                can_add_item = quantity <= available_stock
-                if not can_add_item:
-                    st.error(f"La quantité demandée ({quantity}) dépasse le stock disponible ({int(available_stock)}).")
-                if st.button("Ajouter l'article", key="add_article", disabled=not can_add_item):
-                    item_dict = {
-                        "denomination": selected_row['denomination'],
-                        "reference": selected_row['reference'],
-                        "Quantity": quantity,
-                        "Price": selected_row[price_type],
-                        "Color": selected_color,
-                        "Image": image_path,
-                        "category": selected_row.get('category', 'Sans Catégorie')
-                    }
-                    st.session_state['items'].append(item_dict)
-                    st.success("Article ajouté !")
-                    del st.session_state['filtered_articles']
+            
+            # Get price
+            price = selected_row[price_type] if pd.notna(selected_row[price_type]) else 0.0
+            st.write(f"**Prix ({price_type}) :** {price}")
+            if price == 0.0:
+                st.warning("Le prix est 0. Vérifiez les données dans la base.")
+            
+            # Get total and color-specific stock
+            total_stock = selected_row.get('quantite_actuelle', 0)
+            st.write(f"**Stock Total Disponible :** {int(total_stock)} unités")
+            colors = [color.strip() for color in selected_row['couleurs-dispo-usine'].split(',')] if pd.notna(selected_row['couleurs-dispo-usine']) else []
+            selected_color = st.selectbox("Choisissez une couleur", colors, key="color_select") if colors else None
+            
+            # Check color-specific stock
+            color_stock = 0
+            if selected_color:
+                color_lower = selected_color.lower()
+                if color_lower in selected_row.index and pd.notna(selected_row[color_lower]):
+                    color_stock = int(selected_row[color_lower])  # Convert REAL to int
+                    st.write(f"**Stock pour {selected_color} :** {color_stock} unités")
+                else:
+                    st.warning(f"Stock pour {selected_color} non défini dans la base.")
+            
+            image_path = get_full_image_path(find_image_path_for_color(selected_row['images'], selected_color)) if selected_color else None
+            if image_path:
+                st.image(image_path, caption=f"Aperçu ({selected_color})", width=150)
+            
+            quantity = st.number_input("Quantité", min_value=1, value=1, key="quantity")
+            can_add_item = True
+            if selected_color and quantity > color_stock:
+                st.error(f"La quantité demandée ({quantity}) dépasse le stock disponible pour {selected_color} ({color_stock}).")
+                can_add_item = False
+            elif not selected_color and quantity > total_stock:
+                st.error(f"La quantité demandée ({quantity}) dépasse le stock total disponible ({int(total_stock)}).")
+                can_add_item = False
+            
+            if st.button("Ajouter l'article", key="add_article", disabled=not can_add_item):
+                item_dict = {
+                    "denomination": selected_row['denomination'],
+                    "reference": selected_row['reference'],
+                    "Quantity": quantity,
+                    "Price": price,  # Use price_type price only
+                    "Color": selected_color,
+                    "Image": image_path,
+                    "category": selected_row.get('category', 'Sans Catégorie')
+                }
+                st.session_state['items'].append(item_dict)
+                st.success("Article ajouté !")
+                del st.session_state['filtered_articles']
 
         if st.session_state['items']:
             st.write("#### Articles sélectionnés")
@@ -192,7 +214,6 @@ def proforma_page(products_df, clients_df):
                     st.write(f"{key}: {value}")
 
     with st.expander("Générer la facture", expanded=True):
-        # Show "Effacer tout" only if proforma hasn't been generated yet
         if not st.session_state.get('proforma_generated', False):
             if st.button("Effacer tout", key="clear_all_before_generate"):
                 if 'items' in st.session_state:
@@ -238,7 +259,6 @@ def proforma_page(products_df, clients_df):
                 else:
                     st.error("Ajoutez des articles et chargez un client !")
 
-        # Show download and reset buttons only after generation
         if st.session_state.get('proforma_generated', False):
             with col1:
                 with open(st.session_state['pdf_filename'], "rb") as file:

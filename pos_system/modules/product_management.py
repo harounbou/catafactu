@@ -1,15 +1,15 @@
-# pos_system/modules/product_management.py
 import pandas as pd
 import streamlit as st
-from .utils import read_local_excel, save_excel
-
-PRODUCTS_FILE = "data/products.xlsx"
+from .utils import fetch_df_from_db, save_df_to_db
 
 def load_products():
-    df = read_local_excel(PRODUCTS_FILE)
-    if df is None:
+    df = fetch_df_from_db('products')
+    if df.empty:
         st.error("Failed to load products.")
-        return pd.DataFrame(columns=["denomination", "reference", "category", "prix-super-gros", "prix-gros", "prix-détail", "quantite_actuelle", "couleurs-dispo-usine", "images"])
+        return pd.DataFrame(columns=[
+            "reference", "denomination", "quantite_actuelle", "prix-super-gros",
+            "prix-gros", "prix-détail", "couleurs-dispo-usine", "images", "category"
+        ])
     return df
 
 def update_stock(products_df, items):
@@ -18,14 +18,20 @@ def update_stock(products_df, items):
         current_stock = products_df.loc[idx, 'quantite_actuelle']
         if current_stock >= item['Quantity']:
             products_df.loc[idx, 'quantite_actuelle'] -= item['Quantity']
+            # Update quantite_vendue if it exists
+            if 'quantite_vendue' in products_df.columns:
+                products_df.loc[idx, 'quantite_vendue'] = products_df.loc[idx, 'quantite_vendue'] + item['Quantity']
         else:
             st.error(f"Insufficient stock for {item['denomination']}")
             return False
-    save_excel(products_df, PRODUCTS_FILE)
+    save_df_to_db(products_df, 'products')
     return True
 
 def restock_product(products_df, reference, quantity, cost):
     idx = products_df[products_df['reference'] == reference].index[0]
     products_df.loc[idx, 'quantite_actuelle'] += quantity
-    save_excel(products_df, PRODUCTS_FILE)
+    # Update quantite_restockee if it exists
+    if 'quantite_restockee' in products_df.columns:
+        products_df.loc[idx, 'quantite_restockee'] = products_df.loc[idx, 'quantite_restockee'] + quantity
+    save_df_to_db(products_df, 'products')
     return cost * quantity
