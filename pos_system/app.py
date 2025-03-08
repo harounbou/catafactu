@@ -4,15 +4,20 @@ import json
 import os
 import bcrypt
 from datetime import datetime
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 from modules.client_management import initialize_clients_df, get_client_info, add_new_client, save_clients, update_client
 from modules.product_management import load_products, update_stock, restock_product
 from modules.transaction_management import record_transaction, record_expenditure, record_staff_payment, get_till_balance
-from modules.pdf_generator import generate_receipt_pdf
+from modules.pdf_generator import generate_receipt_pdf, generate_proforma_pdf
 from modules.proforma import proforma_page
-from modules.utils import validate_email, validate_phone, fetch_df_from_db
+from modules.utils import validate_email, validate_phone, fetch_df_from_db, find_image_path_for_color, get_full_image_path
 
 # Paths
 USERS_FILE = "data/users.json"
+DB_PATH = "/Users/h.boukhalfa/Desktop/pos/catafactu/pos_system/data/pos_system.db"
 
 # Global CSS styling
 st.markdown(
@@ -50,6 +55,34 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+# Email sending function
+def send_email(to_email, subject, body, attachment_path=None):
+    sender_email = st.secrets["gmail"]["email"]  # Store in secrets.toml
+    sender_password = st.secrets["gmail"]["password"]  # Use Gmail App Password
+    
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = to_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+    
+    if attachment_path:
+        with open(attachment_path, "rb") as f:
+            part = MIMEApplication(f.read(), Name=os.path.basename(attachment_path))
+            part['Content-Disposition'] = f'attachment; filename="{os.path.basename(attachment_path)}"'
+            msg.attach(part)
+    
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Échec de l'envoi de l'email : {e}")
+        return False
 
 def load_users(force_reset=False):
     default_users = {
@@ -113,7 +146,7 @@ def initialize_session_state():
     initialize_clients_df()
 
 def pos_page():
-    st.title("Point of Sale")
+    st.title("Point de Vente (POS)")
     initialize_session_state()
     products_df = load_products()
     clients_df = st.session_state['clients_df']
@@ -229,32 +262,76 @@ def pos_page():
             filtered_df = products_df[products_df['denomination'].str.contains(search_term, case=False, na=False)]
             if not filtered_df.empty:
                 st.session_state['pos_filtered'] = filtered_df
+            else:
+                st.error("Aucun article trouvé.")
+        
         if 'pos_filtered' in st.session_state:
-            selected_item = st.selectbox("Sélectionnez un article", st.session_state['pos_filtered']['denomination'], key="pos_selected")
-            selected_row = st.session_state['pos_filtered'][st.session_state['pos_filtered']['denomination'] == selected_item].squeeze()
-            st.write(f"Prix détail : {selected_row['prix-détail']}")
+            filtered_df = st.session_state['pos_filtered']
+            selected_item = st.selectbox("Sélectionnez un article", filtered_df['denomination'], key="pos_selected")
+            selected_row = filtered_df[filtered_df['denomination'] == selected_item].squeeze()
+            price = selected_row['prix-détail'] if pd.notna(selected_row['prix-détail']) else 0.0
+            st.write(f"**Prix détail :** {price:.2f} DZD")
+            
+            total_stock = selected_row.get('quantite_actuelle', 0)
+            st.write(f"**Stock Total Disponible :** {int(total_stock)} unités")
+            colors = [color.strip() for color in selected_row['couleurs-dispo-usine'].split(',')] if pd.notna(selected_row['couleurs-dispo-usine']) else []
+            selected_color = st.selectbox("Choisissez une couleur", colors, key="pos_color_select") if colors else None
+            
+            color_stock = 0
+            if selected_color:
+                color_lower = selected_color.lower()
+                if color_lower in selected_row.index and pd.notna(selected_row[color_lower]):
+                    color_stock = int(selected_row[color_lower])
+                    st.write(f"**Stock pour {selected_color} :** {color_stock} unités")
+                else:
+                    st.warning(f"Stock pour {selected_color} non défini.")
+            
+            image_path = get_full_image_path(find_image_path_for_color(selected_row['images'], selected_color)) if selected_color else None
+            if image_path:
+                st.image(image_path, caption=f"Aperçu ({selected_color})", width=150)
+            
             quantity = st.number_input("Quantité", min_value=1, value=1, key="pos_quantity")
-            if st.button("Ajouter"):
+            can_add_item = True
+            if selected_color and quantity > color_stock:
+                st.error(f"La quantité demandée ({quantity}) dépasse le stock disponible pour {selected_color} ({color_stock}).")
+                can_add_item = False
+            elif not selected_color and quantity > total_stock:
+                st.error(f"La quantité demandée ({quantity}) dépasse le stock total disponible ({int(total_stock)}).")
+                can_add_item = False
+            
+            if st.button("Ajouter", disabled=not can_add_item):
                 item_dict = {
                     "denomination": selected_row['denomination'],
                     "reference": selected_row['reference'],
                     "Quantity": quantity,
-                    "Price": selected_row['prix-détail'],
+                    "Price": price,
+                    "Color": selected_color,
+                    "Image": image_path,
                     "category": selected_row.get('category', 'Sans Catégorie')
                 }
                 st.session_state['pos_items'].append(item_dict)
                 st.success("Article ajouté !")
+        
         if st.session_state['pos_items']:
+            st.write("#### Articles sélectionnés")
             for i, item in enumerate(st.session_state['pos_items']):
-                st.write(f"{item['denomination']} - {item['Quantity']} x {item['Price']}")
-                if st.button(f"Supprimer {i+1}", key=f"pos_delete_{i}"):
-                    st.session_state['pos_items'].pop(i)
-                    st.rerun()
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    st.write(f"{item['denomination']} - {item['reference']} - Couleur: {item['Color']} - {item['Quantity']} x {item['Price']:.2f}")
+                    if item.get('Image'):
+                        st.image(item['Image'], width=100)
+                with col2:
+                    if st.button(f"Supprimer {i+1}", key=f"pos_delete_{i}"):
+                        st.session_state['pos_items'].pop(i)
+                        st.rerun()
 
     with st.expander("Paiement", expanded=True):
         total_amount = sum(item['Quantity'] * item['Price'] for item in st.session_state['pos_items'])
-        st.write(f"Total : {total_amount:.2f} DZD")
-        col1, col2 = st.columns(2)
+        st.write(f"**Total :** {total_amount:.2f} DZD")
+        
+        payment_type = st.selectbox("Mode de paiement", ["Espèces", "Virement bancaire", "Chèque"], key="pos_payment_type")
+        col1, col2, col3 = st.columns(3)
+        
         with col1:
             if st.button("Process Sale"):
                 client_info = st.session_state.get("client_info_loaded", None)
@@ -264,18 +341,30 @@ def pos_page():
                     st.error("Ajoutez des articles !")
                 else:
                     if update_stock(products_df, st.session_state['pos_items']):
-                        transaction_id = record_transaction(client_info, st.session_state['pos_items'], "Full Payment", total_amount, total_amount, status="completed")
+                        transaction_id = record_transaction(client_info, st.session_state['pos_items'], payment_type, total_amount, total_amount, status="completed")
                         transaction_info = {"transaction_number": transaction_id, "transaction_date": datetime.now().strftime("%d/%m/%Y"), "client_id": client_info['id_client']}
                         pdf_filename = generate_receipt_pdf(transaction_info, st.session_state['pos_items'], total_amount)
-                        with open(pdf_filename, "rb") as file:
-                            st.download_button("Télécharger le reçu", file, pdf_filename, mime="application/pdf")
+                        st.session_state['pos_pdf_filename'] = pdf_filename
+                        st.session_state['pos_transaction_generated'] = True
                         st.success("Vente terminée !")
-                        del st.session_state['pos_items']
-                        if 'pos_filtered' in st.session_state:
-                            del st.session_state['pos_filtered']
-                        if 'client_info_loaded' in st.session_state:
-                            del st.session_state['client_info_loaded']
                         st.rerun()
+        
+        if st.session_state.get('pos_transaction_generated', False):
+            pdf_filename = st.session_state['pos_pdf_filename']
+            with col2:
+                with open(pdf_filename, "rb") as file:
+                    st.download_button("Télécharger le reçu", file, pdf_filename, mime="application/pdf", key="pos_download")
+            with col3:
+                st.markdown(f'<a href="file://{pdf_filename}" target="_blank"><button>Imprimer le reçu</button></a>', unsafe_allow_html=True)
+            
+            client_email = st.session_state['client_info_loaded'].get('email_client', '')
+            if client_email and validate_email(client_email):
+                if st.button("Envoyer par email", key="pos_email"):
+                    subject = f"Reçu de vente #{transaction_info['transaction_number']}"
+                    body = f"Bonjour {client_info.get('nom_client', '')},\n\nVoici votre reçu pour la transaction #{transaction_info['transaction_number']}.\nMontant total: {total_amount:.2f} DZD\n\nCordialement,\nTakideco"
+                    if send_email(client_email, subject, body, pdf_filename):
+                        st.success("Reçu envoyé par email !")
+        
         with col2:
             if st.button("Effacer tout"):
                 if 'pos_items' in st.session_state:
@@ -284,6 +373,10 @@ def pos_page():
                     del st.session_state['pos_filtered']
                 if 'client_info_loaded' in st.session_state:
                     del st.session_state['client_info_loaded']
+                if 'pos_transaction_generated' in st.session_state:
+                    del st.session_state['pos_transaction_generated']
+                if 'pos_pdf_filename' in st.session_state:
+                    del st.session_state['pos_pdf_filename']
                 st.success("Tout effacé !")
                 st.rerun()
 

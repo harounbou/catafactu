@@ -1,0 +1,71 @@
+Table: sqlite_sequence
+  Column: name, Data Type: 
+  Column: seq, Data Type: 
+Table: clients
+  Column: id_client, Data Type: INTEGER
+  Column: nom_client, Data Type: TEXT
+  Column: prenom_client, Data Type: TEXT
+  Column: telephone_client, Data Type: REAL
+  Column: address_client, Data Type: TEXT
+  Column: email_client, Data Type: REAL
+  Column: entreprise_client, Data Type: TEXT
+Table: expenditures
+  Column: expenditure_id, Data Type: INTEGER
+  Column: date, Data Type: TEXT
+  Column: assistant_name, Data Type: TEXT
+  Column: amount, Data Type: REAL
+  Column: description, Data Type: REAL
+Table: staff_payments
+  Column: payment_id, Data Type: INTEGER
+  Column: date, Data Type: TEXT
+  Column: staff_name, Data Type: TEXT
+  Column: amount, Data Type: REAL
+Table: products
+  Column: reference, Data Type: TEXT
+  Column: denomination, Data Type: TEXT
+  Column: quantite_initiale, Data Type: REAL
+  Column: quantite_restockee, Data Type: REAL
+  Column: quantite_vendue, Data Type: INTEGER
+  Column: quantite_actuelle, Data Type: INTEGER
+  Column: couleurs-dispo-usine, Data Type: TEXT
+  Column: images, Data Type: TEXT
+  Column: prix-super-gros, Data Type: REAL
+  Column: prix-gros, Data Type: REAL
+  Column: prix-détail, Data Type: REAL
+  Column: uni_colour, Data Type: REAL
+  Column: default_colour, Data Type: REAL
+  Column: brown, Data Type: REAL
+  Column: brown_deg, Data Type: REAL
+  Column: blue, Data Type: REAL
+  Column: white, Data Type: REAL
+  Column: black, Data Type: REAL
+  Column: green_bottle, Data Type: REAL
+  Column: red, Data Type: REAL
+  Column: grey, Data Type: REAL
+  Column: grey_deg, Data Type: REAL
+  Column: beige, Data Type: REAL
+  Column: yellow, Data Type: REAL
+  Column: orange, Data Type: REAL
+  Column: garnet, Data Type: REAL
+  Column: golden, Data Type: REAL
+  Column: green, Data Type: REAL
+  Column: rose, Data Type: REAL
+  Column: note, Data Type: TEXT
+  Column: category, Data Type: TEXT
+  Column: quantite_vendu_actue, Data Type: INTEGER
+Table: transactions
+  Column: transaction_id, Data Type: INTEGER
+  Column: date, Data Type: TEXT
+  Column: client_id, Data Type: INTEGER
+  Column: items, Data Type: TEXT
+  Column: total_amount, Data Type: REAL
+  Column: status, Data Type: TEXT
+  Column: payment_type, Data Type: TEXT
+  Column: deposit_amount, Data Type: REAL
+  Column: remaining_amount, Data Type: REAL
+Table: till
+  Column: date, Data Type: TEXT
+  Column: amount, Data Type: REAL
+  Column: direction, Data Type: TEXT
+  Column: description, Data Type: TEXT
+  Column: balance, Data Type: REAL

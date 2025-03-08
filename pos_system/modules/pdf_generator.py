@@ -123,10 +123,47 @@ def generate_receipt_pdf(transaction_info, items, payment_amount):
     pdf.set_font("Arial", size=24, style='B')
     pdf.cell(200, 15, txt=sanitize_text("Reçu Takideco"), ln=True, align='C')
     pdf.ln(10)
+    
     pdf.set_font("Arial", size=12)
     pdf.cell(0, 10, txt=sanitize_text(f"Transaction ID: {transaction_info['transaction_number']} | Date: {transaction_info['transaction_date']}"), ln=1)
     total_amount = sum(item['Quantity'] * item['Price'] for item in items)
     pdf.cell(0, 10, txt=sanitize_text(f"Montant Payé: {payment_amount:.2f} DZD | Total: {total_amount:.2f} DZD"), ln=1)
+    pdf.ln(10)
+    
+    # Items table with images
+    pdf.set_font("Arial", size=12, style='B')
+    col_widths = [60, 30, 30, 30, 30]
+    headers = ["Article", "Image", "Référence", "Quantité", "Total"]
+    for w, h in zip(col_widths, headers):
+        pdf.cell(w, 10, txt=h, border=1)
+    pdf.ln()
+    pdf.set_font("Arial", size=12)
+    row_height = 30
+    
+    for item in items:
+        item_total = item['Quantity'] * item['Price']
+        y_before = pdf.get_y()
+        pdf.cell(col_widths[0], row_height, txt=sanitize_text(truncate_text(item['denomination'])), border=1)
+        x_image = pdf.get_x()
+        image_path = item.get('Image')
+        if image_path:
+            try:
+                scaled_width_mm, scaled_height_mm = calculate_image_dimensions(image_path, col_widths[1], row_height)
+                x_offset = (col_widths[1] - scaled_width_mm) / 2
+                y_offset = (row_height - scaled_height_mm) / 2
+                pdf.image(image_path, x=x_image + x_offset, y=y_before + y_offset, w=scaled_width_mm, h=scaled_height_mm)
+            except Exception:
+                pdf.set_xy(x_image, y_before)
+                pdf.cell(col_widths[1], row_height, txt="Pas d'Image", border=1)
+        else:
+            pdf.set_xy(x_image, y_before)
+            pdf.cell(col_widths[1], row_height, txt="Pas d'Image", border=1)
+        pdf.set_xy(x_image + col_widths[1], y_before)
+        pdf.cell(col_widths[2], row_height, txt=sanitize_text(truncate_text(item['reference'])), border=1)
+        pdf.cell(col_widths[3], row_height, txt=str(item['Quantity']), border=1)
+        pdf.cell(col_widths[4], row_height, txt=f"{item_total:.2f}", border=1)
+        pdf.ln(row_height)
+    
     pdf_filename = f"Receipt-{transaction_info['transaction_number']}-{datetime.now().strftime('%d%m%Y')}.pdf"
     pdf.output(pdf_filename)
     return pdf_filename

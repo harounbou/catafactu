@@ -5,6 +5,37 @@ from .transaction_management import record_transaction
 from .pdf_generator import generate_proforma_pdf
 from .utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path
 from datetime import datetime
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
+
+def send_email(to_email, subject, body, attachment_path=None):
+    sender_email = st.secrets["gmail"]["email"]
+    sender_password = st.secrets["gmail"]["password"]
+    
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = to_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+    
+    if attachment_path:
+        with open(attachment_path, "rb") as f:
+            part = MIMEApplication(f.read(), Name=os.path.basename(attachment_path))
+            part['Content-Disposition'] = f'attachment; filename="{os.path.basename(attachment_path)}"'
+            msg.attach(part)
+    
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Échec de l'envoi de l'email : {e}")
+        return False
 
 def proforma_page(products_df, clients_df):
     st.title("Générateur de Facture Proforma")
@@ -56,31 +87,26 @@ def proforma_page(products_df, clients_df):
                 else:
                     st.warning("Veuillez entrer un terme de recherche.")
 
-
-
         if 'filtered_articles' in st.session_state:
             filtered_df = st.session_state['filtered_articles']
             selected_item = st.selectbox("Sélectionnez un article", filtered_df['denomination'], key="selected_item")
             selected_row = filtered_df[filtered_df['denomination'] == selected_item].squeeze()
             
-            # Get price
             price = selected_row[price_type] if pd.notna(selected_row[price_type]) else 0.0
             st.write(f"**Prix ({price_type}) :** {price}")
             if price == 0.0:
                 st.warning("Le prix est 0. Vérifiez les données dans la base.")
             
-            # Get total and color-specific stock
             total_stock = selected_row.get('quantite_actuelle', 0)
             st.write(f"**Stock Total Disponible :** {int(total_stock)} unités")
             colors = [color.strip() for color in selected_row['couleurs-dispo-usine'].split(',')] if pd.notna(selected_row['couleurs-dispo-usine']) else []
             selected_color = st.selectbox("Choisissez une couleur", colors, key="color_select") if colors else None
             
-            # Check color-specific stock
             color_stock = 0
             if selected_color:
                 color_lower = selected_color.lower()
                 if color_lower in selected_row.index and pd.notna(selected_row[color_lower]):
-                    color_stock = int(selected_row[color_lower])  # Convert REAL to int
+                    color_stock = int(selected_row[color_lower])
                     st.write(f"**Stock pour {selected_color} :** {color_stock} unités")
                 else:
                     st.warning(f"Stock pour {selected_color} non défini dans la base.")
@@ -103,7 +129,7 @@ def proforma_page(products_df, clients_df):
                     "denomination": selected_row['denomination'],
                     "reference": selected_row['reference'],
                     "Quantity": quantity,
-                    "Price": price,  # Use price_type price only
+                    "Price": price,
                     "Color": selected_color,
                     "Image": image_path,
                     "category": selected_row.get('category', 'Sans Catégorie')
@@ -241,7 +267,7 @@ def proforma_page(products_df, clients_df):
         st.write(f"Date de transaction : {transaction_info['transaction_date']}")
         st.write(f"ID Client : {transaction_info['client_id']}")
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             if st.button("Générer la facture proforma"):
                 if st.session_state['items'] and "client_info_loaded" in st.session_state:
@@ -260,15 +286,27 @@ def proforma_page(products_df, clients_df):
                     st.error("Ajoutez des articles et chargez un client !")
 
         if st.session_state.get('proforma_generated', False):
+            pdf_filename = st.session_state['pdf_filename']
             with col1:
-                with open(st.session_state['pdf_filename'], "rb") as file:
+                with open(pdf_filename, "rb") as file:
                     st.download_button(
                         label="Télécharger la facture proforma",
                         data=file,
-                        file_name=st.session_state['pdf_filename'],
+                        file_name=pdf_filename,
                         mime="application/pdf",
                         key="download_proforma"
                     )
+            with col2:
+                st.markdown(f'<a href="file://{pdf_filename}" target="_blank"><button>Imprimer la facture</button></a>', unsafe_allow_html=True)
+            with col3:
+                client_email = client_info.get('email_client', '')
+                if client_email and validate_email(client_email):
+                    if st.button("Envoyer par email", key="proforma_email"):
+                        subject = f"Facture Proforma #{transaction_info['transaction_number']}"
+                        body = f"Bonjour {client_info.get('nom_client', '')},\n\nVoici votre facture proforma #{transaction_info['transaction_number']}.\nMontant total: {total_amount:.2f} DZD\n\nCordialement,\nTakideco"
+                        if send_email(client_email, subject, body, pdf_filename):
+                            st.success("Facture envoyée par email !")
+            
             with col2:
                 if st.button("Commencer une nouvelle proforma", key="reset_after_download"):
                     if 'items' in st.session_state:
