@@ -1,19 +1,12 @@
 .
 ├── DejaVuSans.ttf
+├── Receipt-1044-08032025.pdf
 ├── app.py
 ├── armchair.png
-├── changing-data-type.py
 ├── data
-│   ├── clients.xlsx
-│   ├── expenditures.csv
 │   ├── pos_system.db
-│   ├── products.xlsx
-│   ├── staff_payments.csv
-│   ├── till.csv
-│   ├── transactions.csv
+│   ├── query.sql
 │   └── users.json
-├── date-format-atabase-path.py
-├── generate_report.py
 ├── images
 │   ├── BEDS
 │   │   └── Lit_Bebe
@@ -260,9 +253,6 @@
 │   ├── proforma.py
 │   ├── transaction_management.py
 │   └── utils.py
-├── read-table-infer.py
-├── requirements.txt
-├── result.txt
 └── tree.txt
 
-111 directories, 155 files
+111 directories, 145 files

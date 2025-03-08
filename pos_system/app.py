@@ -16,8 +16,7 @@ from modules.proforma import proforma_page
 from modules.utils import validate_email, validate_phone, fetch_df_from_db, find_image_path_for_color, get_full_image_path
 
 # Paths
-USERS_FILE = "data/users.json"
-DB_PATH = "/Users/h.boukhalfa/Desktop/pos/catafactu/pos_system/data/pos_system.db"
+USERS_FILE = "data/users.json"  # Already relative, no change needed
 
 # Global CSS styling
 st.markdown(

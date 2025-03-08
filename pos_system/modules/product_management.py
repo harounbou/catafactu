@@ -1,13 +1,7 @@
 import pandas as pd
 import sqlite3
 import json
-
-DB_PATH = "/Users/h.boukhalfa/Desktop/pos/catafactu/pos_system/data/pos_system.db"
-
-def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+from .utils import get_db_connection  # Import from utils
 
 def load_products():
     conn = get_db_connection()
