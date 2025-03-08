@@ -83,7 +83,12 @@ def send_email(to_email, subject, body, attachment_path=None):
         st.error(f"Échec de l'envoi de l'email : {e}")
         return False
 
+
 def load_users(force_reset=False):
+    # Define the file path
+    USERS_FILE = "data/users.json"
+    
+    # Default user data
     default_users = {
         "users": [
             {"username": "admin", "password": bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode(), "role": "admin", "access": ["Proforma", "POS", "Restock", "Expenditures", "Staff Payments", "Till", "Access Control", "Dashboard", "Invoice History", "Activity Log"]},
@@ -94,6 +99,19 @@ def load_users(force_reset=False):
         "access_control_enabled": False
     }
     
+    # Ensure the 'data' directory exists
+    os.makedirs("data", exist_ok=True)
+    
+    # If force_reset is True or the file doesn't exist, create it with default data
+    if force_reset or not os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'w') as f:
+            json.dump(default_users, f)
+        return default_users
+    
+    # Otherwise, load the existing file
+    with open(USERS_FILE, 'r') as f:
+        return json.load(f)
+    
     if force_reset or not os.path.exists(USERS_FILE):
         with open(USERS_FILE, 'w') as f:
             json.dump(default_users, f)
@@ -101,6 +119,8 @@ def load_users(force_reset=False):
     
     with open(USERS_FILE, 'r') as f:
         return json.load(f)
+
+
 
 def save_users(users_data):
     with open(USERS_FILE, 'w') as f:
