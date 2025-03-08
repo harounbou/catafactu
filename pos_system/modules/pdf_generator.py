@@ -25,7 +25,8 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
     pdf.cell(90, 10, txt=sanitize_text(f"Date de transaction : {transaction_info['transaction_date']}"), ln=1, align='R')
     pdf.cell(100, 10, txt=sanitize_text(f"Adresse : {client_info.get('address_client', '')}"), ln=0)
     pdf.cell(90, 10, txt=sanitize_text(f"ID Client : {transaction_info['client_id']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Telephone : {client_info.get('telephone_client', '')}"), ln=1)
+    pdf.cell(100, 10, txt=sanitize_text(f"Telephone : {client_info.get('telephone_client', '')}"), ln=0)
+    pdf.cell(90, 10, txt=sanitize_text(f"Effectué par : {transaction_info['performed_by']}"), ln=1, align='R')
     pdf.ln(10)
     
     total_amount = sum(item['Quantity'] * item['Price'] for item in items)
@@ -125,7 +126,12 @@ def generate_receipt_pdf(transaction_info, items, payment_amount, discount_amoun
     pdf.ln(10)
     
     pdf.set_font("Arial", size=12)
-    pdf.cell(0, 10, txt=sanitize_text(f"Transaction ID: {transaction_info['transaction_number']} | Date: {transaction_info['transaction_date']}"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"Transaction ID: {transaction_info['transaction_number']}"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"Date: {transaction_info['transaction_date']}"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"ID Client: {transaction_info['client_id']}"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"Effectué par: {transaction_info['performed_by']}"), ln=1)
+    pdf.ln(10)
+    
     total_amount = sum(item['Quantity'] * item['Price'] for item in items)
     pdf.cell(0, 10, txt=sanitize_text(f"Montant Total (HT): {total_amount:.2f} DZD"), ln=1)
     if discount_amount > 0:
@@ -166,7 +172,13 @@ def generate_receipt_pdf(transaction_info, items, payment_amount, discount_amoun
         pdf.cell(col_widths[3], row_height, txt=str(item['Quantity']), border=1)
         pdf.cell(col_widths[4], row_height, txt=f"{item_total:.2f}", border=1)
         pdf.ln(row_height)
+        pdf.ln(3)
     
-    pdf_filename = f"Receipt-{transaction_info['transaction_number']}-{datetime.now().strftime('%d%m%Y')}.pdf"
+    pdf.ln(10)
+    pdf.set_font("Arial", size=10, style='I')
+    total_amount_words = num2words(int(payment_amount), lang='fr') if payment_amount <= 999999 else "Montant très élevé"
+    pdf.cell(0, 10, txt=sanitize_text(f"Arrêté à la somme de : {total_amount_words} dinars."), ln=1)
+    
+    pdf_filename = f"Receipt-{transaction_info['transaction_number']}-{transaction_info['transaction_date'].replace('/', '')}.pdf"
     pdf.output(pdf_filename)
     return pdf_filename

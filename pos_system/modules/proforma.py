@@ -54,9 +54,17 @@ def stock_checker_section(products_df, section_key_prefix=""):
                         color_lower = color.lower()
                         if color_lower in row.index and pd.notna(row[color_lower]):
                             stock = int(row[color_lower])
-                            st.write(f"- {color}: {stock} unités")
-                            if stock <= 5:
-                                st.warning(f"Alerte: Stock faible pour {color} ({stock} unités restantes)")
+                            image_path = get_full_image_path(find_image_path_for_color(row['images'], color))
+                            col1, col2 = st.columns([1, 4])
+                            with col1:
+                                if image_path:
+                                    st.image(image_path, width=50)
+                                else:
+                                    st.write("Image non disponible")
+                            with col2:
+                                st.write(f"- {color}: {stock} unités")
+                                if stock <= 5:
+                                    st.warning(f"Alerte: Stock faible pour {color} ({stock} unités restantes)")
                     if row['quantite_actuelle'] <= 5:
                         st.warning(f"Alerte: Stock total faible ({int(row['quantite_actuelle'])} unités restantes)")
             else:
@@ -64,6 +72,7 @@ def stock_checker_section(products_df, section_key_prefix=""):
 
 def proforma_page(products_df, clients_df):
     st.title("Générateur de Facture Proforma")
+    username = st.session_state['user']['username']
 
     st.markdown(
         """
@@ -97,14 +106,17 @@ def proforma_page(products_df, clients_df):
             st.session_state['items'] = []
         categories = ['Toutes'] + sorted(products_df['category'].dropna().unique().tolist())
         selected_category = st.selectbox("Filtrer par catégorie", categories, key="category_filter")
-        search_term = st.text_input("Rechercher un article par Dénomination", placeholder="Tapez le nom de l'article", key="article_search")
+        search_term = st.text_input("Rechercher par nom ou référence", placeholder="Tapez le nom ou la référence", key="article_search")
         col1, col2 = st.columns([1, 10])
         with col1:
             pass
         with col2:
             if st.button("Rechercher l'article"):
                 if search_term:
-                    filtered_df = products_df[products_df['denomination'].str.contains(search_term, case=False, na=False, regex=False)]
+                    filtered_df = products_df[
+                        products_df['denomination'].str.contains(search_term, case=False, na=False, regex=False) |
+                        products_df['reference'].str.contains(search_term, case=False, na=False, regex=False)
+                    ]
                     if selected_category != 'Toutes':
                         filtered_df = filtered_df[filtered_df['category'] == selected_category]
                     if not filtered_df.empty:
@@ -292,18 +304,20 @@ def proforma_page(products_df, clients_df):
         transaction_info = {
             "transaction_number": st.session_state.get('transaction_number', 1000),
             "transaction_date": datetime.now().strftime("%d/%m/%Y"),
-            "client_id": client_info.get("id_client", "N/A")
+            "client_id": client_info.get("id_client", "N/A"),
+            "performed_by": username
         }
         st.write(f"N° De transaction : {transaction_info['transaction_number']}")
         st.write(f"Date de transaction : {transaction_info['transaction_date']}")
         st.write(f"ID Client : {transaction_info['client_id']}")
+        st.write(f"Effectué par : {username}")
 
         col1, col2, col3 = st.columns(3)
         with col1:
             if st.button("Générer la facture proforma"):
                 if st.session_state['items'] and "client_info_loaded" in st.session_state:
                     total_amount = sum(item['Quantity'] * item['Price'] for item in st.session_state['items'])
-                    transaction_id = record_transaction(client_info, st.session_state['items'], "Proforma", 0, total_amount)
+                    transaction_id = record_transaction(client_info, st.session_state['items'], "Proforma", 0, total_amount, "proforma", username)
                     transaction_info["transaction_number"] = transaction_id
                     pdf_filename = generate_proforma_pdf(
                         st.session_state['items'], price_type, client_info, transaction_info,
@@ -334,7 +348,7 @@ def proforma_page(products_df, clients_df):
                 if client_email and validate_email(client_email):
                     if st.button("Envoyer par email", key="proforma_email"):
                         subject = f"Facture Proforma #{transaction_info['transaction_number']}"
-                        body = f"Bonjour {client_info.get('nom_client', '')},\n\nVoici votre facture proforma #{transaction_info['transaction_number']}.\nMontant total: {total_amount:.2f} DZD\n\nCordialement,\nTakideco"
+                        body = f"Bonjour {client_info.get('nom_client', '')},\n\nVoici votre facture proforma #{transaction_info['transaction_number']}.\nMontant total: {total_amount:.2f} DZD\nEffectué par: {username}\n\nCordialement,\nTakideco"
                         if send_email(client_email, subject, body, pdf_filename):
                             st.success("Facture envoyée par email !")
             
