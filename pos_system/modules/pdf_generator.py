@@ -11,7 +11,7 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
     pdf.set_font("Arial", size=24, style='B')
     pdf.cell(200, 15, txt=sanitize_text("Facture Proforma Takideco"), ln=True, align='C')
     pdf.ln(10)
-    
+
     pdf.set_font("Arial", size=10)
     pdf.cell(200, 5, txt=sanitize_text("Taki Deco"), ln=True, align='C')
     pdf.cell(200, 5, txt=sanitize_text("0542918226 | 0698077751" if not show_onama else "0542310057 | 0542918226 | 0698077751"), ln=True, align='C')
