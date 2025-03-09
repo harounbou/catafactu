@@ -1,3 +1,4 @@
+#  utils.py 
 import sqlite3
 import os
 import re
@@ -15,6 +16,7 @@ def get_db_connection():
     """Establish a connection to the SQLite database."""
     try:
         conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row  # <-- KEY FIX
         return conn
     except sqlite3.Error as e:
         st.error(f"Database connection failed: {e}")

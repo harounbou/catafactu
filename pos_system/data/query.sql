@@ -1,1 +1,1 @@
-SELECT reference, denomination, "prix-super-gros", "prix-gros", "prix-détail" FROM products WHERE reference = 'ME1000';
+SELECT quantite_actuelle, golden FROM products WHERE reference = 'FR0005';

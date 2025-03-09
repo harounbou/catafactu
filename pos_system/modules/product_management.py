@@ -59,3 +59,4 @@ def restock_product(products_df, reference, quantity, cost_per_unit, color=None)
     conn.commit()
     conn.close()
     return total_cost
+
