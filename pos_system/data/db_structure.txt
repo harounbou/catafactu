@@ -4,16 +4,6 @@ Columns:
   - name ()
   - seq ()
 
-Table: clients
-Columns:
-  - id_client (INTEGER)
-  - nom_client (TEXT)
-  - prenom_client (TEXT)
-  - telephone_client (REAL)
-  - address_client (TEXT)
-  - email_client (REAL)
-  - entreprise_client (TEXT)
-
 Table: staff_payments
 Columns:
   - payment_id (INTEGER)
@@ -36,6 +26,7 @@ Columns:
   - payment_amount (REAL)
   - transaction_date (TEXT)
   - performed_by (TEXT)
+  - linked_proforma_id (INTEGER)
 
 Table: products
 Columns:
@@ -87,3 +78,13 @@ Columns:
   - direction (TEXT)
   - description (TEXT)
   - balance (REAL)
+
+Table: clients
+Columns:
+  - id_client (INTEGER)
+  - nom_client (TEXT)
+  - prenom_client (TEXT)
+  - telephone_client (TEXT)
+  - address_client (TEXT)
+  - email_client (TEXT)
+  - entreprise_client (TEXT)

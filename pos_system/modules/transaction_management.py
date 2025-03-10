@@ -1,6 +1,7 @@
 # transaction_management.py
 import sqlite3
 import json
+import pandas as pd
 from datetime import datetime
 from .utils import get_db_connection
 
@@ -59,6 +60,19 @@ def initialize_db():
     conn.commit()
     conn.close()
 
+def fetch_df_from_db(table_name):
+    """Fetch all records from the specified table and return as a DataFrame."""
+    initialize_db()  # Ensure the table exists
+    conn = get_db_connection()
+    try:
+        df = pd.read_sql_query(f"SELECT * FROM {table_name}", conn)
+        return df
+    except sqlite3.Error as e:
+        print(f"Database error fetching {table_name}: {e}")
+        return pd.DataFrame()
+    finally:
+        conn.close()
+
 def record_transaction(client_info, items, payment_details, payment_amount, 
                       total_amount, status, performed_by, proforma_id=None):
     """Record any type of transaction (proforma or sale)"""
@@ -110,8 +124,6 @@ def get_proformas():
         return c.fetchall()
     finally:
         conn.close()
-
-# Original functions maintained below
 
 def record_expenditure(description, amount, performed_by="N/A"):
     """Record an expenditure"""

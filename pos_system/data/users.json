@@ -1,1 +1,50 @@
-{"users": [{"username": "admin", "password": "$2b$12$9cPTh5GHYFya1pLuaigshucc4SSsRYuqPFg8tm4VXAiH/dhpe.3te", "role": "admin", "access": ["Proforma", "POS", "Restock", "Expenditures", "Staff Payments", "Till", "Access Control", "Dashboard", "Activity Log"]}, {"username": "constantine", "password": "$2b$12$qNwyue08CAVow4ALDKDPxerVb7KT1hqnpGsykkgfrKl.zojc.gVVS", "role": "operator", "access": ["Proforma", "POS"]}, {"username": "alger", "password": "$2b$12$Bg5AmBDZzUMlOdCtN52AgOqzhTAgKxVuOJXXlUNLmKln0w1L/74mK", "role": "operator", "access": ["POS", "Proforma", "Till"]}, {"username": "eulma", "password": "$2b$12$gH3jJnJw.DIFmeGpzT8D.eLHfrcpHuEvcAg.rkUFvltiqvdJ8tfaS", "role": "operator", "access": ["POS", "Proforma", "Till"]}], "access_control_enabled": true}
+{
+    "users": [
+        {
+            "username": "admin",
+            "password": "$2b$12$9cPTh5GHYFya1pLuaigshucc4SSsRYuqPFg8tm4VXAiH/dhpe.3te",
+            "role": "admin",
+            "access": [
+                "Proforma",
+                "POS",
+                "Restock",
+                "Expenditures",
+                "Staff Payments",
+                "Till",
+                "Access Control",
+                "Dashboard",
+                "Activity Log"
+            ]
+        },
+        {
+            "username": "constantine",
+            "password": "$2b$12$qNwyue08CAVow4ALDKDPxerVb7KT1hqnpGsykkgfrKl.zojc.gVVS",
+            "role": "operator",
+            "access": [
+                "Proforma",
+                "POS"
+            ]
+        },
+        {
+            "username": "alger",
+            "password": "$2b$12$Bg5AmBDZzUMlOdCtN52AgOqzhTAgKxVuOJXXlUNLmKln0w1L/74mK",
+            "role": "operator",
+            "access": [
+                "POS",
+                "Proforma",
+                "Till"
+            ]
+        },
+        {
+            "username": "eulma",
+            "password": "$2b$12$gH3jJnJw.DIFmeGpzT8D.eLHfrcpHuEvcAg.rkUFvltiqvdJ8tfaS",
+            "role": "operator",
+            "access": [
+                "POS",
+                "Proforma",
+                "Till"
+            ]
+        }
+    ],
+    "access_control_enabled": true
+}

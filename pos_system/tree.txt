@@ -4,6 +4,7 @@
 ├── armchair.png
 ├── data
 │   ├── db_structure.py
+│   ├── db_structure.txt
 │   ├── pos_system.db
 │   ├── query.sql
 │   └── users.json
@@ -233,14 +234,28 @@
 │   │   └── CHAISE_NAPOLEON.jpg
 │   └── logo.png
 ├── modules
+│   ├── __pycache__
+│   │   ├── client_management.cpython-311.pyc
+│   │   ├── client_management.cpython-313.pyc
+│   │   ├── pdf_generator.cpython-311.pyc
+│   │   ├── pdf_generator.cpython-313.pyc
+│   │   ├── product_management.cpython-311.pyc
+│   │   ├── product_management.cpython-313.pyc
+│   │   ├── proforma.cpython-311.pyc
+│   │   ├── transaction_management.cpython-311.pyc
+│   │   ├── transaction_management.cpython-313.pyc
+│   │   ├── utils.cpython-311.pyc
+│   │   └── utils.cpython-313.pyc
 │   ├── ai_assistant.py
 │   ├── client_management.py
 │   ├── pdf_generator.py
+│   ├── pos.py
 │   ├── product_management.py
 │   ├── proforma.py
+│   ├── restock.py
 │   ├── transaction_management.py
 │   └── utils.py
 ├── requirements.txt
 └── tree.txt
 
-110 directories, 134 files
+111 directories, 148 files
