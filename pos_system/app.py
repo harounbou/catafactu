@@ -471,7 +471,8 @@ def pos_page():
                     elif not st.session_state.get("client_info_loaded"):
                         st.error("Chargez un client !")
                     else:
-                        if update_stock(products_df, st.session_state['pos_items']):
+                        # Fix: Remove products_df from the call
+                        if update_stock(st.session_state['pos_items']):  # Changed from update_stock(products_df, st.session_state['pos_items'])
                             payment_details = "; ".join([f"{k}: {v:.2f}" for k, v in payments.items() if v > 0])
                             transaction_id = record_transaction(
                                 st.session_state['client_info_loaded'],

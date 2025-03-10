@@ -1,14 +1,15 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 from .client_management import get_client_info, add_new_client, save_clients, update_client
-from .transaction_management import record_transaction
+from .transaction_management import record_transaction, get_proformas
 from .pdf_generator import generate_proforma_pdf
 from .utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path
-from datetime import datetime
-import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+import smtplib
+import os
 
 def send_email(to_email, subject, body, attachment_path=None):
     sender_email = st.secrets["gmail"]["email"]
@@ -37,332 +38,214 @@ def send_email(to_email, subject, body, attachment_path=None):
         st.error(f"Échec de l'envoi de l'email : {e}")
         return False
 
-def stock_checker_section(products_df, section_key_prefix=""):
-    with st.expander("Vérificateur de Stock", expanded=False):
-        search_term = st.text_input("Rechercher par nom ou référence", placeholder="Tapez le nom ou la référence", key=f"{section_key_prefix}stock_search")
-        if st.button("Vérifier", key=f"{section_key_prefix}stock_check"):
-            filtered_df = products_df[
-                products_df['denomination'].str.contains(search_term, case=False, na=False) |
-                products_df['reference'].str.contains(search_term, case=False, na=False)
-            ]
-            if not filtered_df.empty:
-                for _, row in filtered_df.iterrows():
-                    st.write(f"**{row['denomination']} ({row['reference']})**")
-                    st.write(f"- Stock Total: {int(row['quantite_actuelle'])} unités")
-                    colors = [color.strip() for color in row['couleurs-dispo-usine'].split(',')] if pd.notna(row['couleurs-dispo-usine']) else []
-                    for color in colors:
-                        color_lower = color.lower()
-                        if color_lower in row.index and pd.notna(row[color_lower]):
-                            stock = int(row[color_lower])
-                            image_path = get_full_image_path(find_image_path_for_color(row['images'], color))
-                            col1, col2 = st.columns([1, 4])
-                            with col1:
-                                if image_path:
-                                    st.image(image_path, width=50)
-                                else:
-                                    st.write("Image non disponible")
-                            with col2:
-                                st.write(f"- {color}: {stock} unités")
-                                if stock <= 5:
-                                    st.warning(f"Alerte: Stock faible pour {color} ({stock} unités restantes)")
-                    if row['quantite_actuelle'] <= 5:
-                        st.warning(f"Alerte: Stock total faible ({int(row['quantite_actuelle'])} unités restantes)")
-            else:
-                st.error("Aucun article trouvé.")
-
 def proforma_page(products_df, clients_df):
     st.title("Générateur de Facture Proforma")
     username = st.session_state['user']['username']
 
-    st.markdown(
-        """
-        <style>
-        .stApp { 
-            background-color: #f5f5f5;
-        }
-        div[data-testid="stDownloadButton"] button {
-            background-color: #d4a373 !important;
-            color: white !important;
-            border: none;
-            border-radius: 4px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+    # Initialize session state
+    if 'proforma_items' not in st.session_state:
+        st.session_state.proforma_items = []
+    if 'proforma_client' not in st.session_state:
+        st.session_state.proforma_client = None
+    if 'show_onama' not in st.session_state:
+        st.session_state.show_onama = False
+    if 'generated_pdf' not in st.session_state:
+        st.session_state.generated_pdf = None
 
-    stock_checker_section(products_df, "proforma_")
-
-    with st.expander("Options de la facture", expanded=True):
-        price_type = st.radio("Type de prix", ["prix-super-gros", "prix-gros", "prix-détail"], key='price_type')
-        apply_tva = st.checkbox("Appliquer la TVA (19%)", value=False, key='apply_tva')
-        show_onama = st.checkbox("Basculer à L'Onama", value=False, key='show_onama')
-        discount_type = st.radio("Type de remise", ["Pourcentage", "Montant fixe"], key='discount_type')
-        discount_value = st.number_input("Valeur de la remise", min_value=0.0, value=0.0, key='discount_value')
-        delivery_days = st.selectbox("Délai de livraison (jours)", list(range(0, 31)), key='delivery_days')
-
-    with st.expander("Ajouter des articles", expanded=True):
-        if 'items' not in st.session_state:
-            st.session_state['items'] = []
-        categories = ['Toutes'] + sorted(products_df['category'].dropna().unique().tolist())
-        selected_category = st.selectbox("Filtrer par catégorie", categories, key="category_filter")
-        search_term = st.text_input("Rechercher par nom ou référence", placeholder="Tapez le nom ou la référence", key="article_search")
-        col1, col2 = st.columns([1, 10])
+    with st.expander("Configuration de la Proforma", expanded=True):
+        col1, col2 = st.columns(2)
         with col1:
-            pass
+            price_type = st.radio("Type de prix", 
+                ["prix-super-gros", "prix-gros", "prix-détail"])
+            apply_tva = st.checkbox("Appliquer TVA 19%")
+            show_onama = st.checkbox("Basculer à l’ONAMA")
+            st.session_state.show_onama = show_onama
         with col2:
-            if st.button("Rechercher l'article"):
-                if search_term:
-                    filtered_df = products_df[
-                        products_df['denomination'].str.contains(search_term, case=False, na=False, regex=False) |
-                        products_df['reference'].str.contains(search_term, case=False, na=False, regex=False)
-                    ]
-                    if selected_category != 'Toutes':
-                        filtered_df = filtered_df[filtered_df['category'] == selected_category]
-                    if not filtered_df.empty:
-                        st.session_state['filtered_articles'] = filtered_df
+            discount_type = st.selectbox("Type de remise", 
+                ["Pourcentage", "Montant fixe"])
+            discount_value = st.number_input("Valeur", min_value=0.0)
+        
+        delivery_days = st.slider("Délai de livraison (jours)", 0, 30, 7)
+        custom_notes = st.text_area("Notes personnalisées")
+
+    # Client management
+    with st.expander("Gestion Client", expanded=True):
+        client_action = st.radio("Action Client", 
+            ["Nouveau Client", "Client Existant"])
+        
+        if client_action == "Client Existant":
+            client_search_value = st.text_input("Rechercher par nom ou ID", placeholder="Tapez le nom ou l'ID du client")
+            if st.button("Rechercher Client"):
+                if client_search_value:
+                    # Try searching by ID first
+                    try:
+                        client_id = int(client_search_value)
+                        client_info = get_client_info(clients_df, client_search_value, "ID Client")
+                    except ValueError:
+                        # If not an ID, search by name
+                        client_info = get_client_info(clients_df, client_search_value, "Nom du client")
+                    
+                    if client_info:
+                        st.session_state.proforma_client = client_info
+                        st.success("Client trouvé!")
+                        # Display client details
+                        st.write("#### Détails du client")
+                        for key, value in client_info.items():
+                            if pd.notna(value) and key != 'index':
+                                st.write(f"{key}: {value}")
                     else:
-                        st.error("Aucun article trouvé.")
-                else:
-                    st.warning("Veuillez entrer un terme de recherche.")
+                        st.error("Client non trouvé")
+        
+        else:
+            new_client = {
+                'nom_client': st.text_input("Nom"),
+                'prenom_client': st.text_input("Prénom"),
+                'entreprise_client': st.text_input("Entreprise"),
+                'telephone_client': st.text_input("Téléphone"),
+                'email_client': st.text_input("Email")
+            }
+            if st.button("Enregistrer Nouveau Client"):
+                if new_client['nom_client']:
+                    clients_df = add_new_client(clients_df, new_client)
+                    save_clients(clients_df)
+                    st.session_state.proforma_client = clients_df.iloc[-1].to_dict()
+                    st.session_state.proforma_client['index'] = len(clients_df) - 1
+                    st.success("Client enregistré!")
+                    # Display new client details
+                    st.write("#### Détails du client")
+                    for key, value in st.session_state.proforma_client.items():
+                        if pd.notna(value) and key != 'index':
+                            st.write(f"{key}: {value}")
 
-        if 'filtered_articles' in st.session_state:
-            filtered_df = st.session_state['filtered_articles']
-            selected_item = st.selectbox("Sélectionnez un article", filtered_df['denomination'], key="selected_item")
-            selected_row = filtered_df[filtered_df['denomination'] == selected_item].squeeze()
+    # Item selection
+    with st.expander("Sélection d'Articles", expanded=True):
+        search_term = st.text_input("Recherche par référence/nom")
+        if st.button("Rechercher Articles"):
+            filtered = products_df[
+                (products_df['reference'].str.contains(search_term, case=False, na=False)) |
+                (products_df['denomination'].str.contains(search_term, case=False, na=False))
+            ]
+            st.session_state.proforma_filtered = filtered if not filtered.empty else None
+
+        if 'proforma_filtered' in st.session_state and st.session_state.proforma_filtered is not None:
+            selected_product = st.selectbox("Articles Disponibles", 
+                st.session_state.proforma_filtered['denomination'])
             
-            price = selected_row[price_type] if pd.notna(selected_row[price_type]) else 0.0
-            st.write(f"**Prix ({price_type}) :** {price}")
-            if price == 0.0:
-                st.warning("Le prix est 0. Vérifiez les données dans la base.")
+            product = st.session_state.proforma_filtered[
+                st.session_state.proforma_filtered['denomination'] == selected_product
+            ].iloc[0]
+
+            # Color selection
+            colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
+            color = st.selectbox("Couleur", colors) if colors else None
             
-            total_stock = selected_row.get('quantite_actuelle', 0)
-            st.write(f"**Stock Total Disponible :** {int(total_stock)} unités")
-            if total_stock <= 5:
-                st.warning(f"Alerte: Stock total faible ({int(total_stock)} unités)")
-            colors = [color.strip() for color in selected_row['couleurs-dispo-usine'].split(',')] if pd.notna(selected_row['couleurs-dispo-usine']) else []
-            selected_color = st.selectbox("Choisissez une couleur", colors, key="color_select") if colors else None
-            
-            color_stock = 0
-            if selected_color:
-                color_lower = selected_color.lower()
-                if color_lower in selected_row.index and pd.notna(selected_row[color_lower]):
-                    color_stock = int(selected_row[color_lower])
-                    st.write(f"**Stock pour {selected_color} :** {color_stock} unités")
-                    if color_stock <= 5:
-                        st.warning(f"Alerte: Stock faible pour {selected_color} ({color_stock} unités)")
-                else:
-                    st.warning(f"Stock pour {selected_color} non défini dans la base.")
-            
-            image_path = get_full_image_path(find_image_path_for_color(selected_row['images'], selected_color)) if selected_color else None
+            # Show item image
+            image_path = get_full_image_path(find_image_path_for_color(product['images'], color)) if color else None
             if image_path:
-                st.image(image_path, caption=f"Aperçu ({selected_color})", width=150)
-            
-            quantity = st.number_input("Quantité", min_value=1, value=1, key="quantity")
-            can_add_item = True
-            if selected_color and quantity > color_stock:
-                st.error(f"La quantité demandée ({quantity}) dépasse le stock disponible pour {selected_color} ({color_stock}).")
-                can_add_item = False
-            elif not selected_color and quantity > total_stock:
-                st.error(f"La quantité demandée ({quantity}) dépasse le stock total disponible ({int(total_stock)}).")
-                can_add_item = False
-            
-            if st.button("Ajouter l'article", key="add_article", disabled=not can_add_item):
-                item_dict = {
-                    "denomination": selected_row['denomination'],
-                    "reference": selected_row['reference'],
-                    "Quantity": quantity,
-                    "Price": price,
-                    "Color": selected_color,
-                    "Image": image_path,
-                    "category": selected_row.get('category', 'Sans Catégorie')
-                }
-                st.session_state['items'].append(item_dict)
-                st.success("Article ajouté !")
-                del st.session_state['filtered_articles']
+                st.image(image_path, caption=f"Aperçu ({color})", width=150)
 
-        if st.session_state['items']:
-            st.write("#### Articles sélectionnés")
-            for i, item in enumerate(st.session_state['items']):
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    st.write(f"{item['denomination']} - {item['reference']} - Couleur: {item['Color']} - {item['Quantity']} x {item['Price']}")
+            qty = st.number_input("Quantité", min_value=1, value=1)
+            
+            if st.button("Ajouter au Panier"):
+                item = {
+                    "reference": product['reference'],
+                    "denomination": product['denomination'],
+                    "Quantity": qty,
+                    "Price": product[price_type],
+                    "Color": color,
+                    "Image": image_path
+                }
+                st.session_state.proforma_items.append(item)
+                st.success("Article ajouté!")
+
+    # Current items
+    if st.session_state.proforma_items:
+        with st.expander("Articles Sélectionnés", expanded=True):
+            for idx, item in enumerate(st.session_state.proforma_items):
+                cols = st.columns([1, 4, 1])
+                with cols[0]:
                     if item.get('Image'):
-                        st.image(item['Image'], width=100)
-                with col2:
-                    if st.button(f"Supprimer {i+1}", key=f"delete_item_{i}"):
-                        st.session_state['items'].pop(i)
-                        st.success("Article supprimé !")
+                        st.image(item['Image'], width=50)
+                with cols[1]:
+                    st.write(f"{item['denomination']} ({item['reference']}) - {item['Quantity']}x {item['Price']:.2f} DZD")
+                with cols[2]:
+                    if st.button("Supprimer", key=f"del_{idx}"):
+                        del st.session_state.proforma_items[idx]
                         st.rerun()
 
-    with st.expander("Gestion des clients", expanded=True):
-        client_action = st.radio("Action", ["Client récent", "Rechercher un client", "Ajouter un nouveau client", "Modifier un client chargé"], key="client_action")
-        if client_action == "Client récent":
-            recent_clients = st.session_state['recent_clients']
-            if recent_clients:
-                st.write("#### Clients récents")
-                for client_id in recent_clients:
-                    client = clients_df[clients_df['id_client'] == client_id]
-                    if not client.empty:
-                        client_info = client.iloc[0].to_dict()
-                        client_info['index'] = client.index[0]
-                        client_name = client_info.get('nom_client', 'Inconnu')
-                        if st.button(f"Charger {client_name} (ID: {client_id})", key=f"recent_{client_id}"):
-                            st.session_state["client_info_loaded"] = client_info
-                            st.session_state["client_index"] = client_info['index']
-                            st.success(f"Client {client_name} chargé !")
-        elif client_action == "Rechercher un client":
-            client_search_method = st.radio("Rechercher par", ["Nom du client", "ID Client"], key="client_search_method")
-            client_search_value = st.text_input("Valeur de recherche", placeholder="Tapez le nom du client ou ID", key="client_search_value")
-            if st.button("Rechercher client"):
-                if client_search_value:
-                    client_info = get_client_info(clients_df, client_search_value, client_search_method)
-                    if client_info:
-                        st.session_state["client_info_loaded"] = client_info
-                        st.session_state["client_index"] = client_info['index']
-                        st.success(f"Client {client_info.get('nom_client', 'Inconnu')} chargé !")
-                    else:
-                        st.info("Aucun client trouvé.")
-        elif client_action == "Ajouter un nouveau client":
-            new_nom_client = st.text_input("Nom du client", placeholder="Tapez le nom du client", key="new_nom_client")
-            new_prenom_client = st.text_input("Prénom du client", placeholder="Tapez le prénom", key="new_prenom_client")
-            new_nom_entreprise = st.text_input("Nom de l’entreprise", placeholder="Tapez le nom de l’entreprise", key="new_nom_entreprise")
-            new_adresse = st.text_input("Adresse", placeholder="Tapez l’adresse", key="new_adresse")
-            new_telephone = st.text_input("Telephone", placeholder="Tapez le numéro de téléphone", key="new_telephone")
-            new_email = st.text_input("Email du client", placeholder="Tapez l’email", key="new_email")
-            if new_email and not validate_email(new_email):
-                st.error("Format d'email invalide.")
-            if new_telephone and not validate_phone(new_telephone):
-                st.error("Le numéro de téléphone doit contenir 10 chiffres.")
-            if st.button("Ajouter nouveau client", key="add_new_client"):
-                if new_nom_client:
-                    new_client_info = {
-                        "nom_client": new_nom_client,
-                        "prenom_client": new_prenom_client,
-                        "entreprise_client": new_nom_entreprise,
-                        "address_client": new_adresse,
-                        "telephone_client": new_telephone,
-                        "email_client": new_email
-                    }
-                    clients_df = add_new_client(clients_df, new_client_info)
-                    if save_clients(clients_df):
-                        st.session_state['clients_df'] = clients_df
-                        client_info = clients_df.iloc[-1].to_dict()
-                        client_info['index'] = len(clients_df) - 1
-                        st.session_state["client_info_loaded"] = client_info
-                        st.session_state["client_index"] = client_info['index']
-                        st.success("Nouveau client ajouté et chargé !")
-        elif client_action == "Modifier un client chargé" and "client_info_loaded" in st.session_state:
-            client_info = st.session_state["client_info_loaded"]
-            edit_nom_client = st.text_input("Nom du client", value=client_info.get("nom_client", ""), placeholder="Tapez le nom du client", key="edit_nom_client")
-            edit_prenom_client = st.text_input("Prénom du client", value=client_info.get("prenom_client", ""), placeholder="Tapez le prénom", key="edit_prenom_client")
-            edit_nom_entreprise = st.text_input("Nom de l’entreprise", value=client_info.get("entreprise_client", ""), placeholder="Tapez le nom de l’entreprise", key="edit_nom_entreprise")
-            edit_adresse = st.text_input("Adresse", value=client_info.get("address_client", ""), placeholder="Tapez l’adresse", key="edit_adresse")
-            edit_telephone = st.text_input("Telephone", value=client_info.get("telephone_client", ""), placeholder="Tapez le numéro de téléphone", key="edit_telephone")
-            edit_email = st.text_input("Email du client", value=client_info.get("email_client", ""), placeholder="Tapez l’email", key="edit_email")
-            if st.button("Sauvegarder les modifications", key="save_edit_client"):
-                updated_client_info = {
-                    "id_client": client_info["id_client"],
-                    "nom_client": edit_nom_client,
-                    "prenom_client": edit_prenom_client,
-                    "entreprise_client": edit_nom_entreprise,
-                    "address_client": edit_adresse,
-                    "telephone_client": edit_telephone,
-                    "email_client": edit_email
-                }
-                clients_df = update_client(clients_df, updated_client_info, st.session_state["client_index"])
-                if save_clients(clients_df):
-                    st.session_state['clients_df'] = clients_df
-                    updated_client_info['index'] = st.session_state["client_index"]
-                    st.session_state["client_info_loaded"] = updated_client_info
-                    st.success("Client modifié avec succès !")
-        if "client_info_loaded" in st.session_state:
-            st.write("#### Client chargé")
-            for key, value in st.session_state["client_info_loaded"].items():
-                if pd.notna(value):
-                    st.write(f"{key}: {value}")
+    # Generate proforma
+    if st.button("Générer Proforma"):
+        if not st.session_state.proforma_items:
+            st.error("Ajoutez des articles avant de générer!")
+            return
+        
+        if not st.session_state.proforma_client:
+            st.error("Sélectionnez ou créez un client!")
+            return
 
-    with st.expander("Générer la facture", expanded=True):
-        if not st.session_state.get('proforma_generated', False):
-            if st.button("Effacer tout", key="clear_all_before_generate"):
-                if 'items' in st.session_state:
-                    del st.session_state['items']
-                if 'filtered_articles' in st.session_state:
-                    del st.session_state['filtered_articles']
-                if 'client_info_loaded' in st.session_state:
-                    del st.session_state['client_info_loaded']
-                if 'proforma_generated' in st.session_state:
-                    del st.session_state['proforma_generated']
-                if 'pdf_filename' in st.session_state:
-                    del st.session_state['pdf_filename']
-                st.success("Tout effacé !")
-                st.rerun()
-
-        client_info = st.session_state.get("client_info_loaded", {
-            "nom_client": "", "prenom_client": "", "entreprise_client": "", "address_client": "", "telephone_client": "", "email_client": "", "id_client": "N/A"
-        })
-        transaction_info = {
-            "transaction_number": st.session_state.get('transaction_number', 1000),
-            "transaction_date": datetime.now().strftime("%d/%m/%Y"),
-            "client_id": client_info.get("id_client", "N/A"),
-            "performed_by": username
-        }
-        st.write(f"N° De transaction : {transaction_info['transaction_number']}")
-        st.write(f"Date de transaction : {transaction_info['transaction_date']}")
-        st.write(f"ID Client : {transaction_info['client_id']}")
-        st.write(f"Effectué par : {username}")
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button("Générer la facture proforma"):
-                if st.session_state['items'] and "client_info_loaded" in st.session_state:
-                    total_amount = sum(item['Quantity'] * item['Price'] for item in st.session_state['items'])
-                    transaction_id = record_transaction(client_info, st.session_state['items'], "Proforma", 0, total_amount, "proforma", username)
-                    transaction_info["transaction_number"] = transaction_id
-                    pdf_filename = generate_proforma_pdf(
-                        st.session_state['items'], price_type, client_info, transaction_info,
-                        apply_tva, discount_type, discount_value, show_onama, delivery_days
-                    )
-                    st.session_state['pdf_filename'] = pdf_filename
-                    st.session_state['transaction_number'] = transaction_id + 1
-                    st.session_state['proforma_generated'] = True
-                    st.success("Facture générée !")
-                else:
-                    st.error("Ajoutez des articles et chargez un client !")
-
-        if st.session_state.get('proforma_generated', False):
-            pdf_filename = st.session_state['pdf_filename']
-            with col1:
-                with open(pdf_filename, "rb") as file:
-                    st.download_button(
-                        label="Télécharger la facture proforma",
-                        data=file,
-                        file_name=pdf_filename,
-                        mime="application/pdf",
-                        key="download_proforma"
-                    )
-            with col2:
-                st.markdown(f'<a href="file://{pdf_filename}" target="_blank"><button>Imprimer la facture</button></a>', unsafe_allow_html=True)
-            with col3:
-                client_email = client_info.get('email_client', '')
-                if client_email and validate_email(client_email):
-                    if st.button("Envoyer par email", key="proforma_email"):
-                        subject = f"Facture Proforma #{transaction_info['transaction_number']}"
-                        body = f"Bonjour {client_info.get('nom_client', '')},\n\nVoici votre facture proforma #{transaction_info['transaction_number']}.\nMontant total: {total_amount:.2f} DZD\nEffectué par: {username}\n\nCordialement,\nTakideco"
-                        if send_email(client_email, subject, body, pdf_filename):
-                            st.success("Facture envoyée par email !")
+        try:
+            total = sum(item['Price'] * item['Quantity'] for item in st.session_state.proforma_items)
             
-            with col2:
-                if st.button("Commencer une nouvelle proforma", key="reset_after_download"):
-                    if 'items' in st.session_state:
-                        del st.session_state['items']
-                    if 'filtered_articles' in st.session_state:
-                        del st.session_state['filtered_articles']
-                    if 'client_info_loaded' in st.session_state:
-                        del st.session_state['client_info_loaded']
-                    if 'proforma_generated' in st.session_state:
-                        del st.session_state['proforma_generated']
-                    if 'pdf_filename' in st.session_state:
-                        del st.session_state['pdf_filename']
-                    st.success("Nouvelle proforma commencée !")
-                    st.rerun()
+            # Record transaction (fixed keyword argument from 'client' to 'client_info')
+            transaction_id = record_transaction(
+                client_info=st.session_state.proforma_client,
+                items=st.session_state.proforma_items,
+                payment_details="Proforma",
+                payment_amount=0,
+                total_amount=total,
+                status="proforma",
+                performed_by=username
+            )
+
+            # Transaction info for PDF
+            transaction_info = {
+                "transaction_number": transaction_id,
+                "transaction_date": datetime.now().strftime("%d/%m/%Y"),
+                "client_id": st.session_state.proforma_client.get('id_client'),
+                "performed_by": username
+            }
+
+            # Generate PDF
+            pdf_path = generate_proforma_pdf(
+                items=st.session_state.proforma_items,
+                price_type=price_type,
+                client_info=st.session_state.proforma_client,
+                transaction_info=transaction_info,
+                apply_tva=apply_tva,
+                discount_type=discount_type,
+                discount_value=discount_value,
+                show_onama=st.session_state.show_onama,
+                delivery_days=delivery_days,
+                notes=custom_notes
+            )
+
+            # Success handling
+            st.session_state.generated_pdf = pdf_path
+            st.success(f"Proforma {transaction_id} générée!")
+
+        except Exception as e:
+            st.error(f"Erreur: {str(e)}")
+            return
+
+    # Post-generation actions
+    if st.session_state.get('generated_pdf'):
+        pdf_path = st.session_state.generated_pdf
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            with open(pdf_path, "rb") as f:
+                st.download_button("Télécharger PDF", f, file_name=os.path.basename(pdf_path), key="proforma_download")
+        
+        with col2:
+            st.markdown(f'<a href="file://{pdf_path}" target="_blank"><button>Imprimer PDF</button></a>', unsafe_allow_html=True)
+        
+        with col3:
+            client_email = st.session_state.proforma_client.get('email_client', '')
+            if client_email and validate_email(client_email):
+                if st.button("Envoyer par email", key="proforma_email"):
+                    subject = f"Facture Proforma #{transaction_id}"
+                    body = f"Bonjour {st.session_state.proforma_client.get('nom_client', '')},\n\nVoici votre facture proforma #{transaction_id}.\nMontant total: {total:.2f} DZD\nEffectué par: {username}\n\nCordialement,\nTakideco"
+                    if send_email(client_email, subject, body, pdf_path):
+                        st.success("Proforma envoyée par email !")
+            else:
+                st.warning("Email client non valide ou non fourni.")

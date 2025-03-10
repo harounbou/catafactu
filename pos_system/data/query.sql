@@ -1,1 +1,1 @@
-SELECT quantite_actuelle, golden FROM products WHERE reference = 'FR0005';
+ALTER TABLE transactions ADD COLUMN linked_proforma_id INTEGER DEFAULT NULL;

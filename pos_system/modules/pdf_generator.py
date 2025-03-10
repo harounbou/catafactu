@@ -4,7 +4,7 @@ from .utils import sanitize_text, calculate_image_dimensions, truncate_text, get
 from num2words import num2words
 from datetime import datetime
 
-def generate_proforma_pdf(items, price_type, client_info, transaction_info, apply_tva, discount_type, discount_value, show_onama, delivery_days):
+def generate_proforma_pdf(items, price_type, client_info, transaction_info, apply_tva, discount_type, discount_value, show_onama, delivery_days, notes=""):
     pdf = FPDF()
     pdf.add_page()
     pdf.image(get_full_image_path("logo.png"), x=10, y=8, w=30)
@@ -101,7 +101,7 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
     pdf.ln(10)
     pdf.set_font("Arial", size=8)
     pdf.set_text_color(0, 0, 128)
-    pdf.multi_cell(0, 5, txt=sanitize_text(
+    default_terms = (
         "Mode de règlement :\n"
         "Espèces, Virement bancaire ou Chèque (à remettre par le client à nos bureaux de Constantine dans un délai maximum de 48 heures suivant la commande).\n"
         "Acompte :\n"
@@ -111,8 +111,16 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
          if delivery_days > 0 else "La commande sera prête dans un délai de 7 à 10 jours.") +
         "\nFrais d’expédition :\n"
         "Les frais d’expédition sont à la charge du client."
-    ))
+    )
+    pdf.multi_cell(0, 5, txt=sanitize_text(default_terms))
     
+    # Add custom notes if provided
+    if notes:
+        pdf.ln(5)
+        pdf.set_font("Arial", size=8, style='I')
+        pdf.set_text_color(0, 0, 0)  # Reset to black for notes
+        pdf.multi_cell(0, 5, txt=sanitize_text(f"Notes personnalisées :\n{notes}"))
+
     pdf_filename = f"Proforma-{client_info.get('nom_client', 'Client')}-{datetime.now().strftime('%d%m%Y')}.pdf"
     pdf.output(pdf_filename)
     return pdf_filename
