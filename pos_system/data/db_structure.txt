@@ -88,3 +88,15 @@ Columns:
   - address_client (TEXT)
   - email_client (TEXT)
   - entreprise_client (TEXT)
+
+Table: orders
+Columns:
+  - order_id (INTEGER) [PK]
+  - city (TEXT)
+  - order_date (TEXT)
+  - delivery_address (TEXT)
+  - items (TEXT)
+  - shipping_method (TEXT)
+  - payment_option (TEXT)
+  - created_by (TEXT)
+  - status (TEXT)

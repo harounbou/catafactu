@@ -81,53 +81,39 @@ def bon_de_commande_page(products_df):
         order_date = datetime.now().strftime("%d/%m/%Y")
         st.write(f"**Ville :** {city} | **Date de Commande :** {order_date}")
 
-        # Delivery Options
-        delivery_option = st.selectbox("Option de Livraison", ["Livraison à Ville Client", "Pickup from Onama"], key="bdc_delivery_option")
-        if delivery_option == "Livraison à Ville Client":
-            known_addresses = ["Bureau Alger", "Dépôt Constantine", "Magasin Eulmi", "Inconnue pour l'instant"]
-            delivery_address = st.selectbox("Adresse de Livraison", known_addresses, key="bdc_address")
-            if delivery_address == "Inconnue pour l'instant":
-                delivery_address = st.text_input("Adresse personnalisée (si connue plus tard)", key="bdc_custom_address")
-        else:
-            delivery_address = "Pickup from Onama"
+        # Replace Delivery Option
+        st.write("**Méthode de Livraison :** Envoi via ONAMA à EULAM")
+        known_addresses = ["Bureau Alger", "Dépôt Constantine", "Magasin Eulmi", "Inconnue pour l'instant"]
+        delivery_address = st.selectbox("Adresse de Livraison", known_addresses, key="bdc_address")
+        if delivery_address == "Inconnue pour l'instant":
+            delivery_address = st.text_input("Adresse personnalisée (si connue plus tard)", key="bdc_custom_address")
 
-        # Import from POS
-        st.subheader("Importer depuis POS (optionnel)")
+        # Unified Import Section
+        st.subheader("Importer depuis Reçu (POS) ou Proforma")
         transactions_df = fetch_df_from_db('transactions')
-        completed_sales = transactions_df[transactions_df['status'] == 'completed']
-        if not completed_sales.empty:
-            sale_options = [f"Transaction #{tid} - {date}" for tid, date in zip(completed_sales['transaction_id'], completed_sales['transaction_date'])]
-            selected_sale = st.selectbox("Sélectionnez une vente", ["Aucune"] + sale_options, key="bdc_import_sale")
-            if selected_sale != "Aucune":
-                selected_tid = int(selected_sale.split('#')[1].split(' - ')[0])
-                items_json = completed_sales[completed_sales['transaction_id'] == selected_tid]['items'].iloc[0]
+        import_options = ["Aucune"]
+        if not transactions_df[transactions_df['status'] == 'completed'].empty:
+            import_options += [f"Reçu #{tid} - {date}" for tid, date in zip(
+                transactions_df[transactions_df['status'] == 'completed']['transaction_id'],
+                transactions_df[transactions_df['status'] == 'completed']['transaction_date']
+            )]
+        if not transactions_df[transactions_df['status'] == 'proforma'].empty:
+            import_options += [f"Proforma #{tid} - {date}" for tid, date in zip(
+                transactions_df[transactions_df['status'] == 'proforma']['transaction_id'],
+                transactions_df[transactions_df['status'] == 'proforma']['transaction_date']
+            )]
+        selected_import = st.selectbox("Sélectionnez une importation", import_options, key="bdc_import_select")
+        if selected_import != "Aucune":
+            if st.button("Importer les articles", key="bdc_import_btn"):
+                selected_tid = int(selected_import.split('#')[1].split(' - ')[0])
+                items_json = transactions_df[transactions_df['transaction_id'] == selected_tid]['items'].iloc[0]
                 imported_items = json.loads(items_json)
-                if st.button("Importer les articles", key="bdc_import_btn"):
-                    st.session_state['order_items'] = [
-                        {"reference": item['reference'], "denomination": item['denomination'], "color": item.get('Color'), "quantity": item['Quantity']}
-                        for item in imported_items
-                    ]
-                    st.success("Articles importés depuis la vente !")
-                    st.rerun()
-
-        # Import from Proforma
-        st.subheader("Récupérer une Facture Proforma (optionnel)")
-        proforma_df = fetch_df_from_db('transactions')
-        proforma_sales = proforma_df[proforma_df['status'] == 'proforma']
-        if not proforma_sales.empty:
-            proforma_options = [f"Proforma #{tid} - {date}" for tid, date in zip(proforma_sales['transaction_id'], proforma_sales['transaction_date'])]
-            selected_proforma = st.selectbox("Sélectionnez une proforma", ["Aucune"] + proforma_options, key="bdc_import_proforma")
-            if selected_proforma != "Aucune":
-                selected_tid = int(selected_proforma.split('#')[1].split(' - ')[0])
-                items_json = proforma_sales[proforma_sales['transaction_id'] == selected_tid]['items'].iloc[0]
-                imported_items = json.loads(items_json)
-                if st.button("Importer depuis Proforma", key="bdc_import_proforma_btn"):
-                    st.session_state['order_items'] = [
-                        {"reference": item['reference'], "denomination": item['denomination'], "color": item.get('Color'), "quantity": item['Quantity']}
-                        for item in imported_items
-                    ]
-                    st.success("Articles importés depuis la proforma !")
-                    st.rerun()
+                st.session_state['order_items'] = [
+                    {"reference": item['reference'], "denomination": item['denomination'], "color": item.get('Color'), "quantity": item['Quantity']}
+                    for item in imported_items
+                ]
+                st.success(f"Articles importés depuis {selected_import} !")
+                st.rerun()
 
         st.subheader("Détails de la Commande")
         if 'order_items' not in st.session_state:
@@ -209,13 +195,11 @@ def bon_de_commande_page(products_df):
         ]
         payment_option = st.selectbox("Option de Paiement", payment_options, key="bdc_payment")
 
-        email_options = ["Aucun"] + [st.text_input("Envoyer le Bon de Commande par email (optionnel)", placeholder="Entrez l'adresse email", key="bdc_email")]
-        email_to_send = st.selectbox("Envoyer par email", email_options, key="bdc_email_select")
-
+        # Single email input moved to post-generation
         if st.button("Créer Bon de Commande", key="bdc_submit"):
             if not st.session_state['order_items']:
                 st.error("Veuillez ajouter au moins un article à la commande.")
-            elif delivery_option == "Livraison à Ville Client" and delivery_address == "Inconnue pour l'instant" and shipping_method not in ["Inconnue pour l'instant", "Pickup from Onama"]:
+            elif delivery_address == "Inconnue pour l'instant" and shipping_method not in ["Inconnue pour l'instant"]:
                 st.error("Veuillez préciser une adresse ou sélectionner 'Inconnue pour l'instant' comme méthode de livraison.")
             else:
                 order_id = save_order(city, delivery_address, st.session_state['order_items'], shipping_method, payment_option, username)
@@ -223,18 +207,20 @@ def bon_de_commande_page(products_df):
                     st.success(f"Bon de Commande #{order_id} créé avec succès !")
                     pdf_path = generate_order_pdf(order_id, city, order_date, delivery_address, st.session_state['order_items'], shipping_method, payment_option, username)
                     
-                    with open(pdf_path, "rb") as file:
-                        st.download_button("Télécharger Bon de Commande", file, f"BonDeCommande-{order_id}.pdf", key=f"bdc_download_{order_id}")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        with open(pdf_path, "rb") as file:
+                            st.download_button("Télécharger Bon de Commande", file, f"BonDeCommande-{order_id}.pdf", key=f"bdc_download_{order_id}")
+                    with col2:
+                        email_to_send = st.text_input("Envoyer par email à", placeholder="Entrez l'adresse email", key=f"bdc_email_{order_id}")
+                        if email_to_send and st.button("Envoyer", key=f"bdc_send_email_{order_id}"):
+                            email_body = f"Bonjour,\n\nVeuillez trouver ci-joint le Bon de Commande #{order_id} créé le {order_date}.\n\nCordialement,\n{username}"
+                            if send_email(email_to_send, f"Bon de Commande #{order_id}", email_body, pdf_path):
+                                st.success(f"Bon de Commande envoyé à {email_to_send} !")
+                            else:
+                                st.error("Échec de l'envoi de l'email.")
                     
-                    if email_to_send != "Aucun":
-                        email_body = f"Bonjour,\n\nVeuillez trouver ci-joint le Bon de Commande #{order_id} créé le {order_date}.\n\nCordialement,\n{username}"
-                        if send_email(email_to_send, f"Bon de Commande #{order_id}", email_body, pdf_path):
-                            st.success(f"Bon de Commande envoyé à {email_to_send} !")
-                        else:
-                            st.error("Échec de l'envoi de l'email.")
-                    
-                    manufacturing_email = "manufacturing@onama.com"
-                    if send_email(manufacturing_email, f"Nouveau Bon de Commande #{order_id}", f"Un nouveau Bon de Commande #{order_id} a été créé par {username}."):
+                    if send_email("manufacturing@onama.com", f"Nouveau Bon de Commande #{order_id}", f"Un nouveau Bon de Commande #{order_id} a été créé par {username}."):
                         st.success("Équipe de fabrication notifiée !")
                     
                     st.session_state['order_items'] = []
@@ -261,11 +247,29 @@ def bon_de_commande_page(products_df):
                     st.write("**Articles :**")
                     st.dataframe(items_df.drop(columns=['images'], errors='ignore'), use_container_width=True)
                     
-                    status_options = ["en attente", "en production", "prêt", "expédié"]
-                    new_status = st.selectbox("Mettre à jour le statut", status_options, index=status_options.index(order['status']), key=f"status_{order['order_id']}")
+                    # Updated status handling
+                    status_options = ["pending", "in production", "ready", "shipped"]  # Match database values
+                    status_display = {
+                        "pending": "En attente",
+                        "in production": "En production",
+                        "ready": "Prêt",
+                        "shipped": "Expédié"
+                    }
+                    display_options = [status_display[status] for status in status_options]
+                    try:
+                        current_index = status_options.index(order['status'])
+                    except ValueError:
+                        current_index = 0  # Default to 'pending' if status not found
+                    new_status_display = st.selectbox(
+                        "Mettre à jour le statut",
+                        display_options,
+                        index=current_index,
+                        key=f"status_{order['order_id']}"
+                    )
+                    new_status = status_options[display_options.index(new_status_display)]
                     if st.button("Mettre à jour", key=f"update_{order['order_id']}"):
                         if update_order_status(order['order_id'], new_status):
-                            st.success(f"Statut de la commande #{order['order_id']} mis à jour à '{new_status}' !")
+                            st.success(f"Statut de la commande #{order['order_id']} mis à jour à '{status_display[new_status]}' !")
                             st.rerun()
         else:
             st.info("Aucune commande enregistrée.")
