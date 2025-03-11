@@ -1,6 +1,7 @@
+# modules/pdf_generator.py
 from fpdf import FPDF
 import streamlit as st
-from .utils import sanitize_text, calculate_image_dimensions, truncate_text, get_full_image_path
+from .utils import sanitize_text, calculate_image_dimensions, truncate_text, get_full_image_path, find_image_path_for_color
 from num2words import num2words
 from datetime import datetime
 
@@ -19,13 +20,13 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
     pdf.ln(10)
     
     pdf.set_font("Arial", size=12)
-    pdf.cell(100, 10, txt=sanitize_text(f"Nom de client : {client_info.get('nom_client', '')}"), ln=0)
-    pdf.cell(90, 10, txt=sanitize_text(f"N° De transaction : {transaction_info['transaction_number']}"), ln=1, align='R')
+    pdf.cell(100, 10, txt=sanitize_text(f"Nom du client : {client_info.get('nom_client', '')}"), ln=0)
+    pdf.cell(90, 10, txt=sanitize_text(f"N° de transaction : {transaction_info['transaction_number']}"), ln=1, align='R')
     pdf.cell(100, 10, txt=sanitize_text(f"Nom de l’entreprise : {client_info.get('entreprise_client', '')}"), ln=0)
     pdf.cell(90, 10, txt=sanitize_text(f"Date de transaction : {transaction_info['transaction_date']}"), ln=1, align='R')
     pdf.cell(100, 10, txt=sanitize_text(f"Adresse : {client_info.get('address_client', '')}"), ln=0)
     pdf.cell(90, 10, txt=sanitize_text(f"ID Client : {transaction_info['client_id']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Telephone : {client_info.get('telephone_client', '')}"), ln=0)
+    pdf.cell(100, 10, txt=sanitize_text(f"Téléphone : {client_info.get('telephone_client', '')}"), ln=0)
     pdf.cell(90, 10, txt=sanitize_text(f"Effectué par : {transaction_info['performed_by']}"), ln=1, align='R')
     pdf.ln(10)
     
@@ -42,7 +43,7 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
 
     for category, category_items in sorted(items_by_category.items()):
         pdf.set_font("Arial", size=14, style='B')
-        pdf.cell(0, 10, txt=sanitize_text(f"Catégorie: {category}"), ln=1)
+        pdf.cell(0, 10, txt=sanitize_text(f"Catégorie : {category}"), ln=1)
         pdf.ln(5)
         pdf.set_font("Arial", size=12, style='B')
         col_widths = [60, 30, 30, 30, 30, 30]
@@ -66,10 +67,10 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
                     pdf.image(image_path, x=x_image + x_offset, y=y_before + y_offset, w=scaled_width_mm, h=scaled_height_mm)
                 except Exception:
                     pdf.set_xy(x_image, y_before)
-                    pdf.cell(col_widths[1], row_height, txt="Pas d'Image", border=1)
+                    pdf.cell(col_widths[1], row_height, txt="Pas d'image", border=1)
             else:
                 pdf.set_xy(x_image, y_before)
-                pdf.cell(col_widths[1], row_height, txt="Pas d'Image", border=1)
+                pdf.cell(col_widths[1], row_height, txt="Pas d'image", border=1)
             pdf.set_xy(x_image + col_widths[1], y_before)
             pdf.cell(col_widths[2], row_height, txt=sanitize_text(truncate_text(item['reference'])), border=1)
             pdf.cell(col_widths[3], row_height, txt=str(item['Quantity']), border=1)
@@ -114,11 +115,10 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
     )
     pdf.multi_cell(0, 5, txt=sanitize_text(default_terms))
     
-    # Add custom notes if provided
     if notes:
         pdf.ln(5)
         pdf.set_font("Arial", size=8, style='I')
-        pdf.set_text_color(0, 0, 0)  # Reset to black for notes
+        pdf.set_text_color(0, 0, 0)
         pdf.multi_cell(0, 5, txt=sanitize_text(f"Notes personnalisées :\n{notes}"))
 
     pdf_filename = f"Proforma-{client_info.get('nom_client', 'Client')}-{datetime.now().strftime('%d%m%Y')}.pdf"
@@ -134,18 +134,18 @@ def generate_receipt_pdf(transaction_info, items, payment_amount, discount_amoun
     pdf.ln(10)
     
     pdf.set_font("Arial", size=12)
-    pdf.cell(0, 10, txt=sanitize_text(f"Transaction ID: {transaction_info['transaction_number']}"), ln=1)
-    pdf.cell(0, 10, txt=sanitize_text(f"Date: {transaction_info['transaction_date']}"), ln=1)
-    pdf.cell(0, 10, txt=sanitize_text(f"ID Client: {transaction_info['client_id']}"), ln=1)
-    pdf.cell(0, 10, txt=sanitize_text(f"Effectué par: {transaction_info['performed_by']}"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"ID de Transaction : {transaction_info['transaction_number']}"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"Date : {transaction_info['transaction_date']}"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"ID Client : {transaction_info['client_id']}"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"Effectué par : {transaction_info['performed_by']}"), ln=1)
     pdf.ln(10)
     
     total_amount = sum(item['Quantity'] * item['Price'] for item in items)
-    pdf.cell(0, 10, txt=sanitize_text(f"Montant Total (HT): {total_amount:.2f} DZD"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"Montant Total (HT) : {total_amount:.2f} DZD"), ln=1)
     if discount_amount > 0:
-        pdf.cell(0, 10, txt=sanitize_text(f"Remise: {discount_amount:.2f} DZD"), ln=1)
-    pdf.cell(0, 10, txt=sanitize_text(f"Montant Payé: {payment_amount:.2f} DZD"), ln=1)
-    pdf.cell(0, 10, txt=sanitize_text(f"Mode de paiement: {payment_details}"), ln=1)
+        pdf.cell(0, 10, txt=sanitize_text(f"Remise : {discount_amount:.2f} DZD"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"Montant Payé : {payment_amount:.2f} DZD"), ln=1)
+    pdf.cell(0, 10, txt=sanitize_text(f"Mode de paiement : {payment_details}"), ln=1)
     pdf.ln(10)
     
     pdf.set_font("Arial", size=12, style='B')
@@ -171,10 +171,10 @@ def generate_receipt_pdf(transaction_info, items, payment_amount, discount_amoun
                 pdf.image(image_path, x=x_image + x_offset, y=y_before + y_offset, w=scaled_width_mm, h=scaled_height_mm)
             except Exception:
                 pdf.set_xy(x_image, y_before)
-                pdf.cell(col_widths[1], row_height, txt="Pas d'Image", border=1)
+                pdf.cell(col_widths[1], row_height, txt="Pas d'image", border=1)
         else:
             pdf.set_xy(x_image, y_before)
-            pdf.cell(col_widths[1], row_height, txt="Pas d'Image", border=1)
+            pdf.cell(col_widths[1], row_height, txt="Pas d'image", border=1)
         pdf.set_xy(x_image + col_widths[1], y_before)
         pdf.cell(col_widths[2], row_height, txt=sanitize_text(truncate_text(item['reference'])), border=1)
         pdf.cell(col_widths[3], row_height, txt=str(item['Quantity']), border=1)
@@ -187,6 +187,74 @@ def generate_receipt_pdf(transaction_info, items, payment_amount, discount_amoun
     total_amount_words = num2words(int(payment_amount), lang='fr') if payment_amount <= 999999 else "Montant très élevé"
     pdf.cell(0, 10, txt=sanitize_text(f"Arrêté à la somme de : {total_amount_words} dinars."), ln=1)
     
-    pdf_filename = f"Receipt-{transaction_info['transaction_number']}-{transaction_info['transaction_date'].replace('/', '')}.pdf"
+    pdf_filename = f"Reçu-{transaction_info['transaction_number']}-{transaction_info['transaction_date'].replace('/', '')}.pdf"
+    pdf.output(pdf_filename)
+    return pdf_filename
+
+def generate_order_pdf(order_id, city, order_date, delivery_address, items, shipping_method, payment_option, created_by):
+    """Générer un PDF pour un Bon de Commande."""
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.image(get_full_image_path("logo.png"), x=10, y=8, w=30)
+    pdf.set_font("Arial", size=24, style='B')
+    pdf.cell(200, 15, txt=sanitize_text(f"Bon de Commande #{order_id} - Takideco"), ln=True, align='C')
+    pdf.ln(10)
+
+    # Header info
+    pdf.set_font("Arial", size=12)
+    pdf.cell(100, 10, txt=sanitize_text(f"Ville : {city}"), ln=0)
+    pdf.cell(90, 10, txt=sanitize_text(f"Date de Commande : {order_date}"), ln=1, align='R')
+    pdf.cell(100, 10, txt=sanitize_text(f"Adresse de Livraison : {delivery_address or 'Non spécifiée'}"), ln=0)
+    pdf.cell(90, 10, txt=sanitize_text(f"Créé par : {created_by}"), ln=1, align='R')
+    pdf.cell(100, 10, txt=sanitize_text(f"Méthode de Livraison : {shipping_method}"), ln=0)
+    pdf.cell(90, 10, txt=sanitize_text(f"Option de Paiement : {payment_option}"), ln=1, align='R')
+    pdf.ln(10)
+
+    # Items table
+    pdf.set_font("Arial", size=12, style='B')
+    col_widths = [60, 30, 30, 30]
+    headers = ["Article", "Image", "Référence", "Quantité"]
+    for w, h in zip(col_widths, headers):
+        pdf.cell(w, 10, txt=h, border=1)
+    pdf.ln()
+    pdf.set_font("Arial", size=12)
+    row_height = 30
+
+    for item in items:
+        y_before = pdf.get_y()
+        pdf.cell(col_widths[0], row_height, txt=sanitize_text(truncate_text(item['denomination'])), border=1)
+        x_image = pdf.get_x()
+        image_path = get_full_image_path(find_image_path_for_color(item.get('images', ''), item.get('color')))
+        if image_path:
+            try:
+                scaled_width_mm, scaled_height_mm = calculate_image_dimensions(image_path, col_widths[1], row_height)
+                x_offset = (col_widths[1] - scaled_width_mm) / 2
+                y_offset = (row_height - scaled_height_mm) / 2
+                pdf.image(image_path, x=x_image + x_offset, y=y_before + y_offset, w=scaled_width_mm, h=scaled_height_mm)
+            except Exception:
+                pdf.set_xy(x_image, y_before)
+                pdf.cell(col_widths[1], row_height, txt="Pas d'image", border=1)
+        else:
+            pdf.set_xy(x_image, y_before)
+            pdf.cell(col_widths[1], row_height, txt="Pas d'image", border=1)
+        pdf.set_xy(x_image + col_widths[1], y_before)
+        pdf.cell(col_widths[2], row_height, txt=sanitize_text(truncate_text(item['reference'])), border=1)
+        pdf.cell(col_widths[3], row_height, txt=str(item['quantity']), border=1)
+        pdf.ln(row_height)
+        pdf.ln(3)
+
+    # Footer terms
+    pdf.ln(10)
+    pdf.set_font("Arial", size=8)
+    pdf.set_text_color(0, 0, 128)
+    default_terms = (
+        "Conditions :\n"
+        "Les articles listés ci-dessus seront fabriqués selon les spécifications indiquées.\n"
+        "Délai de réalisation : 7 à 10 jours ouvrables après confirmation, sauf indication contraire.\n"
+        "Frais d’expédition : À la charge du client, sauf pour le retrait à Onama."
+    )
+    pdf.multi_cell(0, 5, txt=sanitize_text(default_terms))
+
+    pdf_filename = f"BonDeCommande-{order_id}-{order_date.replace('/', '')}.pdf"
     pdf.output(pdf_filename)
     return pdf_filename

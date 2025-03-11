@@ -1,10 +1,14 @@
-#  utils.py 
+# modules/utils.py
 import sqlite3
 import os
 import re
 from PIL import Image
 import streamlit as st
 import pandas as pd
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\d{10}$'
@@ -121,3 +125,31 @@ def validate_phone(phone):
     if not phone:
         return True
     return bool(re.match(PHONE_REGEX, phone))
+
+def send_email(to_email, subject, body, attachment_path=None):
+    """Send an email with optional attachment."""
+    sender_email = st.secrets["gmail"]["email"]
+    sender_password = st.secrets["gmail"]["password"]
+    
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = to_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+    
+    if attachment_path:
+        with open(attachment_path, "rb") as f:
+            part = MIMEApplication(f.read(), Name=os.path.basename(attachment_path))
+            part['Content-Disposition'] = f'attachment; filename="{os.path.basename(attachment_path)}"'
+            msg.attach(part)
+    
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Échec de l'envoi de l'email : {e}")
+        return False

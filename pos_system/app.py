@@ -5,23 +5,20 @@ import json
 import os
 import bcrypt
 from datetime import datetime
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
 from modules.client_management import initialize_clients_df, get_client_info, add_new_client, save_clients, update_client
 from modules.product_management import load_products, update_stock, restock_product
 from modules.transaction_management import record_transaction, record_expenditure, record_staff_payment, get_till_balance, fetch_df_from_db
-from modules.pdf_generator import generate_receipt_pdf, generate_proforma_pdf
+from modules.pdf_generator import generate_receipt_pdf, generate_proforma_pdf, generate_order_pdf
 from modules.proforma import proforma_page
-from modules.pos import pos_page  # New import
-from modules.utils import validate_email, validate_phone, fetch_df_from_db, find_image_path_for_color, get_full_image_path
-from modules.restock import restock_page  # New import
+from modules.pos import pos_page
+from modules.restock import restock_page
+from modules.bon_de_commande import bon_de_commande_page
+from modules.utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path, send_email  # Updated import
 
 # Paths
 USERS_FILE = "data/users.json"
 
-# Global CSS styling
+# Global CSS styling (unchanged)
 st.markdown(
     """
     <style>
@@ -58,37 +55,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-def send_email(to_email, subject, body, attachment_path=None):
-    sender_email = st.secrets["gmail"]["email"]
-    sender_password = st.secrets["gmail"]["password"]
-    
-    msg = MIMEMultipart()
-    msg['From'] = sender_email
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
-    
-    if attachment_path:
-        with open(attachment_path, "rb") as f:
-            part = MIMEApplication(f.read(), Name=os.path.basename(attachment_path))
-            part['Content-Disposition'] = f'attachment; filename="{os.path.basename(attachment_path)}"'
-            msg.attach(part)
-    
-    try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
-        server.quit()
-        return True
-    except Exception as e:
-        st.error(f"Échec de l'envoi de l'email : {e}")
-        return False
-
 def load_users(force_reset=False):
     default_users = {
         "users": [
-            {"username": "admin", "password": bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode(), "role": "admin", "access": ["Proforma", "POS", "Restock", "Expenditures", "Staff Payments", "Till", "Access Control", "Dashboard", "Invoice History", "Activity Log"]},
+            {"username": "admin", "password": bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode(), "role": "admin", "access": ["Proforma", "POS", "Restock", "Expenditures", "Staff Payments", "Till", "Access Control", "Dashboard", "Invoice History", "Activity Log", "Bon de Commande"]},
             {"username": "eulma", "password": bcrypt.hashpw("eulma".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["Proforma", "POS"]},
             {"username": "alger", "password": bcrypt.hashpw("alger".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["Proforma", "POS"]},
             {"username": "constantine", "password": bcrypt.hashpw("constantine".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["Proforma", "POS"]}
@@ -155,7 +125,7 @@ def restock_page():
     products_df = load_products()
     username = st.session_state['user']['username']
     
-    from modules.pos import stock_checker_section  # Import stock checker
+    from modules.pos import stock_checker_section
     stock_checker_section(products_df, "restock_")
     
     with st.expander("Restocker un produit", expanded=True):
@@ -215,7 +185,7 @@ def access_control_page():
             new_username = st.text_input("Nom d'utilisateur", value=user["username"], key=f"username_{i}")
             new_password = st.text_input("Nouveau mot de passe", type="password", key=f"password_{i}")
             new_role = st.selectbox("Rôle", ["admin", "operator"], index=0 if user["role"] == "admin" else 1, key=f"role_{i}")
-            access_options = ["Proforma", "POS", "Restock", "Expenditures", "Staff Payments", "Till", "Access Control", "Dashboard", "Invoice History", "Activity Log"]
+            access_options = ["Proforma", "POS", "Restock", "Expenditures", "Staff Payments", "Till", "Access Control", "Dashboard", "Invoice History", "Activity Log", "Bon de Commande"]
             new_access = st.multiselect("Accès", access_options, default=user["access"], key=f"access_{i}")
             
             temp_users_data["users"][i]["username"] = new_username
@@ -294,9 +264,25 @@ def dashboard_page():
     total_sales = transactions_df[transactions_df['status'] == "completed"]['payment_amount'].sum()
     st.write(f"**Ventes Totales :** {total_sales:.2f} DZD")
     
-    top_items = pd.DataFrame([json.loads(t['items']) for t in transactions_df[transactions_df['status'] == "completed"]['items']]).explode().groupby('denomination')['Quantity'].sum().nlargest(5)
-    st.write("**Top 5 Articles Vendus :**")
-    st.dataframe(top_items)
+    completed_items = []
+    for items_json in transactions_df[transactions_df['status'] == "completed"]['items']:
+        try:
+            items = json.loads(items_json)
+            if isinstance(items, list):
+                for item in items:
+                    if isinstance(item, dict) and 'denomination' in item and 'Quantity' in item:
+                        completed_items.append(item)
+                    else:
+                        st.warning(f"Invalid item format skipped: {item}")
+        except json.JSONDecodeError as e:
+            st.warning(f"Failed to parse items JSON: {e}")
+    
+    if completed_items:
+        top_items = pd.DataFrame(completed_items).groupby('denomination')['Quantity'].sum().nlargest(5)
+        st.write("**Top 5 Articles Vendus :**")
+        st.dataframe(top_items)
+    else:
+        st.write("**Top 5 Articles Vendus :** Aucun article vendu trouvé.")
     
     till_balance = get_till_balance()
     st.write(f"**Solde de la Caisse :** {till_balance:.2f} DZD")
@@ -331,7 +317,8 @@ def activity_log_page():
     
     if not transactions_df.empty:
         st.write("### Toutes les actions enregistrées")
-        filter_user = st.selectbox("Filtrer par utilisateur", ["Tous"] + sorted(transactions_df['performed_by'].unique().tolist()), key="filter_user")
+        users = [str(u) if u is not None else "Inconnu" for u in transactions_df['performed_by'].unique()]
+        filter_user = st.selectbox("Filtrer par utilisateur", ["Tous"] + sorted(users), key="filter_user")
         filter_type = st.selectbox("Filtrer par type", ["Tous", "proforma", "completed", "restock", "expenditure", "staff_payment"], key="filter_type")
         
         filtered_df = transactions_df
@@ -414,6 +401,8 @@ def main():
         invoice_history_page()
     elif page == "Activity Log":
         activity_log_page()
+    elif page == "Bon de Commande":
+        bon_de_commande_page(products_df)
     elif page == "Changer le mot de passe":
         change_password_page()
 

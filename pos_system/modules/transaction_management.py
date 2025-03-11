@@ -1,4 +1,4 @@
-# transaction_management.py
+# modules/transaction_management.py
 import sqlite3
 import json
 import pandas as pd
@@ -31,7 +31,7 @@ def initialize_db():
                     description TEXT NOT NULL,
                     amount REAL NOT NULL,
                     date TEXT NOT NULL,
-                    performed_by TEXT NOT NULL
+                    assistant_name TEXT NOT NULL
                  )''')
 
     # Staff Payments Table
@@ -39,16 +39,13 @@ def initialize_db():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     staff_name TEXT NOT NULL,
                     amount REAL NOT NULL,
-                    date TEXT NOT NULL,
-                    performed_by TEXT NOT NULL,
-                    note TEXT
+                    date TEXT NOT NULL
                  )''')
 
     # Check and add missing columns to transactions table
     c.execute("PRAGMA table_info(transactions)")
     columns = [row[1] for row in c.fetchall()]
     
-    # Add missing columns with proper data types
     column_definitions = {
         'linked_proforma_id': 'INTEGER DEFAULT NULL REFERENCES transactions(transaction_id)'
     }
@@ -125,7 +122,7 @@ def get_proformas():
     finally:
         conn.close()
 
-def record_expenditure(description, amount, performed_by="N/A"):
+def record_expenditure(description, amount, assistant_name="N/A"):
     """Record an expenditure"""
     initialize_db()
     conn = get_db_connection()
@@ -134,10 +131,12 @@ def record_expenditure(description, amount, performed_by="N/A"):
         date = datetime.now().strftime("%d/%m/%Y")
         c.execute("""
             INSERT INTO expenditures 
-            (description, amount, date, performed_by)
+            (description, amount, date, assistant_name)
             VALUES (?, ?, ?, ?)
-        """, (description, amount, date, performed_by))
+        """, (description, amount, date, assistant_name))
         conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Failed to record expenditure: {str(e)}")
     finally:
         conn.close()
 
@@ -150,10 +149,12 @@ def record_staff_payment(staff_name, amount, performed_by="N/A", note=""):
         date = datetime.now().strftime("%d/%m/%Y")
         c.execute("""
             INSERT INTO staff_payments 
-            (staff_name, amount, date, performed_by, note)
-            VALUES (?, ?, ?, ?, ?)
-        """, (staff_name, amount, date, performed_by, note))
+            (staff_name, amount, date)
+            VALUES (?, ?, ?)
+        """, (staff_name, amount, date))
         conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Failed to record staff payment: {str(e)}")
     finally:
         conn.close()
 
