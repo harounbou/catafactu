@@ -9,42 +9,43 @@ from .pos import stock_checker_section
 def restock_page():
     st.title("Re-stocking")
     products_df = load_products()
-    username = st.session_state['user']['username']
+    product_options = products_df['denomination'].tolist()
+    selected_product = st.selectbox("Select Product to Restock", product_options)
     
-    stock_checker_section(products_df, "restock_")
-    
-    with st.expander("Restocker un produit", expanded=True):
-        search_term = st.text_input("Rechercher par nom ou référence", placeholder="Tapez le nom ou la référence", key="restock_search")
-        if st.button("Rechercher", key="restock_search_btn"):
-            filtered_df = products_df[
-                products_df['denomination'].str.contains(search_term, case=False, na=False) |
-                products_df['reference'].str.contains(search_term, case=False, na=False)
-            ]
-            if not filtered_df.empty:
-                st.session_state['restock_filtered'] = filtered_df
-            else:
-                st.error("Aucun produit trouvé.")
+    if selected_product:
+        product = products_df[products_df['denomination'] == selected_product].iloc[0]
+        st.write(f"Current Stock: {product['quantite_actuelle']}")
         
-        if 'restock_filtered' in st.session_state:
-            filtered_df = st.session_state['restock_filtered']
-            selected_item = st.selectbox("Sélectionnez un produit", filtered_df['denomination'], key="restock_selected")
-            selected_row = filtered_df[filtered_df['denomination'] == selected_item].squeeze()
-            st.write(f"**Référence :** {selected_row['reference']}")
-            st.write(f"**Stock actuel :** {int(selected_row['quantite_actuelle'])} unités")
+        # Get all available colors from couleurs-dispo-usine
+        colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
+        if not colors:
+            st.warning("No colors available for this product.")
+            total_quantity = st.number_input("Total Quantity to Restock", min_value=0, value=0)
+            color_quantities = {"total": total_quantity}
+        else:
+            # Dynamically create input fields for each color
+            color_quantities = {}
+            for color in colors:
+                current_stock = int(product.get(color.lower(), 0)) if color.lower() in product.index else 0
+                st.write(f"Current {color} Stock: {current_stock}")
+                color_quantities[color] = st.number_input(f"{color} Quantity", min_value=0, value=0, key=f"restock_{color}")
             
-            colors = [color.strip() for color in selected_row['couleurs-dispo-usine'].split(',')] if pd.notna(selected_row['couleurs-dispo-usine']) else []
-            selected_color = st.selectbox("Choisissez une couleur", colors, key="restock_color_select") if colors else None
-            
-            image_path = get_full_image_path(find_image_path_for_color(selected_row['images'], selected_color)) if selected_color else None
-            if image_path:
-                st.image(image_path, caption=f"Aperçu ({selected_color})", width=150)
-            else:
-                st.write("Image non disponible")
-            
-            quantity = st.number_input("Quantité à ajouter", min_value=1, key="restock_quantity")
-            if st.button("Restocker", key="restock_btn"):
-                total_cost = restock_product(products_df, selected_row['reference'], quantity, 0, selected_color)
-                record_transaction(None, [{"denomination": selected_row['denomination'], "reference": selected_row['reference'], "Quantity": quantity, "Color": selected_color}], "Restock", 0, 0, "restock", username)
-                st.success(f"{quantity} unités de {selected_row['denomination']} ({selected_color}) restockées !")
-                del st.session_state['restock_filtered']
-                st.rerun()
+            # Calculate total quantity dynamically
+            total_quantity = sum(color_quantities.values())
+            st.number_input("Total Quantity to Restock", value=total_quantity, disabled=True, key="total_restock")
+        
+        if st.button("Restock"):
+            for color, qty in color_quantities.items():
+                if qty > 0:
+                    restock_product(products_df, product['reference'], qty, color=color if color != "total" else None)
+            record_transaction(
+                None,
+                json.dumps([{
+                    "denomination": selected_product,
+                    "reference": product['reference'],
+                    "quantities": {k: v for k, v in color_quantities.items() if v > 0}
+                }]),
+                "N/A", 0.0, 0.0, "restock", st.session_state['user']['username']
+            )
+            st.success(f"Restocked {selected_product} successfully!")
+            st.rerun()

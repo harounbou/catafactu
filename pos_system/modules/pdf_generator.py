@@ -5,123 +5,116 @@ from .utils import sanitize_text, calculate_image_dimensions, truncate_text, get
 from num2words import num2words
 from datetime import datetime
 
-def generate_proforma_pdf(items, price_type, client_info, transaction_info, apply_tva, discount_type, discount_value, show_onama, delivery_days, notes=""):
+def generate_proforma_pdf(items, price_type, client_info, transaction_info, apply_tva=False, discount_type="Pourcentage", discount_value=0.0, show_onama=False, delivery_days=7, notes=""):
     pdf = FPDF()
     pdf.add_page()
-    pdf.image(get_full_image_path("logo.png"), x=10, y=8, w=30)
-    pdf.set_font("Arial", size=24, style='B')
-    pdf.cell(200, 15, txt=sanitize_text("Facture Proforma Takideco"), ln=True, align='C')
+    effective_page_width = pdf.w - 2 * pdf.l_margin
+    
+    # Header
+    pdf.set_font("Arial", "B", 16)
+    title = "Proforma Invoice" if not show_onama else "ONAMA Proforma"
+    pdf.cell(effective_page_width, 10, title, ln=True, align="C")
+    pdf.set_font("Arial", size=12)
+    pdf.cell(effective_page_width, 10, f"Proforma ID: {transaction_info['transaction_number']}", ln=True)
+    pdf.cell(effective_page_width, 10, f"Date: {transaction_info['transaction_date']}", ln=True)
+    pdf.cell(effective_page_width, 10, f"Performed by: {transaction_info['performed_by']}", ln=True)
     pdf.ln(10)
-
+    
+    # Client Information
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(effective_page_width, 10, "Client Information", ln=True)
     pdf.set_font("Arial", size=10)
-    pdf.cell(200, 5, txt=sanitize_text("Taki Deco"), ln=True, align='C')
-    pdf.cell(200, 5, txt=sanitize_text("0542918226 | 0698077751" if not show_onama else "0542310057 | 0542918226 | 0698077751"), ln=True, align='C')
-    pdf.cell(200, 5, txt=sanitize_text("www.takideco.com | email: takidecommercial@gmail.com"), ln=True, align='C')
+    pdf.cell(effective_page_width, 8, f"Name: {client_info.get('nom_client', '')} {client_info.get('prenom_client', '')}", ln=True)
+    pdf.cell(effective_page_width, 8, f"Phone: {client_info.get('telephone_client', '')}", ln=True)
+    pdf.cell(effective_page_width, 8, f"Email: {client_info.get('email_client', '')}", ln=True)
+    pdf.cell(effective_page_width, 8, f"Company: {client_info.get('entreprise_client', '')}", ln=True)
     pdf.ln(10)
-    
-    pdf.set_font("Arial", size=12)
-    pdf.cell(100, 10, txt=sanitize_text(f"Nom du client : {client_info.get('nom_client', '')}"), ln=0)
-    pdf.cell(90, 10, txt=sanitize_text(f"N° de transaction : {transaction_info['transaction_number']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Nom de l’entreprise : {client_info.get('entreprise_client', '')}"), ln=0)
-    pdf.cell(90, 10, txt=sanitize_text(f"Date de transaction : {transaction_info['transaction_date']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Adresse : {client_info.get('address_client', '')}"), ln=0)
-    pdf.cell(90, 10, txt=sanitize_text(f"ID Client : {transaction_info['client_id']}"), ln=1, align='R')
-    pdf.cell(100, 10, txt=sanitize_text(f"Téléphone : {client_info.get('telephone_client', '')}"), ln=0)
-    pdf.cell(90, 10, txt=sanitize_text(f"Effectué par : {transaction_info['performed_by']}"), ln=1, align='R')
-    pdf.ln(10)
-    
-    total_amount = sum(item['Quantity'] * item['Price'] for item in items)
-    discount_amount = total_amount * (discount_value / 100) if discount_type == "Pourcentage" else discount_value
-    total_amount_after_discount = total_amount - discount_amount
-    tva_amount = total_amount_after_discount * 0.19 if apply_tva else 0
-    total_amount_with_tva = total_amount_after_discount + tva_amount
 
-    items_by_category = {}
-    for item in items:
-        category = item.get('category', 'Sans Catégorie')
-        items_by_category.setdefault(category, []).append(item)
+    # Table Header
+    col_widths = [10, 60, 30, 20, 30, 30]  # N°, Désignation, Référence, Quantité, Prix Unitaire, Montant
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(col_widths[0], 10, "N°", 1)
+    pdf.cell(col_widths[1], 10, "Désignation", 1)
+    pdf.cell(col_widths[2], 10, "Référence", 1)
+    pdf.cell(col_widths[3], 10, "Quantité", 1)
+    pdf.cell(col_widths[4], 10, "Prix Unitaire", 1)
+    pdf.cell(col_widths[5], 10, "Montant", 1)
+    pdf.ln()
 
-    for category, category_items in sorted(items_by_category.items()):
-        pdf.set_font("Arial", size=14, style='B')
-        pdf.cell(0, 10, txt=sanitize_text(f"Catégorie : {category}"), ln=1)
-        pdf.ln(5)
-        pdf.set_font("Arial", size=12, style='B')
-        col_widths = [60, 30, 30, 30, 30, 30]
-        headers = ["Article", "Image", "Référence", "Quantité", "Prix", "Total"]
-        for w, h in zip(col_widths, headers):
-            pdf.cell(w, 10, txt=h, border=1)
-        pdf.ln()
-        pdf.set_font("Arial", size=12)
-        row_height = 30
-        for item in category_items:
-            item_total = item['Quantity'] * item['Price']
-            y_before = pdf.get_y()
-            pdf.cell(col_widths[0], row_height, txt=sanitize_text(truncate_text(item['denomination'])), border=1)
-            x_image = pdf.get_x()
-            image_path = item.get('Image')
-            if image_path:
-                try:
-                    scaled_width_mm, scaled_height_mm = calculate_image_dimensions(image_path, col_widths[1], row_height)
-                    x_offset = (col_widths[1] - scaled_width_mm) / 2
-                    y_offset = (row_height - scaled_height_mm) / 2
-                    pdf.image(image_path, x=x_image + x_offset, y=y_before + y_offset, w=scaled_width_mm, h=scaled_height_mm)
-                except Exception:
-                    pdf.set_xy(x_image, y_before)
-                    pdf.cell(col_widths[1], row_height, txt="Pas d'image", border=1)
-            else:
-                pdf.set_xy(x_image, y_before)
-                pdf.cell(col_widths[1], row_height, txt="Pas d'image", border=1)
-            pdf.set_xy(x_image + col_widths[1], y_before)
-            pdf.cell(col_widths[2], row_height, txt=sanitize_text(truncate_text(item['reference'])), border=1)
-            pdf.cell(col_widths[3], row_height, txt=str(item['Quantity']), border=1)
-            pdf.cell(col_widths[4], row_height, txt=f"{item['Price']:.2f}", border=1)
-            pdf.cell(col_widths[5], row_height, txt=f"{item_total:.2f}", border=1)
-            pdf.ln(row_height)
-            pdf.ln(3)
-        pdf.ln(5)
+    # Table Content with Improved Page Break Handling
+    pdf.set_font("Arial", size=10)
+    line_height = 10
+    page_bottom_margin = pdf.h - pdf.b_margin - 80  # Increased to ensure footer fits
+    
+    for i, item in enumerate(items, 1):
+        # Check if the next row will fit entirely on the current page
+        if pdf.get_y() + line_height > page_bottom_margin:
+            pdf.add_page()
+            pdf.set_font("Arial", "B", 10)
+            pdf.cell(col_widths[0], 10, "N°", 1)
+            pdf.cell(col_widths[1], 10, "Désignation", 1)
+            pdf.cell(col_widths[2], 10, "Référence", 1)
+            pdf.cell(col_widths[3], 10, "Quantité", 1)
+            pdf.cell(col_widths[4], 10, "Prix Unitaire", 1)
+            pdf.cell(col_widths[5], 10, "Montant", 1)
+            pdf.ln()
+            pdf.set_font("Arial", size=10)
+        
+        # Write the row at the current position
+        start_x = pdf.l_margin
+        start_y = pdf.get_y()
+        pdf.set_xy(start_x, start_y)
+        pdf.cell(col_widths[0], line_height, str(i), 1)
+        pdf.set_xy(start_x + col_widths[0], start_y)
+        pdf.cell(col_widths[1], line_height, truncate_text(item['denomination'], 60), 1)
+        pdf.set_xy(start_x + col_widths[0] + col_widths[1], start_y)
+        pdf.cell(col_widths[2], line_height, item['reference'], 1)
+        pdf.set_xy(start_x + col_widths[0] + col_widths[1] + col_widths[2], start_y)
+        pdf.cell(col_widths[3], line_height, str(item['Quantity']), 1)
+        pdf.set_xy(start_x + col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3], start_y)
+        pdf.cell(col_widths[4], line_height, f"{item['Price']:.2f}", 1)
+        pdf.set_xy(start_x + col_widths[0] + col_widths[1] + col_widths[2] + col_widths[3] + col_widths[4], start_y)
+        pdf.cell(col_widths[5], line_height, f"{item['Price'] * item['Quantity']:.2f}", 1)
+        pdf.set_xy(start_x, start_y + line_height)  # Move to next line manually
 
+    # Footer with Totals and Additional Info
     pdf.ln(10)
-    pdf.set_font("Arial", size=12)
-    pdf.cell(160, 10, txt=sanitize_text("Montant Total (HT) :"), border=0)
-    pdf.cell(30, 10, txt=sanitize_text(f"{total_amount:.2f}"), border=1, ln=True)
-    pdf.cell(160, 10, txt=sanitize_text(f"Remise ({discount_value}{'%' if discount_type=='Pourcentage' else 'DZD'}) :"), border=0)
-    pdf.cell(30, 10, txt=sanitize_text(f"{discount_amount:.2f}"), border=1, ln=True)
-    pdf.cell(160, 10, txt=sanitize_text("Montant Total Après Remise (HT) :"), border=0)
-    pdf.cell(30, 10, txt=sanitize_text(f"{total_amount_after_discount:.2f}"), border=1, ln=True)
-    if apply_tva:
-        pdf.cell(160, 10, txt=sanitize_text("TVA (19%) :"), border=0)
-        pdf.cell(30, 10, txt=sanitize_text(f"{tva_amount:.2f}"), border=1, ln=True)
-        pdf.cell(160, 10, txt=sanitize_text("Montant Total (TTC) :"), border=0)
-        pdf.cell(30, 10, txt=sanitize_text(f"{total_amount_with_tva:.2f}"), border=1, ln=True)
+    pdf.set_font("Arial", "B", 12)
+    subtotal = sum(item['Price'] * item['Quantity'] for item in items)
+    discount_amount = subtotal * (discount_value / 100) if discount_type == "Pourcentage" else discount_value
+    taxable_amount = subtotal - discount_amount
+    tax_rate = 19 if apply_tva else 0
+    tax_amount = taxable_amount * (tax_rate / 100)
+    grand_total = taxable_amount + tax_amount
+
+    # Ensure footer fits on the page
+    if pdf.get_y() + 60 > page_bottom_margin:  # 60mm for footer
+        pdf.add_page()
     
-    total_amount_words = num2words(int(total_amount_with_tva), lang='fr') if total_amount_with_tva <= 999999 else "Montant très élevé"
+    pdf.cell(150, 10, "Subtotal:", 0)
+    pdf.cell(40, 10, f"{subtotal:.2f} DZD", 0, ln=True, align="R")
+    if discount_amount > 0:
+        discount_label = f"Discount ({discount_value}%)" if discount_type == "Pourcentage" else "Discount (Fixed)"
+        pdf.cell(150, 10, discount_label, 0)
+        pdf.cell(40, 10, f"-{discount_amount:.2f} DZD", 0, ln=True, align="R")
+    if tax_rate > 0:
+        pdf.cell(150, 10, f"TVA ({tax_rate}%):", 0)
+        pdf.cell(40, 10, f"{tax_amount:.2f} DZD", 0, ln=True, align="R")
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(150, 10, "Grand Total:", 0)
+    pdf.cell(40, 10, f"{grand_total:.2f} DZD", 0, ln=True, align="R")
+    
     pdf.ln(10)
-    pdf.set_font("Arial", size=10, style='I')
-    pdf.cell(200, 10, txt=sanitize_text(f"Arrêter la présente facture proforma à la somme de : {total_amount_words} dinars."), ln=True)
-    
-    pdf.ln(10)
-    pdf.set_font("Arial", size=8)
-    pdf.set_text_color(0, 0, 128)
-    default_terms = (
-        "Mode de règlement :\n"
-        "Espèces, Virement bancaire ou Chèque (à remettre par le client à nos bureaux de Constantine dans un délai maximum de 48 heures suivant la commande).\n"
-        "Acompte :\n"
-        "Un acompte de 50 % est exigé au moment de placer la commande.\n"
-        "Délai de réalisation :\n" +
-        (f"La commande sera prête dans un délai de {delivery_days} jours à compter de la date de réception de l’acompte."
-         if delivery_days > 0 else "La commande sera prête dans un délai de 7 à 10 jours.") +
-        "\nFrais d’expédition :\n"
-        "Les frais d’expédition sont à la charge du client."
-    )
-    pdf.multi_cell(0, 5, txt=sanitize_text(default_terms))
-    
+    pdf.set_font("Arial", size=10)
+    amount_in_words = num2words(grand_total, lang='fr').replace("virgule", "et") + " Dinars Algériens"
+    pdf.cell(0, 10, f"Montant en lettres: {amount_in_words}", ln=True)
+    pdf.cell(0, 10, f"Délai de livraison: {delivery_days} jours", ln=True)
     if notes:
-        pdf.ln(5)
-        pdf.set_font("Arial", size=8, style='I')
-        pdf.set_text_color(0, 0, 0)
-        pdf.multi_cell(0, 5, txt=sanitize_text(f"Notes personnalisées :\n{notes}"))
+        pdf.cell(0, 10, f"Notes: {notes}", ln=True)
+    pdf.ln(20)
+    pdf.cell(0, 10, "Signature: ___________________________", ln=True, align="R")
 
-    pdf_filename = f"Proforma-{client_info.get('nom_client', 'Client')}-{datetime.now().strftime('%d%m%Y')}.pdf"
+    pdf_filename = f"Proforma-{transaction_info['transaction_number']}.pdf"
     pdf.output(pdf_filename)
     return pdf_filename
 

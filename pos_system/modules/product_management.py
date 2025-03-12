@@ -24,22 +24,16 @@ def update_stock(items):
                 WHERE reference = ?
             """, (item['reference'],))
             product = cursor.fetchone()
-            
             if not product:
                 raise ValueError(f"Product {item['reference']} not found")
-            
             current_stock = product['quantite_actuelle']
             quantity = item['Quantity']
             color = item.get('Color', '').lower()
-            
-            # Validate stock
             available = current_stock
             if color in ['golden', 'white', 'black']:
                 available = product[color]
                 if available < quantity:
                     raise ValueError(f"Insufficient {color} stock for {item['reference']}")
-                
-                # Update color stock
                 conn.execute(f"""
                     UPDATE products 
                     SET {color} = {color} - ?, 
@@ -49,14 +43,11 @@ def update_stock(items):
             else:
                 if current_stock < quantity:
                     raise ValueError(f"Insufficient total stock for {item['reference']}")
-                
-                # Update total stock
                 conn.execute("""
                     UPDATE products 
                     SET quantite_actuelle = quantite_actuelle - ? 
                     WHERE reference = ?
                 """, (quantity, item['reference']))
-        
         conn.commit()
         return True
     except Exception as e:
@@ -66,33 +57,78 @@ def update_stock(items):
     finally:
         conn.close()
 
-def restock_product(products_df, reference, quantity, total_cost=0, color=None):
-    """Restock items with color support, return total_cost for tracking"""
+
+    """Restock items with dynamic color support, return quantity restocked"""
     conn = get_db_connection()
     try:
         conn.execute("BEGIN TRANSACTION")
-        
-        if color and color.lower() in ['golden', 'white', 'black']:
-            color_col = color.lower()
-            conn.execute(f"""
-                UPDATE products 
-                SET {color_col} = {color_col} + ?,
-                    quantite_actuelle = quantite_actuelle + ?
-                WHERE reference = ?
-            """, (quantity, quantity, reference))
+        if color:
+            color_col = color.lower().strip()
+            cursor = conn.execute("PRAGMA table_info(products)")
+            columns = [row[1].lower() for row in cursor.fetchall()]
+            if color_col in columns:
+                conn.execute(f"""
+                    UPDATE products 
+                    SET {color_col} = {color_col} + ?, 
+                        quantite_actuelle = quantite_actuelle + ?
+                    WHERE reference = ?
+                """, (quantity, quantity, reference))
+            else:
+                conn.execute("""
+                    UPDATE products 
+                    SET quantite_actuelle = quantite_actuelle + ?
+                    WHERE reference = ?
+                """, (quantity, reference))
         else:
             conn.execute("""
                 UPDATE products 
                 SET quantite_actuelle = quantite_actuelle + ?
                 WHERE reference = ?
             """, (quantity, reference))
-        
         conn.commit()
-        return total_cost  # Return total_cost (0 for now, can be enhanced later)
+        return quantity  # Return quantity restocked
     except Exception as e:
         conn.rollback()
         st.error(f"Restock failed: {str(e)}")
-        return 0  # Return 0 on failure instead of False to match restock_page expectation
+        return 0
+    finally:
+        conn.close()
+
+def restock_product(products_df, reference, quantity, total_cost=0, color=None):
+    """Restock items with dynamic color support, return quantity restocked"""
+    conn = get_db_connection()
+    try:
+        conn.execute("BEGIN TRANSACTION")
+        if color:
+            color_col = color.lower().strip()
+            # Check if the color column exists; if not, only update quantite_actuelle
+            cursor = conn.execute("PRAGMA table_info(products)")
+            columns = [row[1].lower() for row in cursor.fetchall()]
+            if color_col in columns:
+                conn.execute(f"""
+                    UPDATE products 
+                    SET {color_col} = {color_col} + ?, 
+                        quantite_actuelle = quantite_actuelle + ?
+                    WHERE reference = ?
+                """, (quantity, quantity, reference))
+            else:
+                conn.execute("""
+                    UPDATE products 
+                    SET quantite_actuelle = quantite_actuelle + ?
+                    WHERE reference = ?
+                """, (quantity, reference))
+        else:
+            conn.execute("""
+                UPDATE products 
+                SET quantite_actuelle = quantite_actuelle + ?
+                WHERE reference = ?
+            """, (quantity, reference))
+        conn.commit()
+        return quantity
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Restock failed: {str(e)}")
+        return 0
     finally:
         conn.close()
 
@@ -104,12 +140,11 @@ def reserve_stock(items):
         for item in items:
             conn.execute("""
                 UPDATE products 
-                SET reserved_stock = reserved_stock + ?,
+                SET reserved_stock = reserved_stock + ?, 
                     quantite_actuelle = quantite_actuelle - ?
                 WHERE reference = ? 
                 AND quantite_actuelle >= ?
-            """, (item['Quantity'], item['Quantity'], 
-                 item['reference'], item['Quantity']))
+            """, (item['Quantity'], item['Quantity'], item['reference'], item['Quantity']))
         conn.commit()
         return True
     except Exception as e:

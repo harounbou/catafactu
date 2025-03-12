@@ -13,7 +13,7 @@ from modules.proforma import proforma_page
 from modules.pos import pos_page
 from modules.restock import restock_page
 from modules.bon_de_commande import bon_de_commande_page
-from modules.utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path, send_email  # Updated import
+from modules.utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path, send_email
 
 # Paths
 USERS_FILE = "data/users.json"
@@ -58,21 +58,18 @@ st.markdown(
 def load_users(force_reset=False):
     default_users = {
         "users": [
-            {"username": "admin", "password": bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode(), "role": "admin", "access": ["Proforma", "POS", "Restock", "Expenditures", "Staff Payments", "Till", "Access Control", "Dashboard", "Invoice History", "Activity Log", "Bon de Commande"]},
-            {"username": "eulma", "password": bcrypt.hashpw("eulma".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["Proforma", "POS"]},
-            {"username": "alger", "password": bcrypt.hashpw("alger".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["Proforma", "POS"]},
-            {"username": "constantine", "password": bcrypt.hashpw("constantine".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["Proforma", "POS"]}
+            {"username": "admin", "password": bcrypt.hashpw("admin".encode(), bcrypt.gensalt()).decode(), "role": "admin", "access": ["🏠 Dashboard", "📋 Proforma", "🛒 POS", "📦 Restock", "👥 Clients", "📚 Articles", "💸 Expenditures", "👨‍💼 Staff Payments", "💰 Till", "🔒 Access Control", "📜 Invoice History", "📋 Activity Log", "📝 Bon de Commande"]},
+            {"username": "eulma", "password": bcrypt.hashpw("eulma".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["📋 Proforma", "🛒 POS", "👥 Clients", "📚 Articles"]},
+            {"username": "alger", "password": bcrypt.hashpw("alger".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["📋 Proforma", "🛒 POS", "👥 Clients", "📚 Articles"]},
+            {"username": "constantine", "password": bcrypt.hashpw("constantine".encode(), bcrypt.gensalt()).decode(), "role": "operator", "access": ["📋 Proforma", "🛒 POS", "👥 Clients", "📚 Articles"]}
         ],
         "access_control_enabled": False
     }
-    
     os.makedirs("data", exist_ok=True)
-    
     if force_reset or not os.path.exists(USERS_FILE):
         with open(USERS_FILE, 'w') as f:
             json.dump(default_users, f)
         return default_users
-    
     with open(USERS_FILE, 'r') as f:
         return json.load(f)
 
@@ -83,23 +80,18 @@ def save_users(users_data):
 def login():
     if st.session_state.get('logged_in', False):
         return True
-
     st.session_state.setdefault('logged_in', False)
     st.session_state.setdefault('user', None)
-
     users_data = load_users()
     access_control_enabled = users_data.get("access_control_enabled", False)
-
     if not access_control_enabled:
         st.session_state['logged_in'] = True
         admin_user = next(u for u in users_data["users"] if u["username"] == "admin")
         st.session_state['user'] = admin_user
         return True
-
     st.title("Connexion")
     username = st.text_input("Nom d'utilisateur", key="login_username")
     password = st.text_input("Mot de passe", type="password", key="login_password")
-    
     if st.button("Se connecter"):
         user = next((u for u in users_data["users"] if u["username"] == username), None)
         if user and bcrypt.checkpw(password.encode(), user["password"].encode()):
@@ -118,118 +110,9 @@ def initialize_session_state():
         st.session_state['transaction_number'] = transactions_df["transaction_id"].max() + 1 if not transactions_df.empty else 1000
     if 'recent_clients' not in st.session_state:
         st.session_state['recent_clients'] = []
-    initialize_clients_df()
+    st.session_state['clients_df'] = initialize_clients_df()  # Always refresh from DB
 
-def restock_page():
-    st.title("Re-stocking")
-    products_df = load_products()
-    username = st.session_state['user']['username']
-    
-    from modules.pos import stock_checker_section
-    stock_checker_section(products_df, "restock_")
-    
-    with st.expander("Restocker un produit", expanded=True):
-        search_term = st.text_input("Rechercher par nom ou référence", placeholder="Tapez le nom ou la référence", key="restock_search")
-        if st.button("Rechercher", key="restock_search_btn"):
-            filtered_df = products_df[
-                products_df['denomination'].str.contains(search_term, case=False, na=False) |
-                products_df['reference'].str.contains(search_term, case=False, na=False)
-            ]
-            if not filtered_df.empty:
-                st.session_state['restock_filtered'] = filtered_df
-            else:
-                st.error("Aucun produit trouvé.")
-        
-        if 'restock_filtered' in st.session_state:
-            filtered_df = st.session_state['restock_filtered']
-            selected_item = st.selectbox("Sélectionnez un produit", filtered_df['denomination'], key="restock_selected")
-            selected_row = filtered_df[filtered_df['denomination'] == selected_item].squeeze()
-            st.write(f"**Référence :** {selected_row['reference']}")
-            st.write(f"**Stock actuel :** {int(selected_row['quantite_actuelle'])} unités")
-            
-            colors = [color.strip() for color in selected_row['couleurs-dispo-usine'].split(',')] if pd.notna(selected_row['couleurs-dispo-usine']) else []
-            selected_color = st.selectbox("Choisissez une couleur", colors, key="restock_color_select") if colors else None
-            
-            image_path = get_full_image_path(find_image_path_for_color(selected_row['images'], selected_color)) if selected_color else None
-            if image_path:
-                st.image(image_path, caption=f"Aperçu ({selected_color})", width=150)
-            else:
-                st.write("Image non disponible")
-            
-            quantity = st.number_input("Quantité à ajouter", min_value=1, key="restock_quantity")
-            if st.button("Restocker", key="restock_btn"):
-                total_cost = restock_product(products_df, selected_row['reference'], quantity, 0, selected_color)
-                record_transaction(None, [{"denomination": selected_row['denomination'], "reference": selected_row['reference'], "Quantity": quantity, "Color": selected_color}], "Restock", 0, 0, "restock", username)
-                st.success(f"{quantity} unités de {selected_row['denomination']} ({selected_color}) restockées !")
-                del st.session_state['restock_filtered']
-                st.rerun()
-
-def access_control_page():
-    st.title("Contrôle d'accès")
-    if st.session_state['user']['role'] != "admin":
-        st.error("Accès réservé à l'administrateur.")
-        return
-
-    users_data = load_users()
-    if 'temp_users_data' not in st.session_state:
-        st.session_state['temp_users_data'] = users_data.copy()
-    
-    temp_users_data = st.session_state['temp_users_data']
-    st.write("### Gestion des utilisateurs")
-    
-    access_enabled = st.checkbox("Activer le contrôle d'accès", value=temp_users_data["access_control_enabled"], key="access_control_toggle")
-    temp_users_data["access_control_enabled"] = access_enabled
-    
-    for i, user in enumerate(temp_users_data["users"]):
-        with st.expander(f"Utilisateur: {user['username']} ({user['role']})", expanded=False):
-            new_username = st.text_input("Nom d'utilisateur", value=user["username"], key=f"username_{i}")
-            new_password = st.text_input("Nouveau mot de passe", type="password", key=f"password_{i}")
-            new_role = st.selectbox("Rôle", ["admin", "operator"], index=0 if user["role"] == "admin" else 1, key=f"role_{i}")
-            access_options = ["Proforma", "POS", "Restock", "Expenditures", "Staff Payments", "Till", "Access Control", "Dashboard", "Invoice History", "Activity Log", "Bon de Commande"]
-            new_access = st.multiselect("Accès", access_options, default=user["access"], key=f"access_{i}")
-            
-            temp_users_data["users"][i]["username"] = new_username
-            if new_password:
-                temp_users_data["users"][i]["password"] = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
-            temp_users_data["users"][i]["role"] = new_role
-            temp_users_data["users"][i]["access"] = new_access
-            
-            if st.button("Supprimer", key=f"delete_{i}"):
-                if user["username"] != "admin":
-                    temp_users_data["users"].pop(i)
-                    st.success(f"Utilisateur supprimé !")
-                    st.rerun()
-                else:
-                    st.error("Impossible de supprimer l'utilisateur admin.")
-    
-    with st.expander("Ajouter un nouvel utilisateur", expanded=False):
-        new_username = st.text_input("Nouveau nom d'utilisateur", key="new_username")
-        new_password = st.text_input("Mot de passe", type="password", key="new_password")
-        new_role = st.selectbox("Rôle", ["admin", "operator"], key="new_role")
-        new_access = st.multiselect("Accès", access_options, key="new_access")
-        if st.button("Ajouter utilisateur", key="add_user"):
-            if new_username and new_password:
-                if any(u["username"] == new_username for u in temp_users_data["users"]):
-                    st.error("Ce nom d'utilisateur existe déjà.")
-                else:
-                    new_user = {
-                        "username": new_username,
-                        "password": bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode(),
-                        "role": new_role,
-                        "access": new_access
-                    }
-                    temp_users_data["users"].append(new_user)
-                    st.success(f"Utilisateur {new_username} ajouté !")
-                    st.rerun()
-            else:
-                st.error("Veuillez remplir tous les champs.")
-    
-    if st.button("Sauvegarder", key="save_access_control"):
-        save_users(temp_users_data)
-        st.session_state['temp_users_data'] = temp_users_data.copy()
-        st.success("Modifications sauvegardées !")
-
-def expenditure_page():
+def expenditure_page():  # Moved from global scope
     st.title("Dépenses")
     username = st.session_state['user']['username']
     description = st.text_input("Description de la dépense")
@@ -260,10 +143,8 @@ def dashboard_page():
     st.title("Tableau de Bord")
     transactions_df = fetch_df_from_db('transactions')
     products_df = load_products()
-    
     total_sales = transactions_df[transactions_df['status'] == "completed"]['payment_amount'].sum()
     st.write(f"**Ventes Totales :** {total_sales:.2f} DZD")
-    
     completed_items = []
     for items_json in transactions_df[transactions_df['status'] == "completed"]['items']:
         try:
@@ -272,18 +153,14 @@ def dashboard_page():
                 for item in items:
                     if isinstance(item, dict) and 'denomination' in item and 'Quantity' in item:
                         completed_items.append(item)
-                    else:
-                        st.warning(f"Invalid item format skipped: {item}")
         except json.JSONDecodeError as e:
             st.warning(f"Failed to parse items JSON: {e}")
-    
     if completed_items:
         top_items = pd.DataFrame(completed_items).groupby('denomination')['Quantity'].sum().nlargest(5)
         st.write("**Top 5 Articles Vendus :**")
         st.dataframe(top_items)
     else:
         st.write("**Top 5 Articles Vendus :** Aucun article vendu trouvé.")
-    
     till_balance = get_till_balance()
     st.write(f"**Solde de la Caisse :** {till_balance:.2f} DZD")
 
@@ -314,19 +191,16 @@ def invoice_history_page():
 def activity_log_page():
     st.title("Journal d'Activité")
     transactions_df = fetch_df_from_db('transactions')
-    
     if not transactions_df.empty:
         st.write("### Toutes les actions enregistrées")
         users = [str(u) if u is not None else "Inconnu" for u in transactions_df['performed_by'].unique()]
         filter_user = st.selectbox("Filtrer par utilisateur", ["Tous"] + sorted(users), key="filter_user")
         filter_type = st.selectbox("Filtrer par type", ["Tous", "proforma", "completed", "restock", "expenditure", "staff_payment"], key="filter_type")
-        
         filtered_df = transactions_df
         if filter_user != "Tous":
             filtered_df = filtered_df[filtered_df['performed_by'] == filter_user]
         if filter_type != "Tous":
             filtered_df = filtered_df[filtered_df['status'] == filter_type]
-        
         display_df = filtered_df[['transaction_id', 'transaction_date', 'performed_by', 'status', 'payment_amount', 'client_id']].rename(columns={
             'transaction_id': 'ID Transaction',
             'transaction_date': 'Date',
@@ -351,7 +225,6 @@ def change_password_page():
     current_password = st.text_input("Mot de passe actuel", type="password", key="current_password")
     new_password = st.text_input("Nouveau mot de passe", type="password", key="new_password")
     confirm_password = st.text_input("Confirmer le nouveau mot de passe", type="password", key="confirm_password")
-    
     if st.button("Changer le mot de passe"):
         users_data = load_users()
         user = next(u for u in users_data["users"] if u["username"] == st.session_state['user']['username'])
@@ -365,10 +238,243 @@ def change_password_page():
         else:
             st.error("Mot de passe actuel incorrect.")
 
+def clients_page():
+    st.title("Gestion des Clients")
+    clients_df = fetch_df_from_db('clients')
+    edited_df = st.data_editor(clients_df, use_container_width=True)
+    if st.button("Sauvegarder"):
+        conn = get_db_connection()
+        edited_df.to_sql('clients', conn, if_exists='replace', index=False)
+        st.session_state['clients_df'] = edited_df
+        conn.close()
+        st.success("Clients mis à jour !")
+
+def articles_page():
+    st.title("Gestion des Articles")
+    products_df = load_products()
+    
+    # Get all unique colors across all products
+    all_colors = set()
+    for colors in products_df['couleurs-dispo-usine'].dropna():
+        all_colors.update([c.strip().lower() for c in colors.split(',')])
+    
+    # Ensure all color columns exist in products_df
+    for color in all_colors:
+        if color not in products_df.columns:
+            products_df[color] = 0
+        products_df[color] = products_df[color].fillna(0).astype(int)
+    
+    # Columns to display
+    base_columns = ['reference', 'denomination', 'quantite_actuelle', 'couleurs-dispo-usine']
+    display_columns = base_columns + sorted(all_colors)
+    
+    # Configure columns for data_editor
+    column_config = {
+        "couleurs-dispo-usine": st.column_config.TextColumn("Couleurs Disponibles", width="medium"),
+        "quantite_actuelle": st.column_config.NumberColumn("Stock Total", min_value=0),
+    }
+    for color in all_colors:
+        column_config[color] = st.column_config.NumberColumn(color.capitalize(), min_value=0)
+    
+    edited_df = st.data_editor(
+        products_df[display_columns],
+        column_config=column_config,
+        use_container_width=True
+    )
+    
+    selected_product = st.selectbox(
+        "Sélectionner un produit pour gérer les couleurs",
+        products_df['denomination'],
+        key="articles_select_product"
+    )
+    product = products_df[products_df['denomination'] == selected_product].iloc[0]
+    colors = st.text_input(
+        "Couleurs disponibles (séparées par des virgules)",
+        value=product['couleurs-dispo-usine'],
+        key="articles_colors_input"  # Added unique key
+    )
+    
+    if st.button("Mettre à jour les couleurs"):
+        conn = get_db_connection()
+        conn.execute("UPDATE products SET `couleurs-dispo-usine` = ? WHERE reference = ?", (colors, product['reference']))
+        conn.commit()
+        conn.close()
+        st.success("Couleurs mises à jour !")
+        st.rerun()
+    
+    if st.button("Sauvegarder"):
+        conn = get_db_connection()
+        edited_df.to_sql('products', conn, if_exists='replace', index=False)
+        conn.close()
+        st.success("Articles mis à jour !")
+        st.rerun()
+    st.title("Gestion des Articles")
+    products_df = load_products()
+    
+    # Get all unique colors across all products
+    all_colors = set()
+    for colors in products_df['couleurs-dispo-usine'].dropna():
+        all_colors.update([c.strip().lower() for c in colors.split(',')])
+    
+    # Ensure all color columns exist in products_df
+    for color in all_colors:
+        if color not in products_df.columns:
+            products_df[color] = 0
+        products_df[color] = products_df[color].fillna(0).astype(int)
+    
+    # Columns to display
+    base_columns = ['reference', 'denomination', 'quantite_actuelle', 'couleurs-dispo-usine']
+    display_columns = base_columns + sorted(all_colors)
+    
+    # Configure columns for data_editor
+    column_config = {
+        "couleurs-dispo-usine": st.column_config.TextColumn("Couleurs Disponibles", width="medium"),
+        "quantite_actuelle": st.column_config.NumberColumn("Stock Total", min_value=0),
+    }
+    for color in all_colors:
+        column_config[color] = st.column_config.NumberColumn(color.capitalize(), min_value=0)
+    
+    edited_df = st.data_editor(
+        products_df[display_columns],
+        column_config=column_config,
+        use_container_width=True
+    )
+    
+    selected_product = st.selectbox(
+        "Sélectionner un produit pour gérer les couleurs",
+        products_df['denomination'],
+        key="articles_select_product"  # Unique key to avoid duplicate ID error
+    )
+    product = products_df[products_df['denomination'] == selected_product].iloc[0]
+    colors = st.text_input("Couleurs disponibles (séparées par des virgules)", value=product['couleurs-dispo-usine'])
+    
+    if st.button("Mettre à jour les couleurs"):
+        conn = get_db_connection()
+        conn.execute("UPDATE products SET `couleurs-dispo-usine` = ? WHERE reference = ?", (colors, product['reference']))
+        conn.commit()
+        conn.close()
+        st.success("Couleurs mises à jour !")
+        st.rerun()
+    
+    if st.button("Sauvegarder"):
+        conn = get_db_connection()
+        edited_df.to_sql('products', conn, if_exists='replace', index=False)
+        conn.close()
+        st.success("Articles mis à jour !")
+        st.rerun()
+    st.title("Gestion des Articles")
+    products_df = load_products()
+    # Ensure 'couleurs-dispo-usine' is always included and formatted
+    if 'couleurs-dispo-usine' not in products_df.columns:
+        products_df['couleurs-dispo-usine'] = ''
+    # Display all columns, including available colors
+    edited_df = st.data_editor(
+        products_df[['reference', 'denomination', 'quantite_actuelle', 'couleurs-dispo-usine', 'golden', 'white', 'black']],
+        column_config={
+            "couleurs-dispo-usine": st.column_config.TextColumn("Couleurs Disponibles", width="medium")
+        },
+        use_container_width=True
+    )
+    selected_product = st.selectbox("Sélectionner un produit pour gérer les couleurs", products_df['denomination'])
+    product = products_df[products_df['denomination'] == selected_product].iloc[0]
+    colors = st.text_input("Couleurs disponibles (séparées par des virgules)", value=product['couleurs-dispo-usine'])
+    if st.button("Mettre à jour les couleurs"):
+        conn = get_db_connection()
+        conn.execute("UPDATE products SET `couleurs-dispo-usine` = ? WHERE reference = ?", (colors, product['reference']))
+        conn.commit()
+        conn.close()
+        st.success("Couleurs mises à jour !")
+        st.rerun()
+    if st.button("Sauvegarder"):
+        conn = get_db_connection()
+        edited_df.to_sql('products', conn, if_exists='replace', index=False)
+        conn.close()
+        st.success("Articles mis à jour !")
+        st.rerun()  # Refresh to show saved changes
+    st.title("Gestion des Articles")
+    products_df = load_products()
+    edited_df = st.data_editor(products_df[['reference', 'denomination', 'quantite_actuelle', 'couleurs-dispo-usine', 'golden', 'white', 'black']], use_container_width=True)
+    selected_product = st.selectbox("Sélectionner un produit pour gérer les couleurs", products_df['denomination'])
+    product = products_df[products_df['denomination'] == selected_product].iloc[0]
+    colors = st.text_input("Couleurs disponibles (séparées par des virgules)", value=product['couleurs-dispo-usine'])
+    if st.button("Mettre à jour les couleurs"):
+        conn = get_db_connection()
+        conn.execute("UPDATE products SET `couleurs-dispo-usine` = ? WHERE reference = ?", (colors, product['reference']))
+        conn.commit()
+        conn.close()
+        st.success("Couleurs mises à jour !")
+        st.rerun()
+    if st.button("Sauvegarder"):
+        conn = get_db_connection()
+        edited_df.to_sql('products', conn, if_exists='replace', index=False)
+        conn.close()
+        st.success("Articles mis à jour !")
+
+def access_control_page():  # Moved from global scope
+    st.title("Contrôle d'accès")
+    if st.session_state['user']['role'] != "admin":
+        st.error("Accès réservé à l'administrateur.")
+        return
+    users_data = load_users()
+    if 'temp_users_data' not in st.session_state:
+        st.session_state['temp_users_data'] = users_data.copy()
+    temp_users_data = st.session_state['temp_users_data']
+    st.write("### Gestion des utilisateurs")
+    access_enabled = st.checkbox("Activer le contrôle d'accès", value=temp_users_data["access_control_enabled"], key="access_control_toggle")
+    temp_users_data["access_control_enabled"] = access_enabled
+    for i, user in enumerate(temp_users_data["users"]):
+        with st.expander(f"Utilisateur: {user['username']} ({user['role']})", expanded=False):
+            new_username = st.text_input("Nom d'utilisateur", value=user["username"], key=f"username_{i}")
+            new_password = st.text_input("Nouveau mot de passe", type="password", key=f"password_{i}")
+            new_role = st.selectbox("Rôle", ["admin", "operator"], index=0 if user["role"] == "admin" else 1, key=f"role_{i}")
+            access_options = [
+                "🏠 Dashboard", "📋 Proforma", "🛒 POS", "📦 Restock",
+                "👥 Clients", "📚 Articles", "💸 Expenditures",
+                "👨‍💼 Staff Payments", "💰 Till", "🔒 Access Control",
+                "📜 Invoice History", "📋 Activity Log", "📝 Bon de Commande"
+            ]
+            new_access = st.multiselect("Accès", access_options, default=user["access"], key=f"access_{i}")
+            temp_users_data["users"][i]["username"] = new_username
+            if new_password:
+                temp_users_data["users"][i]["password"] = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+            temp_users_data["users"][i]["role"] = new_role
+            temp_users_data["users"][i]["access"] = new_access
+            if st.button("Supprimer", key=f"delete_{i}"):
+                if user["username"] != "admin":
+                    temp_users_data["users"].pop(i)
+                    st.success(f"Utilisateur supprimé !")
+                    st.rerun()
+                else:
+                    st.error("Impossible de supprimer l'utilisateur admin.")
+    with st.expander("Ajouter un nouvel utilisateur", expanded=False):
+        new_username = st.text_input("Nouveau nom d'utilisateur", key="new_username")
+        new_password = st.text_input("Mot de passe", type="password", key="new_password")
+        new_role = st.selectbox("Rôle", ["admin", "operator"], key="new_role")
+        new_access = st.multiselect("Accès", access_options, key="new_access")
+        if st.button("Ajouter utilisateur", key="add_user"):
+            if new_username and new_password:
+                if any(u["username"] == new_username for u in temp_users_data["users"]):
+                    st.error("Ce nom d'utilisateur existe déjà.")
+                else:
+                    new_user = {
+                        "username": new_username,
+                        "password": bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode(),
+                        "role": new_role,
+                        "access": new_access
+                    }
+                    temp_users_data["users"].append(new_user)
+                    st.success(f"Utilisateur {new_username} ajouté !")
+                    st.rerun()
+            else:
+                st.error("Veuillez remplir tous les champs.")
+    if st.button("Sauvegarder", key="save_access_control"):
+        save_users(temp_users_data)
+        st.session_state['temp_users_data'] = temp_users_data.copy()
+        st.success("Modifications sauvegardées !")
+
 def main():
     if not login():
         return
-
     user = st.session_state['user']
     menu_options = user["access"]
     st.sidebar.title(f"Menu - {user['username']} ({user['role'].capitalize()})")
@@ -376,34 +482,37 @@ def main():
         st.session_state['logged_in'] = False
         st.session_state['user'] = None
         st.rerun()
-    page = st.sidebar.radio("Aller à", menu_options + ["Changer le mot de passe"])
+    page = st.sidebar.radio("Aller à", menu_options + ["🔑 Changer le mot de passe"])
     initialize_session_state()
     products_df = load_products()
     clients_df = st.session_state['clients_df']
-
-    if page == "Proforma":
-        proforma_page(products_df, clients_df)
-    elif page == "POS":
-        pos_page()
-    elif page == "Restock":
-        restock_page()
-    elif page == "Expenditures":
-        expenditure_page()
-    elif page == "Staff Payments":
-        staff_payment_page()
-    elif page == "Till":
-        till_page()
-    elif page == "Access Control":
-        access_control_page()
-    elif page == "Dashboard":
+    if page == "🏠 Dashboard":
         dashboard_page()
-    elif page == "Invoice History":
+    elif page == "📋 Proforma":
+        proforma_page(products_df, clients_df)
+    elif page == "🛒 POS":
+        pos_page()
+    elif page == "📦 Restock":
+        restock_page()
+    elif page == "👥 Clients":
+        clients_page()
+    elif page == "📚 Articles":
+        articles_page()
+    elif page == "💸 Expenditures":
+        expenditure_page()
+    elif page == "👨‍💼 Staff Payments":
+        staff_payment_page()
+    elif page == "💰 Till":
+        till_page()
+    elif page == "🔒 Access Control":
+        access_control_page()
+    elif page == "📜 Invoice History":
         invoice_history_page()
-    elif page == "Activity Log":
+    elif page == "📋 Activity Log":
         activity_log_page()
-    elif page == "Bon de Commande":
+    elif page == "📝 Bon de Commande":
         bon_de_commande_page(products_df)
-    elif page == "Changer le mot de passe":
+    elif page == "🔑 Changer le mot de passe":
         change_password_page()
 
 if __name__ == "__main__":
