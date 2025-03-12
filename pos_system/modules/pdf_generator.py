@@ -114,6 +114,8 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
     pdf.ln(20)
     pdf.cell(0, 10, "Signature: ___________________________", ln=True, align="R")
 
+
+
     pdf_filename = f"Proforma-{transaction_info['transaction_number']}.pdf"
     pdf.output(pdf_filename)
     return pdf_filename
