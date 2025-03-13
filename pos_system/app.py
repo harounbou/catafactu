@@ -14,6 +14,7 @@ from modules.pos import pos_page
 from modules.restock import restock_page
 from modules.bon_de_commande import bon_de_commande_page
 from modules.utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path, send_email
+from modules.utils import get_db_connection
 
 # Paths
 USERS_FILE = "data/users.json"
@@ -112,12 +113,12 @@ def initialize_session_state():
         st.session_state['recent_clients'] = []
     st.session_state['clients_df'] = initialize_clients_df()  # Always refresh from DB
 
-def expenditure_page():  # Moved from global scope
+def expenditure_page():
     st.title("Dépenses")
     username = st.session_state['user']['username']
     description = st.text_input("Description de la dépense")
     amount = st.number_input("Montant (DZD)", min_value=0.0)
-    if st.button("Enregistrer la dépense"):
+    if st.button("Enregistrer la dépense", key="expenditure_save_button"):
         record_expenditure(description, amount, username)
         st.success("Dépense enregistrée !")
 
@@ -127,7 +128,7 @@ def staff_payment_page():
     staff_name = st.text_input("Nom du personnel")
     amount = st.number_input("Montant (DZD)", min_value=0.0)
     note = st.text_area("Note", placeholder="Ajoutez une note (optionnel)")
-    if st.button("Enregistrer le paiement"):
+    if st.button("Enregistrer le paiement", key="staff_payment_save_button"):
         if staff_name and amount > 0:
             record_staff_payment(staff_name, amount, username, note)
             st.success("Paiement du personnel enregistré !")
@@ -143,24 +144,30 @@ def dashboard_page():
     st.title("Tableau de Bord")
     transactions_df = fetch_df_from_db('transactions')
     products_df = load_products()
-    total_sales = transactions_df[transactions_df['status'] == "completed"]['payment_amount'].sum()
-    st.write(f"**Ventes Totales :** {total_sales:.2f} DZD")
-    completed_items = []
-    for items_json in transactions_df[transactions_df['status'] == "completed"]['items']:
-        try:
-            items = json.loads(items_json)
-            if isinstance(items, list):
-                for item in items:
-                    if isinstance(item, dict) and 'denomination' in item and 'Quantity' in item:
-                        completed_items.append(item)
-        except json.JSONDecodeError as e:
-            st.warning(f"Failed to parse items JSON: {e}")
-    if completed_items:
-        top_items = pd.DataFrame(completed_items).groupby('denomination')['Quantity'].sum().nlargest(5)
-        st.write("**Top 5 Articles Vendus :**")
-        st.dataframe(top_items)
+
+    # Check if transactions_df is empty
+    if transactions_df.empty:
+        st.info("Aucune transaction enregistrée pour le moment.")
     else:
-        st.write("**Top 5 Articles Vendus :** Aucun article vendu trouvé.")
+        total_sales = transactions_df[transactions_df['status'] == "completed"]['payment_amount'].sum()
+        st.write(f"**Ventes Totales :** {total_sales:.2f} DZD")
+        completed_items = []
+        for items_json in transactions_df[transactions_df['status'] == "completed"]['items']:
+            try:
+                items = json.loads(items_json)
+                if isinstance(items, list):
+                    for item in items:
+                        if isinstance(item, dict) and 'denomination' in item and 'Quantity' in item:
+                            completed_items.append(item)
+            except json.JSONDecodeError as e:
+                st.warning(f"Failed to parse items JSON: {e}")
+        if completed_items:
+            top_items = pd.DataFrame(completed_items).groupby('denomination')['Quantity'].sum().nlargest(5)
+            st.write("**Top 5 Articles Vendus :**")
+            st.dataframe(top_items)
+        else:
+            st.write("**Top 5 Articles Vendus :** Aucun article vendu trouvé.")
+    
     till_balance = get_till_balance()
     st.write(f"**Solde de la Caisse :** {till_balance:.2f} DZD")
 
@@ -242,7 +249,7 @@ def clients_page():
     st.title("Gestion des Clients")
     clients_df = fetch_df_from_db('clients')
     edited_df = st.data_editor(clients_df, use_container_width=True)
-    if st.button("Sauvegarder"):
+    if st.button("Sauvegarder", key="clients_save_button"):
         conn = get_db_connection()
         edited_df.to_sql('clients', conn, if_exists='replace', index=False)
         st.session_state['clients_df'] = edited_df
@@ -253,33 +260,18 @@ def articles_page():
     st.title("Gestion des Articles")
     products_df = load_products()
     
-    # Get all unique colors across all products
-    all_colors = set()
-    for colors in products_df['couleurs-dispo-usine'].dropna():
-        all_colors.update([c.strip().lower() for c in colors.split(',')])
+    # Ensure 'couleurs-dispo-usine' is always included and formatted
+    if 'couleurs-dispo-usine' not in products_df.columns:
+        products_df['couleurs-dispo-usine'] = ''
     
-    # Ensure all color columns exist in products_df
-    for color in all_colors:
-        if color not in products_df.columns:
-            products_df[color] = 0
-        products_df[color] = products_df[color].fillna(0).astype(int)
-    
-    # Columns to display
-    base_columns = ['reference', 'denomination', 'quantite_actuelle', 'couleurs-dispo-usine']
-    display_columns = base_columns + sorted(all_colors)
-    
-    # Configure columns for data_editor
-    column_config = {
-        "couleurs-dispo-usine": st.column_config.TextColumn("Couleurs Disponibles", width="medium"),
-        "quantite_actuelle": st.column_config.NumberColumn("Stock Total", min_value=0),
-    }
-    for color in all_colors:
-        column_config[color] = st.column_config.NumberColumn(color.capitalize(), min_value=0)
-    
+    # Display all columns, including available colors
     edited_df = st.data_editor(
-        products_df[display_columns],
-        column_config=column_config,
-        use_container_width=True
+        products_df[['reference', 'denomination', 'quantite_actuelle', 'couleurs-dispo-usine', 'golden', 'white', 'black']],
+        column_config={
+            "couleurs-dispo-usine": st.column_config.TextColumn("Couleurs Disponibles", width="medium")
+        },
+        use_container_width=True,
+        key="articles_editor"
     )
     
     selected_product = st.selectbox(
@@ -291,10 +283,10 @@ def articles_page():
     colors = st.text_input(
         "Couleurs disponibles (séparées par des virgules)",
         value=product['couleurs-dispo-usine'],
-        key="articles_colors_input"  # Added unique key
+        key="articles_colors_input"
     )
     
-    if st.button("Mettre à jour les couleurs"):
+    if st.button("Mettre à jour les couleurs", key="articles_update_colors"):
         conn = get_db_connection()
         conn.execute("UPDATE products SET `couleurs-dispo-usine` = ? WHERE reference = ?", (colors, product['reference']))
         conn.commit()
@@ -302,115 +294,14 @@ def articles_page():
         st.success("Couleurs mises à jour !")
         st.rerun()
     
-    if st.button("Sauvegarder"):
+    if st.button("Sauvegarder", key="articles_save"):
         conn = get_db_connection()
         edited_df.to_sql('products', conn, if_exists='replace', index=False)
         conn.close()
         st.success("Articles mis à jour !")
         st.rerun()
-    st.title("Gestion des Articles")
-    products_df = load_products()
-    
-    # Get all unique colors across all products
-    all_colors = set()
-    for colors in products_df['couleurs-dispo-usine'].dropna():
-        all_colors.update([c.strip().lower() for c in colors.split(',')])
-    
-    # Ensure all color columns exist in products_df
-    for color in all_colors:
-        if color not in products_df.columns:
-            products_df[color] = 0
-        products_df[color] = products_df[color].fillna(0).astype(int)
-    
-    # Columns to display
-    base_columns = ['reference', 'denomination', 'quantite_actuelle', 'couleurs-dispo-usine']
-    display_columns = base_columns + sorted(all_colors)
-    
-    # Configure columns for data_editor
-    column_config = {
-        "couleurs-dispo-usine": st.column_config.TextColumn("Couleurs Disponibles", width="medium"),
-        "quantite_actuelle": st.column_config.NumberColumn("Stock Total", min_value=0),
-    }
-    for color in all_colors:
-        column_config[color] = st.column_config.NumberColumn(color.capitalize(), min_value=0)
-    
-    edited_df = st.data_editor(
-        products_df[display_columns],
-        column_config=column_config,
-        use_container_width=True
-    )
-    
-    selected_product = st.selectbox(
-        "Sélectionner un produit pour gérer les couleurs",
-        products_df['denomination'],
-        key="articles_select_product"  # Unique key to avoid duplicate ID error
-    )
-    product = products_df[products_df['denomination'] == selected_product].iloc[0]
-    colors = st.text_input("Couleurs disponibles (séparées par des virgules)", value=product['couleurs-dispo-usine'])
-    
-    if st.button("Mettre à jour les couleurs"):
-        conn = get_db_connection()
-        conn.execute("UPDATE products SET `couleurs-dispo-usine` = ? WHERE reference = ?", (colors, product['reference']))
-        conn.commit()
-        conn.close()
-        st.success("Couleurs mises à jour !")
-        st.rerun()
-    
-    if st.button("Sauvegarder"):
-        conn = get_db_connection()
-        edited_df.to_sql('products', conn, if_exists='replace', index=False)
-        conn.close()
-        st.success("Articles mis à jour !")
-        st.rerun()
-    st.title("Gestion des Articles")
-    products_df = load_products()
-    # Ensure 'couleurs-dispo-usine' is always included and formatted
-    if 'couleurs-dispo-usine' not in products_df.columns:
-        products_df['couleurs-dispo-usine'] = ''
-    # Display all columns, including available colors
-    edited_df = st.data_editor(
-        products_df[['reference', 'denomination', 'quantite_actuelle', 'couleurs-dispo-usine', 'golden', 'white', 'black']],
-        column_config={
-            "couleurs-dispo-usine": st.column_config.TextColumn("Couleurs Disponibles", width="medium")
-        },
-        use_container_width=True
-    )
-    selected_product = st.selectbox("Sélectionner un produit pour gérer les couleurs", products_df['denomination'])
-    product = products_df[products_df['denomination'] == selected_product].iloc[0]
-    colors = st.text_input("Couleurs disponibles (séparées par des virgules)", value=product['couleurs-dispo-usine'])
-    if st.button("Mettre à jour les couleurs"):
-        conn = get_db_connection()
-        conn.execute("UPDATE products SET `couleurs-dispo-usine` = ? WHERE reference = ?", (colors, product['reference']))
-        conn.commit()
-        conn.close()
-        st.success("Couleurs mises à jour !")
-        st.rerun()
-    if st.button("Sauvegarder"):
-        conn = get_db_connection()
-        edited_df.to_sql('products', conn, if_exists='replace', index=False)
-        conn.close()
-        st.success("Articles mis à jour !")
-        st.rerun()  # Refresh to show saved changes
-    st.title("Gestion des Articles")
-    products_df = load_products()
-    edited_df = st.data_editor(products_df[['reference', 'denomination', 'quantite_actuelle', 'couleurs-dispo-usine', 'golden', 'white', 'black']], use_container_width=True)
-    selected_product = st.selectbox("Sélectionner un produit pour gérer les couleurs", products_df['denomination'])
-    product = products_df[products_df['denomination'] == selected_product].iloc[0]
-    colors = st.text_input("Couleurs disponibles (séparées par des virgules)", value=product['couleurs-dispo-usine'])
-    if st.button("Mettre à jour les couleurs"):
-        conn = get_db_connection()
-        conn.execute("UPDATE products SET `couleurs-dispo-usine` = ? WHERE reference = ?", (colors, product['reference']))
-        conn.commit()
-        conn.close()
-        st.success("Couleurs mises à jour !")
-        st.rerun()
-    if st.button("Sauvegarder"):
-        conn = get_db_connection()
-        edited_df.to_sql('products', conn, if_exists='replace', index=False)
-        conn.close()
-        st.success("Articles mis à jour !")
 
-def access_control_page():  # Moved from global scope
+def access_control_page():
     st.title("Contrôle d'accès")
     if st.session_state['user']['role'] != "admin":
         st.error("Accès réservé à l'administrateur.")
@@ -476,16 +367,28 @@ def main():
     if not login():
         return
     user = st.session_state['user']
-    menu_options = user["access"]
+    menu_options = user.get("access", [])
+    
+    # Validate menu_options
+    if not isinstance(menu_options, list) or not all(isinstance(opt, str) for opt in menu_options):
+        st.error("Erreur: Les options de menu de l'utilisateur sont invalides.")
+        st.write("Données utilisateur:", user)
+        return
+    
     st.sidebar.title(f"Menu - {user['username']} ({user['role'].capitalize()})")
-    if st.sidebar.button("Déconnexion"):
+    if st.sidebar.button("Déconnexion", key="logout_button"):  # Added unique key
         st.session_state['logged_in'] = False
         st.session_state['user'] = None
         st.rerun()
-    page = st.sidebar.radio("Aller à", menu_options + ["🔑 Changer le mot de passe"])
+    
+
+    
+    page = st.sidebar.radio("Aller à", menu_options + ["🔑 Changer le mot de passe"], key="sidebar_menu")
+    
     initialize_session_state()
     products_df = load_products()
     clients_df = st.session_state['clients_df']
+    
     if page == "🏠 Dashboard":
         dashboard_page()
     elif page == "📋 Proforma":
@@ -514,6 +417,8 @@ def main():
         bon_de_commande_page(products_df)
     elif page == "🔑 Changer le mot de passe":
         change_password_page()
+    else:
+        st.error(f"Page '{page}' non reconnue. Veuillez sélectionner une option valide.")
 
 if __name__ == "__main__":
     main()

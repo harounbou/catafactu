@@ -1,4 +1,3 @@
-# proforma.py
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -48,6 +47,28 @@ def proforma_page(products_df, clients_df):
     if 'generated_pdf' not in st.session_state:
         st.session_state.generated_pdf = None
 
+    # Stock Checker
+    with st.expander("Vérificateur de Stock", expanded=False):
+        stock_search = st.text_input("Rechercher un article pour vérifier le stock", key="stock_search")
+        if stock_search:
+            filtered_products = products_df[
+                (products_df['reference'].str.contains(stock_search, case=False, na=False)) |
+                (products_df['denomination'].str.contains(stock_search, case=False, na=False))
+            ]
+            if not filtered_products.empty:
+                for _, product in filtered_products.iterrows():
+                    st.write(f"**{product['denomination']} ({product['reference']})**")
+                    st.write(f"Stock Total: {product['quantite_actuelle']}")
+                    colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
+                    for color in colors:
+                        color_lower = color.lower()
+                        if color_lower in product and pd.notna(product[color_lower]):
+                            st.write(f"{color.capitalize()}: {product[color_lower]}")
+                        else:
+                            st.write(f"{color.capitalize()}: N/A")
+            else:
+                st.warning("Aucun article trouvé.")
+
     with st.expander("Configuration de la Proforma", expanded=True):
         col1, col2 = st.columns(2)
         with col1:
@@ -64,17 +85,38 @@ def proforma_page(products_df, clients_df):
     with st.expander("Gestion Client", expanded=True):
         client_action = st.radio("Action Client", ["Nouveau Client", "Client Existant"])
         if client_action == "Client Existant":
-            client_search_value = st.text_input("Rechercher par nom ou ID", placeholder="Tapez le nom ou l'ID du client")
-            if st.button("Rechercher Client"):
-                if client_search_value:
-                    try:
-                        client_id = int(client_search_value)
-                        client_info = get_client_info(clients_df, client_search_value, "ID Client")
-                    except ValueError:
-                        client_info = get_client_info(clients_df, client_search_value, "Nom du client")
+            if 'client_search_input' not in st.session_state:
+                st.session_state.client_search_input = ""
+            search_input = st.text_input(
+                "Rechercher par nom (autocomplétion)",
+                value=st.session_state.client_search_input,
+                placeholder="Tapez 2+ caractères pour chercher (ex: Da pour David)",
+                key="client_search_input_field"
+            )
+            if search_input != st.session_state.client_search_input:
+                st.session_state.client_search_input = search_input
+            if len(search_input) >= 2:
+                filtered_clients = clients_df[
+                    clients_df['nom_client'].str.lower().str.startswith(search_input.lower())
+                ]
+                client_options = [
+                    f"{row['nom_client']} {row['prenom_client']} (ID: {row['id_client']})"
+                    for _, row in filtered_clients.iterrows()
+                ]
+            else:
+                client_options = ["Commencez à taper pour voir les options..."]
+            selected_client = st.selectbox(
+                "Sélectionnez un client",
+                client_options,
+                key="client_selectbox"
+            )
+            if st.button("Charger Client", key="load_client_btn"):
+                if selected_client and selected_client != "Commencez à taper pour voir les options...":
+                    client_id = int(selected_client.split("ID: ")[1].strip(")"))
+                    client_info = get_client_info(clients_df, client_id, "ID Client")
                     if client_info:
                         st.session_state.proforma_client = client_info
-                        st.success("Client trouvé!")
+                        st.success("Client chargé!")
                         st.write("#### Détails du client")
                         for key, value in client_info.items():
                             if pd.notna(value) and key != 'index':
@@ -88,7 +130,7 @@ def proforma_page(products_df, clients_df):
                 'entreprise_client': st.text_input("Entreprise"),
                 'telephone_client': st.text_input("Téléphone"),
                 'email_client': st.text_input("Email"),
-                'address_client': st.text_input("Adresse")  # Added address field
+                'address_client': st.text_input("Adresse")
             }
             if st.button("Enregistrer Nouveau Client"):
                 if new_client['nom_client']:
@@ -118,7 +160,7 @@ def proforma_page(products_df, clients_df):
             image_path = get_full_image_path(find_image_path_for_color(product['images'], color)) if color else None
             if image_path:
                 st.image(image_path, caption=f"Aperçu ({color})", width=150)
-            qty = st.number_input("Quantité", min_value=1, value=1)
+            qty = st.number_input("Quantité", min_value=1, value=1, max_value=10000, key=f"qty_{search_term}")
             if st.button("Ajouter au Panier"):
                 item = {
                     "reference": product['reference'],
@@ -144,6 +186,11 @@ def proforma_page(products_df, clients_df):
                     if st.button("Supprimer", key=f"del_{idx}"):
                         del st.session_state.proforma_items[idx]
                         st.rerun()
+            if st.button("Vider le Panier", key="clear_proforma_items"):
+                st.session_state.proforma_items = []
+                st.rerun()
+            subtotal = sum(item['Price'] * item['Quantity'] for item in st.session_state.proforma_items)
+            st.write(f"**Total estimé (HT):** {subtotal:.2f} DZD")
 
     if st.button("Générer Proforma"):
         if not st.session_state.proforma_items:

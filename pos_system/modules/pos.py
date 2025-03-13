@@ -1,4 +1,4 @@
-# pos.py
+# modules/pos.py
 import streamlit as st
 import pandas as pd
 import json
@@ -6,7 +6,7 @@ from datetime import datetime
 from .client_management import get_client_info, add_new_client, save_clients, update_client
 from .product_management import load_products, update_stock
 from .transaction_management import record_transaction, fetch_df_from_db
-from .pdf_generator import generate_receipt_pdf
+from .pdf_generator import generate_receipt_pdf, send_email  # Updated import
 from .utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path
 
 def stock_checker_section(products_df, section_key_prefix=""):
@@ -347,7 +347,6 @@ def pos_page():
                     if st.button("Envoyer par email", key="pos_email"):
                         subject = f"Reçu de vente #{transaction_info['transaction_number']}"
                         body = f"Bonjour {st.session_state['client_info_loaded'].get('nom_client', '')},\n\nVoici votre reçu pour la transaction #{transaction_info['transaction_number']}.\nMontant total: {final_amount:.2f} DZD\nEffectué par: {username}\n\nCordialement,\nTakideco"
-                        from .app import send_email  # Import from app.py
                         if send_email(client_email, subject, body, pdf_filename):
                             st.success("Reçu envoyé par email !")
 

@@ -14,34 +14,6 @@ def initialize_clients_df():
         return st.session_state['clients_df']
     finally:
         conn.close()
-    
-    if 'clients_df' not in st.session_state:
-        clients_df = fetch_df_from_db('clients')
-        if not clients_df.empty:
-            st.session_state['clients_df'] = clients_df
-        else:
-            st.session_state['clients_df'] = pd.DataFrame(columns=[
-                "id_client", "nom_client", "prenom_client", "telephone_client",
-                "address_client", "email_client", "entreprise_client"
-            ])
-    if 'recent_clients' not in st.session_state:
-        st.session_state['recent_clients'] = []
-
-
-    if not clients_df.empty:
-        if search_method == "Nom du client":
-            client = clients_df[clients_df['nom_client'].astype(str).str.lower() == search_value.lower()]
-        elif search_method == "ID Client":
-            try:
-                client_id = int(search_value)
-                client = clients_df[clients_df['id_client'] == client_id]
-            except ValueError:
-                return None
-        if not client.empty:
-            client_info = client.iloc[0].to_dict()
-            client_info['index'] = client.index[0]
-            return client_info
-    return None
 
 def add_new_client_info(clients_df, client_info):
     """Add a new client and refresh clients_df"""
