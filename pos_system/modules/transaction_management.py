@@ -4,7 +4,6 @@ import json
 import pandas as pd
 from datetime import datetime
 from .utils import get_db_connection
-from turtle import st
 
 
 def initialize_db():

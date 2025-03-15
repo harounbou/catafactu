@@ -16,6 +16,7 @@ from modules.bon_de_commande import bon_de_commande_page
 from modules.utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path, send_email
 from modules.utils import get_db_connection
 
+
 # Paths
 USERS_FILE = "data/users.json"
 
