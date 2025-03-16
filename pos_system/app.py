@@ -5,8 +5,12 @@ import json
 import os
 import bcrypt
 from datetime import datetime
+import shutil
+import threading
+import schedule
+import time
 from modules.client_management import initialize_clients_df, get_client_info, add_new_client, save_clients, update_client
-from modules.product_management import load_products, update_stock, restock_product
+from modules.product_management import add_or_update_product, generate_excel_template, import_products_from_excel, load_products, mark_discontinued, permanently_delete, update_stock, restock_product
 from modules.transaction_management import record_transaction, record_expenditure, record_staff_payment, get_till_balance, fetch_df_from_db
 from modules.pdf_generator import generate_receipt_pdf, generate_proforma_pdf, generate_order_pdf
 from modules.proforma import proforma_page
@@ -16,9 +20,10 @@ from modules.bon_de_commande import bon_de_commande_page
 from modules.utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path, send_email
 from modules.utils import get_db_connection
 
-
 # Paths
 USERS_FILE = "data/users.json"
+DB_FILE = "data/query.sql"  # Assuming this is your DB path
+BACKUP_DIR = "backups"
 
 # Global CSS styling (unchanged)
 st.markdown(
@@ -257,50 +262,155 @@ def clients_page():
         conn.close()
         st.success("Clients mis à jour !")
 
+def backup_database():
+    """Create a backup of the database with a timestamp."""
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = os.path.join(BACKUP_DIR, f"backup_{timestamp}.sqlite")
+    shutil.copy2(DB_FILE, backup_path)
+    return backup_path
+
+def run_scheduled_tasks():
+    """Run scheduled tasks in a background thread."""
+    schedule.every().day.at("00:00").do(backup_database)
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Check every minute
+
 def articles_page():
-    st.title("Gestion des Articles")
+    if 'role' not in st.session_state.user or st.session_state.user['role'] not in ['admin', 'inventory_manager']:
+        st.error("You need elevated privileges to access this page!")
+        return
+    
+    st.title("📚 Product Management")
     products_df = load_products()
+    is_admin = st.session_state.user['role'] == 'admin'
     
-    # Ensure 'couleurs-dispo-usine' is always included and formatted
-    if 'couleurs-dispo-usine' not in products_df.columns:
-        products_df['couleurs-dispo-usine'] = ''
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["List & Edit", "Import from Excel", "Add New", "Manage Discontinued", "Backup"])
     
-    # Display all columns, including available colors
-    edited_df = st.data_editor(
-        products_df[['reference', 'denomination', 'quantite_actuelle', 'couleurs-dispo-usine', 'golden', 'white', 'black']],
-        column_config={
-            "couleurs-dispo-usine": st.column_config.TextColumn("Couleurs Disponibles", width="medium")
-        },
-        use_container_width=True,
-        key="articles_editor"
-    )
+    # Tab 1: List & Edit
+    with tab1:
+        st.subheader("Product List")
+        edited_df = st.data_editor(products_df[['reference', 'denomination', 'quantite_actuelle', 'couleurs-dispo-usine', 
+                                                'prix-super-gros', 'prix-gros', 'prix-détail', 'images']],
+                                   use_container_width=True, key="product_list")
+        selected_ref = st.selectbox("Select Product to Edit", products_df['reference'], key="edit_ref")
+        if selected_ref:
+            product = products_df[products_df['reference'] == selected_ref].iloc[0]
+            with st.expander("Edit Product", expanded=True):
+                updated_data = {
+                    "reference": selected_ref,
+                    "denomination": st.text_input("Name", product['denomination']),
+                    "quantite_actuelle": st.number_input("Quantity", min_value=0, value=int(product['quantite_actuelle'])),
+                    "couleurs-dispo-usine": st.text_input("Colors", product['couleurs-dispo-usine']),
+                    "prix-super-gros": st.number_input("Super Gros Price", min_value=0.0, value=float(product['prix-super-gros'])),
+                    "prix-gros": st.number_input("Gros Price", min_value=0.0, value=float(product['prix-gros'])),
+                    "prix-détail": st.number_input("Detail Price", min_value=0.0, value=float(product['prix-détail'])),
+                    "images": product['images']
+                }
+                
+                # Image Management
+                current_images = updated_data['images'].split(',') if updated_data['images'] else []
+                if current_images:
+                    cols = st.columns(min(len(current_images), 4))
+                    for idx, img in enumerate(current_images):
+                        if os.path.exists(img):  # Check if the file exists
+                            with cols[idx % 4]:
+                                st.image(img, width=100)
+                                if st.button(f"Remove {os.path.basename(img)}", key=f"rm_{idx}_{selected_ref}"):
+                                    current_images.remove(img)
+                                    updated_data['images'] = ','.join(current_images)
+                                    add_or_update_product(updated_data, is_update=True)
+                                    st.rerun()
+                        else:
+                            with cols[idx % 4]:
+                                st.warning(f"Image not found: {img}")
+                
+                new_images = st.file_uploader("Add Images", ['jpg', 'png', 'jpeg'], accept_multiple_files=True, key=f"up_{selected_ref}")
+                if new_images:
+                    os.makedirs("images", exist_ok=True)
+                    for img in new_images:
+                        img_path = os.path.join("images", img.name)
+                        with open(img_path, "wb") as f:
+                            f.write(img.getbuffer())
+                        current_images.append(img_path)
+                    updated_data['images'] = ','.join(current_images)
+                
+                if st.button("Save Changes", key=f"save_{selected_ref}"):
+                    add_or_update_product(updated_data, is_update=True)
+                    st.rerun()
     
-    selected_product = st.selectbox(
-        "Sélectionner un produit pour gérer les couleurs",
-        products_df['denomination'],
-        key="articles_select_product"
-    )
-    product = products_df[products_df['denomination'] == selected_product].iloc[0]
-    colors = st.text_input(
-        "Couleurs disponibles (séparées par des virgules)",
-        value=product['couleurs-dispo-usine'],
-        key="articles_colors_input"
-    )
+    # Tab 2: Import from Excel
+    with tab2:
+        st.subheader("Import Products")
+        uploaded_file = st.file_uploader("Upload Excel File", ['xlsx', 'xls'])
+        if uploaded_file and st.button("Import"):
+            import_products_from_excel(uploaded_file)
+            st.rerun()
+        st.download_button("Download Template", generate_excel_template(), "product_template.xlsx", 
+                          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     
-    if st.button("Mettre à jour les couleurs", key="articles_update_colors"):
-        conn = get_db_connection()
-        conn.execute("UPDATE products SET `couleurs-dispo-usine` = ? WHERE reference = ?", (colors, product['reference']))
-        conn.commit()
-        conn.close()
-        st.success("Couleurs mises à jour !")
-        st.rerun()
+    # Tab 3: Add New
+    with tab3:
+        st.subheader("Add New Product")
+        new_data = {
+            "reference": st.text_input("Reference", key="new_ref"),
+            "denomination": st.text_input("Name", key="new_name"),
+            "quantite_actuelle": st.number_input("Quantity", min_value=0, key="new_qty"),
+            "couleurs-dispo-usine": st.text_input("Colors", key="new_colors"),
+            "prix-super-gros": st.number_input("Super Gros Price", min_value=0.0, key="new_sg"),
+            "prix-gros": st.number_input("Gros Price", min_value=0.0, key="new_g"),
+            "prix-détail": st.number_input("Detail Price", min_value=0.0, key="new_d"),
+            "images": ""
+        }
+        new_images = st.file_uploader("Add Images", ['jpg', 'png', 'jpeg'], accept_multiple_files=True, key="new_up")
+        if new_images:
+            os.makedirs("images", exist_ok=True)
+            image_paths = []
+            for img in new_images:
+                img_path = os.path.join("images", img.name)
+                with open(img_path, "wb") as f:
+                    f.write(img.getbuffer())
+                image_paths.append(img_path)
+            new_data['images'] = ','.join(image_paths)
+            # Preview uploaded images
+            cols = st.columns(min(len(image_paths), 4))
+            for idx, img_path in enumerate(image_paths):
+                with cols[idx % 4]:
+                    st.image(img_path, width=100, caption=os.path.basename(img_path))
+        if st.button("Add Product", key="add_btn"):
+            add_or_update_product(new_data)
+            st.rerun()
     
-    if st.button("Sauvegarder", key="articles_save"):
-        conn = get_db_connection()
-        edited_df.to_sql('products', conn, if_exists='replace', index=False)
-        conn.close()
-        st.success("Articles mis à jour !")
-        st.rerun()
+    # Tab 4: Manage Discontinued
+    with tab4:
+        st.subheader("Discontinued Products")
+        discontinued_df = load_products(active_only=False)
+        discontinued_df = discontinued_df[discontinued_df['discontinued'] == 1]
+        st.dataframe(discontinued_df[['reference', 'denomination', 'last_updated']])
+        
+        to_discontinue = st.multiselect("Mark as Discontinued", products_df['reference'], key="disc_select")
+        if st.button("Mark Selected", key="disc_btn"):
+            for ref in to_discontinue:
+                mark_discontinued(ref)
+            st.rerun()
+        
+        if is_admin:
+            to_delete = st.multiselect("Permanently Delete", discontinued_df['reference'], key="del_select")
+            if st.button("Delete Selected", key="del_btn"):
+                for ref in to_delete:
+                    permanently_delete(ref)
+                st.rerun()
+    
+    # Tab 5: Backup
+    with tab5:
+        st.subheader("Database Backup")
+        if st.button("Create Manual Backup", key="manual_backup"):
+            backup_path = backup_database()
+            st.success(f"Backup created: {backup_path}")
+            with open(backup_path, "rb") as f:
+                st.download_button("Download Backup", f, os.path.basename(backup_path), mime="application/octet-stream")
+        st.info("Automatic backups are scheduled daily at 00:00.")
 
 def access_control_page():
     st.title("Contrôle d'accès")
@@ -382,9 +492,12 @@ def main():
         st.session_state['user'] = None
         st.rerun()
     
-
-    
     page = st.sidebar.radio("Aller à", menu_options + ["🔑 Changer le mot de passe"], key="sidebar_menu")
+    
+    # Start background scheduler
+    if 'scheduler_started' not in st.session_state:
+        st.session_state['scheduler_started'] = True
+        threading.Thread(target=run_scheduled_tasks, daemon=True).start()
     
     initialize_session_state()
     products_df = load_products()

@@ -1,155 +1,267 @@
 # modules/product_management.py
+import streamlit as st
 import pandas as pd
 import sqlite3
-import streamlit as st
+import os
+from datetime import datetime
 from .utils import get_db_connection
 
-def load_products():
-    """Load products with caching and refresh on update"""
-    conn = get_db_connection()
-    try:
-        return pd.read_sql_query("SELECT * FROM products", conn)
-    finally:
-        conn.close()
+# Configurable feature flag
+ENABLE_PRICE_HISTORY = False  # Toggle this in a config file or environment variable
 
-def update_stock(items):
-    """Update stock levels after sale with transaction safety"""
+def load_products(active_only=True):
+    """Load products with optional filtering for active items."""
+    conn = get_db_connection()
+    query = "SELECT * FROM products WHERE discontinued = 0" if active_only else "SELECT * FROM products"
+    df = pd.read_sql_query(query, conn)
+    conn.close()
+    return df
+
+def import_products_from_excel(file):
+    """Handle Excel import with updates and inserts."""
     conn = get_db_connection()
     try:
-        conn.execute("BEGIN TRANSACTION")
-        for item in items:
-            cursor = conn.execute("""
-                SELECT quantite_actuelle, golden, white, black 
-                FROM products 
-                WHERE reference = ?
-            """, (item['reference'],))
-            product = cursor.fetchone()
-            if not product:
-                raise ValueError(f"Product {item['reference']} not found")
-            current_stock = product['quantite_actuelle']
-            quantity = item['Quantity']
-            color = item.get('Color', '').lower()
-            available = current_stock
-            if color in ['golden', 'white', 'black']:
-                available = product[color]
-                if available < quantity:
-                    raise ValueError(f"Insufficient {color} stock for {item['reference']}")
-                conn.execute(f"""
-                    UPDATE products 
-                    SET {color} = {color} - ?, 
-                        quantite_actuelle = quantite_actuelle - ?
-                    WHERE reference = ?
-                """, (quantity, quantity, item['reference']))
-            else:
-                if current_stock < quantity:
-                    raise ValueError(f"Insufficient total stock for {item['reference']}")
-                conn.execute("""
-                    UPDATE products 
-                    SET quantite_actuelle = quantite_actuelle - ? 
-                    WHERE reference = ?
-                """, (quantity, item['reference']))
-        conn.commit()
+        df = pd.read_excel(file).astype(str).replace({'nan': None})
+        required_cols = ['reference', 'denomination', 'quantite_actuelle', 'prix-super-gros', 'prix-gros', 'prix-détail']
+        if not all(col in df.columns for col in required_cols):
+            st.error("Excel file missing required columns!")
+            return False
+        
+        existing_df = load_products(active_only=False)
+        missing_images = []
+        with conn:
+            cursor = conn.cursor()
+            for _, row in df.iterrows():
+                ref = row['reference']
+                images = row.get('images', '')
+                if images:
+                    image_list = [img.strip() for img in images.split(',')]
+                    valid_images = []
+                    for img in image_list:
+                        img_path = img if os.path.isabs(img) else os.path.join("images", img)
+                        if os.path.exists(img_path):
+                            valid_images.append(img_path)
+                        else:
+                            missing_images.append(img)
+                    images = ','.join(valid_images) if valid_images else ''
+                
+                values = (
+                    ref, row['denomination'], float(row['quantite_actuelle'] or 0),
+                    row.get('couleurs-dispo-usine', ''), images,
+                    float(row['prix-super-gros'] or 0), float(row['prix-gros'] or 0), float(row['prix-détail'] or 0),
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 0
+                )
+                
+                if ref in existing_df['reference'].values:
+                    cursor.execute('''UPDATE products SET denomination=?, quantite_actuelle=?, 
+                                    `couleurs-dispo-usine`=?, images=?, `prix-super-gros`=?, 
+                                    `prix-gros`=?, `prix-détail`=?, last_updated=?, discontinued=?
+                                    WHERE reference=?''', (*values[1:], ref))
+                else:
+                    cursor.execute('''INSERT INTO products 
+                                    (reference, denomination, quantite_actuelle, `couleurs-dispo-usine`, 
+                                    images, `prix-super-gros`, `prix-gros`, `prix-détail`, last_updated, discontinued)
+                                    VALUES (?,?,?,?,?,?,?,?,?,?)''', values)
+                
+                if ENABLE_PRICE_HISTORY:
+                    for price_type, value in [('super_gros', row['prix-super-gros']), ('gros', row['prix-gros']), ('detail', row['prix-détail'])]:
+                        if value:
+                            cursor.execute('''INSERT INTO price_history 
+                                            (product_ref, price_type, old_price, new_price, changed_at)
+                                            VALUES (?, ?, ?, ?, ?)''', 
+                                            (ref, price_type, None, float(value), datetime.now()))
+            conn.commit()
+        
+        st.success("Products imported successfully!")
+        if missing_images:
+            st.warning(f"Some images were not found and skipped: {', '.join(set(missing_images))}")
         return True
     except Exception as e:
         conn.rollback()
-        st.error(f"Stock update failed: {str(e)}")
+        st.error(f"Import failed: {str(e)}")
         return False
     finally:
         conn.close()
 
-
-    """Restock items with dynamic color support, return quantity restocked"""
+def add_or_update_product(product_data, is_update=False):
+    """Add or update a product with image handling."""
     conn = get_db_connection()
     try:
-        conn.execute("BEGIN TRANSACTION")
-        if color:
-            color_col = color.lower().strip()
-            cursor = conn.execute("PRAGMA table_info(products)")
-            columns = [row[1].lower() for row in cursor.fetchall()]
-            if color_col in columns:
-                conn.execute(f"""
-                    UPDATE products 
-                    SET {color_col} = {color_col} + ?, 
-                        quantite_actuelle = quantite_actuelle + ?
-                    WHERE reference = ?
-                """, (quantity, quantity, reference))
+        ref = product_data['reference']
+        existing_df = load_products(active_only=False)
+        with conn:
+            cursor = conn.cursor()
+            values = (
+                ref, product_data['denomination'], product_data['quantite_actuelle'],
+                product_data['couleurs-dispo-usine'], product_data['images'],
+                product_data['prix-super-gros'], product_data['prix-gros'], product_data['prix-détail'],
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 0
+            )
+            
+            if is_update and ref in existing_df['reference'].values:
+                cursor.execute('''UPDATE products SET denomination=?, quantite_actuelle=?, 
+                                `couleurs-dispo-usine`=?, images=?, `prix-super-gros`=?, 
+                                `prix-gros`=?, `prix-détail`=?, last_updated=?, discontinued=?
+                                WHERE reference=?''', (*values[1:], ref))
+                action = "updated"
             else:
-                conn.execute("""
-                    UPDATE products 
-                    SET quantite_actuelle = quantite_actuelle + ?
-                    WHERE reference = ?
-                """, (quantity, reference))
-        else:
-            conn.execute("""
-                UPDATE products 
-                SET quantite_actuelle = quantite_actuelle + ?
-                WHERE reference = ?
-            """, (quantity, reference))
-        conn.commit()
-        return quantity  # Return quantity restocked
-    except Exception as e:
-        conn.rollback()
-        st.error(f"Restock failed: {str(e)}")
-        return 0
-    finally:
-        conn.close()
-
-def restock_product(products_df, reference, quantity, total_cost=0, color=None):
-    """Restock items with dynamic color support, return quantity restocked"""
-    conn = get_db_connection()
-    try:
-        conn.execute("BEGIN TRANSACTION")
-        if color:
-            color_col = color.lower().strip()
-            # Check if the color column exists; if not, only update quantite_actuelle
-            cursor = conn.execute("PRAGMA table_info(products)")
-            columns = [row[1].lower() for row in cursor.fetchall()]
-            if color_col in columns:
-                conn.execute(f"""
-                    UPDATE products 
-                    SET {color_col} = {color_col} + ?, 
-                        quantite_actuelle = quantite_actuelle + ?
-                    WHERE reference = ?
-                """, (quantity, quantity, reference))
-            else:
-                conn.execute("""
-                    UPDATE products 
-                    SET quantite_actuelle = quantite_actuelle + ?
-                    WHERE reference = ?
-                """, (quantity, reference))
-        else:
-            conn.execute("""
-                UPDATE products 
-                SET quantite_actuelle = quantite_actuelle + ?
-                WHERE reference = ?
-            """, (quantity, reference))
-        conn.commit()
-        return quantity
-    except Exception as e:
-        conn.rollback()
-        st.error(f"Restock failed: {str(e)}")
-        return 0
-    finally:
-        conn.close()
-
-def reserve_stock(items):
-    """Reserve stock for proforma invoices"""
-    conn = get_db_connection()
-    try:
-        conn.execute("BEGIN TRANSACTION")
-        for item in items:
-            conn.execute("""
-                UPDATE products 
-                SET reserved_stock = reserved_stock + ?, 
-                    quantite_actuelle = quantite_actuelle - ?
-                WHERE reference = ? 
-                AND quantite_actuelle >= ?
-            """, (item['Quantity'], item['Quantity'], item['reference'], item['Quantity']))
-        conn.commit()
+                if ref in existing_df['reference'].values:
+                    st.error("Reference already exists!")
+                    return False
+                cursor.execute('''INSERT INTO products 
+                                (reference, denomination, quantite_actuelle, `couleurs-dispo-usine`, 
+                                images, `prix-super-gros`, `prix-gros`, `prix-détail`, last_updated, discontinued)
+                                VALUES (?,?,?,?,?,?,?,?,?,?)''', values)
+                action = "added"
+            
+            if ENABLE_PRICE_HISTORY and is_update:
+                old_product = existing_df[existing_df['reference'] == ref].iloc[0]
+                for price_type, new_val, old_val in [
+                    ('super_gros', product_data['prix-super-gros'], old_product['prix-super-gros']),
+                    ('gros', product_data['prix-gros'], old_product['prix-gros']),
+                    ('detail', product_data['prix-détail'], old_product['prix-détail'])
+                ]:
+                    if new_val != old_val:
+                        cursor.execute('''INSERT INTO price_history 
+                                        (product_ref, price_type, old_price, new_price, changed_at)
+                                        VALUES (?, ?, ?, ?, ?)''', 
+                                        (ref, price_type, old_val, new_val, datetime.now()))
+            conn.commit()
+        st.success(f"Product {action} successfully!")
         return True
     except Exception as e:
         conn.rollback()
-        st.error(f"Stock reservation failed: {str(e)}")
+        st.error(f"Error: {str(e)}")
         return False
     finally:
         conn.close()
+
+def mark_discontinued(reference):
+    """Mark a product as discontinued."""
+    conn = get_db_connection()
+    try:
+        with conn:
+            conn.execute("UPDATE products SET discontinued=1, last_updated=? WHERE reference=?", 
+                         (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
+        st.success("Product marked as discontinued!")
+        return True
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+        return False
+    finally:
+        conn.close()
+
+def permanently_delete(reference):
+    """Permanently delete a discontinued product (admin only)."""
+    conn = get_db_connection()
+    try:
+        with conn:
+            conn.execute("DELETE FROM products WHERE reference=? AND discontinued=1", (reference,))
+        st.success("Product permanently deleted!")
+        return True
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+        return False
+    finally:
+        conn.close()
+
+def check_stock(reference, quantity_needed, color=None):
+    """Check if sufficient stock is available, optionally for a specific color."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT quantite_actuelle, `couleurs-dispo-usine` FROM products WHERE reference = ?", (reference,))
+        result = cursor.fetchone()
+        if result is None:
+            return False, f"Product {reference} not found."
+        current_stock = result[0]
+        colors = [c.strip().lower() for c in result[1].split(',')] if result[1] else []
+        
+        if color:
+            color = color.lower()
+            if color not in colors:
+                return False, f"Color {color} not available for {reference}."
+            cursor.execute(f"SELECT `{color}` FROM products WHERE reference = ?", (reference,))
+            color_stock = cursor.fetchone()
+            if color_stock is None or color_stock[0] is None:
+                return False, f"Stock for {color} not defined for {reference}."
+            color_stock = color_stock[0]
+            if color_stock < quantity_needed:
+                return False, f"Insufficient stock for {reference} ({color}): {color_stock} available, {quantity_needed} needed."
+            return True, color_stock
+        else:
+            if current_stock < quantity_needed:
+                return False, f"Insufficient stock for {reference}: {current_stock} available, {quantity_needed} needed."
+            return True, current_stock
+    finally:
+        conn.close()
+
+def update_stock(reference, quantity_change, color=None):
+    """Update the stock quantity of a product (positive or negative change), optionally for a color."""
+    conn = get_db_connection()
+    try:
+        with conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT quantite_actuelle FROM products WHERE reference = ?", (reference,))
+            result = cursor.fetchone()
+            if result is None:
+                st.error(f"Product with reference {reference} not found!")
+                return False
+            
+            current_quantity = result[0]
+            new_quantity = current_quantity + quantity_change
+            if new_quantity < 0:
+                st.error("Cannot reduce stock below 0!")
+                return False
+            
+            if color:
+                color = color.lower()
+                cursor.execute(f"SELECT `{color}` FROM products WHERE reference = ?", (reference,))
+                current_color_qty = cursor.fetchone()[0] or 0
+                new_color_qty = current_color_qty + quantity_change
+                if new_color_qty < 0:
+                    st.error(f"Cannot reduce {color} stock below 0!")
+                    return False
+                cursor.execute(f"UPDATE products SET `{color}` = ?, last_updated = ? WHERE reference = ?",
+                              (new_color_qty, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
+                st.success(f"Stock updated for {reference} ({color}): {current_color_qty} -> {new_color_qty}")
+            cursor.execute("UPDATE products SET quantite_actuelle = ?, last_updated = ? WHERE reference = ?",
+                          (new_quantity, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
+            conn.commit()
+        st.success(f"Stock updated for {reference}: {current_quantity} -> {new_quantity}")
+        return True
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Error updating stock: {str(e)}")
+        return False
+    finally:
+        conn.close()
+
+def restock_product(reference, quantity_to_add, color=None):
+    """Restock a product by adding to its current quantity, optionally for a specific color."""
+    if quantity_to_add < 0:
+        st.error("Restock quantity must be positive!")
+        return False
+    return update_stock(reference, quantity_to_add, color)
+
+def generate_excel_template():
+    """Generate a sample Excel template."""
+    from io import BytesIO
+    sample_data = {
+        'reference': ['PROD001'], 'denomination': ['Sample Product'], 'quantite_actuelle': [100],
+        'couleurs-dispo-usine': ['Red,Blue'], 'images': ['image1.jpg'], 
+        'prix-super-gros': [5000], 'prix-gros': [7500], 'prix-détail': [10000]
+    }
+    output = BytesIO()
+    pd.DataFrame(sample_data).to_excel(output, index=False)
+    return output.getvalue()
+    """Generate a sample Excel template."""
+    from io import BytesIO
+    sample_data = {
+        'reference': ['PROD001'], 'denomination': ['Sample Product'], 'quantite_actuelle': [100],
+        'couleurs-dispo-usine': ['Red,Blue'], 'images': ['image1.jpg'], 
+        'prix-super-gros': [5000], 'prix-gros': [7500], 'prix-détail': [10000]
+    }
+    output = BytesIO()
+    pd.DataFrame(sample_data).to_excel(output, index=False)
+    return output.getvalue()

@@ -62,6 +62,8 @@ Columns:
   - note (TEXT)
   - category (TEXT)
   - quantite_vendu_actue (INTEGER)
+  - last_updated (TEXT)
+  - discontinued (BOOLEAN)
 
 Table: expenditures
 Columns:
@@ -100,3 +102,12 @@ Columns:
   - address_client (TEXT)
   - email_client (TEXT)
   - entreprise_client (TEXT)
+
+Table: price_history
+Columns:
+  - id (INTEGER) [PK]
+  - product_ref (TEXT)
+  - price_type (TEXT)
+  - old_price (REAL)
+  - new_price (REAL)
+  - changed_at (TEXT)

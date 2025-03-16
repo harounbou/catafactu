@@ -5,7 +5,7 @@ import pandas as pd
 from .product_management import load_products, restock_product
 from .transaction_management import record_transaction
 from .utils import get_full_image_path, find_image_path_for_color
-from .stock_utils import stock_checker_section  # New import
+from .pos import stock_checker_section  # Updated import
 
 def restock_page():
     st.title("Re-stocking")
@@ -57,19 +57,22 @@ def restock_page():
             )
         
         if st.button("Restock", key="restock_submit"):
+            restock_items = []
             for color, qty in color_quantities.items():
                 if qty > 0:
-                    restock_product(products_df, product['reference'], qty, color=color if color != "total" else None)
-            record_transaction(
-                None,
-                json.dumps([{
-                    "denomination": selected_product,
-                    "reference": product['reference'],
-                    "quantities": {k: v for k, v in color_quantities.items() if v > 0}
-                }]),
-                "N/A", 0.0, 0.0, "restock", st.session_state['user']['username']
-            )
-            st.success(f"Restocked {selected_product} successfully!")
-            st.rerun()
-
-# Removed duplicate code block starting with second st.title("Re-stocking")
+                    success = restock_product(product['reference'], qty, color if color != "total" else None)
+                    if success:
+                        restock_items.append({
+                            "denomination": selected_product,
+                            "reference": product['reference'],
+                            "color": color if color != "total" else None,
+                            "quantity": qty
+                        })
+            if restock_items:
+                record_transaction(
+                    None,
+                    json.dumps(restock_items),
+                    "N/A", 0.0, 0.0, "restock", st.session_state['user']['username']
+                )
+                st.success(f"Restocked {selected_product} successfully!")
+                st.rerun()

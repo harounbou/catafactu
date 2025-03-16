@@ -4,12 +4,13 @@ import pandas as pd
 import json
 from datetime import datetime
 from .client_management import get_client_info, add_new_client, save_clients, update_client
-from .product_management import load_products, update_stock
+from .product_management import load_products, update_stock, check_stock
 from .transaction_management import record_transaction, fetch_df_from_db
-from .pdf_generator import generate_receipt_pdf, send_email  # Updated import
+from .pdf_generator import generate_receipt_pdf, send_email
 from .utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path
 
 def stock_checker_section(products_df, section_key_prefix=""):
+    """Display a stock checker section with search functionality."""
     with st.expander("Vérificateur de Stock", expanded=False):
         search_term = st.text_input("Rechercher par nom ou référence", placeholder="Tapez le nom ou la référence", key=f"{section_key_prefix}stock_search")
         if st.button("Vérifier", key=f"{section_key_prefix}stock_check"):
@@ -214,11 +215,9 @@ def pos_page():
             
             quantity = st.number_input("Quantité", min_value=1, value=1, key="pos_quantity")
             can_add_item = True
-            if selected_color and quantity > color_stock:
-                st.error(f"La quantité demandée ({quantity}) dépasse le stock disponible pour {selected_color} ({color_stock}).")
-                can_add_item = False
-            elif not selected_color and quantity > total_stock:
-                st.error(f"La quantité demandée ({quantity}) dépasse le stock total disponible ({int(total_stock)}).")
+            is_available, stock_msg = check_stock(selected_row['reference'], quantity, selected_color)
+            if not is_available:
+                st.error(stock_msg)
                 can_add_item = False
             
             if st.button("Ajouter", disabled=not can_add_item):
@@ -231,8 +230,11 @@ def pos_page():
                     "Image": image_path,
                     "category": selected_row.get('category', 'Sans Catégorie')
                 }
-                st.session_state['pos_items'].append(item_dict)
-                st.success("Article ajouté !")
+                if update_stock(selected_row['reference'], -quantity, selected_color):
+                    st.session_state['pos_items'].append(item_dict)
+                    st.success("Article ajouté !")
+                else:
+                    st.error("Échec de la mise à jour du stock.")
         
         if st.session_state['pos_items']:
             st.write("#### Articles sélectionnés")
@@ -244,6 +246,8 @@ def pos_page():
                         st.image(item['Image'], width=100)
                 with col2:
                     if st.button(f"Supprimer {i+1}", key=f"pos_delete_{i}"):
+                        # Restore stock when removing an item
+                        update_stock(item['reference'], item['Quantity'], item['Color'])
                         st.session_state['pos_items'].pop(i)
                         st.rerun()
 
@@ -313,26 +317,25 @@ def pos_page():
                     elif not st.session_state.get("client_info_loaded"):
                         st.error("Chargez un client !")
                     else:
-                        if update_stock(st.session_state['pos_items']):
-                            payment_details = "; ".join([f"{k}: {v:.2f}" for k, v in payments.items() if v > 0])
-                            transaction_id = record_transaction(
-                                st.session_state['client_info_loaded'],
-                                st.session_state['pos_items'],
-                                payment_details,
-                                final_amount,
-                                total_amount,
-                                status="completed",
-                                performed_by=username
-                            )
-                            transaction_info = {"transaction_number": transaction_id, "transaction_date": datetime.now().strftime("%d/%m/%Y"), "client_id": st.session_state['client_info_loaded']['id_client'], "performed_by": username}
-                            pdf_filename = generate_receipt_pdf(transaction_info, st.session_state['pos_items'], final_amount, discount_amount, payment_details)
-                            st.session_state['pos_pdf_filename'] = pdf_filename
-                            st.session_state['pos_transaction_generated'] = True
-                            st.session_state['recent_clients'].insert(0, st.session_state['client_info_loaded']['id_client'])
-                            if len(st.session_state['recent_clients']) > 5:
-                                st.session_state['recent_clients'].pop()
-                            st.success("Vente terminée !")
-                            st.rerun()
+                        payment_details = "; ".join([f"{k}: {v:.2f}" for k, v in payments.items() if v > 0])
+                        transaction_id = record_transaction(
+                            st.session_state['client_info_loaded'],
+                            st.session_state['pos_items'],
+                            payment_details,
+                            final_amount,
+                            total_amount,
+                            status="completed",
+                            performed_by=username
+                        )
+                        transaction_info = {"transaction_number": transaction_id, "transaction_date": datetime.now().strftime("%d/%m/%Y"), "client_id": st.session_state['client_info_loaded']['id_client'], "performed_by": username}
+                        pdf_filename = generate_receipt_pdf(transaction_info, st.session_state['pos_items'], final_amount, discount_amount, payment_details)
+                        st.session_state['pos_pdf_filename'] = pdf_filename
+                        st.session_state['pos_transaction_generated'] = True
+                        st.session_state['recent_clients'].insert(0, st.session_state['client_info_loaded']['id_client'])
+                        if len(st.session_state['recent_clients']) > 5:
+                            st.session_state['recent_clients'].pop()
+                        st.success("Vente terminée !")
+                        st.rerun()
 
             if st.session_state.get('pos_transaction_generated', False):
                 pdf_filename = st.session_state['pos_pdf_filename']
@@ -352,6 +355,9 @@ def pos_page():
 
             with col2:
                 if st.button("Effacer tout"):
+                    # Restore stock for all items when clearing
+                    for item in st.session_state.get('pos_items', []):
+                        update_stock(item['reference'], item['Quantity'], item['Color'])
                     if 'pos_items' in st.session_state:
                         del st.session_state['pos_items']
                     if 'pos_filtered' in st.session_state:

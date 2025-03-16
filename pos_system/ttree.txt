@@ -1,6 +1,8 @@
 .
 ├── app.py
 ├── armchair.png
+├── backups
+│   └── backup_20250316_021702.sqlite
 ├── data
 │   ├── db_structure.py
 │   ├── db_structure.txt
@@ -233,27 +235,6 @@
 │   │   └── CHAISE_NAPOLEON.jpg
 │   └── logo.png
 ├── modules
-│   ├── __pycache__
-│   │   ├── bon_de_commande.cpython-311.pyc
-│   │   ├── bon_de_commande.cpython-313.pyc
-│   │   ├── client_management.cpython-311.pyc
-│   │   ├── client_management.cpython-313.pyc
-│   │   ├── pdf_generator.cpython-311.pyc
-│   │   ├── pdf_generator.cpython-313.pyc
-│   │   ├── pos.cpython-311.pyc
-│   │   ├── pos.cpython-313.pyc
-│   │   ├── product_management.cpython-311.pyc
-│   │   ├── product_management.cpython-313.pyc
-│   │   ├── proforma.cpython-311.pyc
-│   │   ├── proforma.cpython-313.pyc
-│   │   ├── restock.cpython-311.pyc
-│   │   ├── restock.cpython-313.pyc
-│   │   ├── stock_utils.cpython-311.pyc
-│   │   ├── stock_utils.cpython-313.pyc
-│   │   ├── transaction_management.cpython-311.pyc
-│   │   ├── transaction_management.cpython-313.pyc
-│   │   ├── utils.cpython-311.pyc
-│   │   └── utils.cpython-313.pyc
 │   ├── bon_de_commande.py
 │   ├── client_management.py
 │   ├── pdf_generator.py
@@ -265,6 +246,6 @@
 │   ├── transaction_management.py
 │   └── utils.py
 ├── requirements.txt
-└── tree.txt
+└── ttree.txt
 
-111 directories, 157 files
+111 directories, 138 files

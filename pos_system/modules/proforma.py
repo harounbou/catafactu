@@ -1,3 +1,4 @@
+# modules/proforma.py
 import streamlit as st
 import pandas as pd
 from datetime import datetime
@@ -5,11 +6,13 @@ from .client_management import get_client_info, add_new_client, save_clients, up
 from .transaction_management import record_transaction, get_proformas
 from .pdf_generator import generate_proforma_pdf
 from .utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path
+from .pos import stock_checker_section  # Import stock checker
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 import os
+from .product_management import check_stock  # Import check_stock
 
 def send_email(to_email, subject, body, attachment_path=None):
     sender_email = st.secrets["gmail"]["email"]
@@ -47,27 +50,8 @@ def proforma_page(products_df, clients_df):
     if 'generated_pdf' not in st.session_state:
         st.session_state.generated_pdf = None
 
-    # Stock Checker
-    with st.expander("Vérificateur de Stock", expanded=False):
-        stock_search = st.text_input("Rechercher un article pour vérifier le stock", key="stock_search")
-        if stock_search:
-            filtered_products = products_df[
-                (products_df['reference'].str.contains(stock_search, case=False, na=False)) |
-                (products_df['denomination'].str.contains(stock_search, case=False, na=False))
-            ]
-            if not filtered_products.empty:
-                for _, product in filtered_products.iterrows():
-                    st.write(f"**{product['denomination']} ({product['reference']})**")
-                    st.write(f"Stock Total: {product['quantite_actuelle']}")
-                    colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
-                    for color in colors:
-                        color_lower = color.lower()
-                        if color_lower in product and pd.notna(product[color_lower]):
-                            st.write(f"{color.capitalize()}: {product[color_lower]}")
-                        else:
-                            st.write(f"{color.capitalize()}: N/A")
-            else:
-                st.warning("Aucun article trouvé.")
+    # Stock Checker using pos.py's stock_checker_section
+    stock_checker_section(products_df, "proforma_")
 
     with st.expander("Configuration de la Proforma", expanded=True):
         col1, col2 = st.columns(2)
@@ -161,7 +145,12 @@ def proforma_page(products_df, clients_df):
             if image_path:
                 st.image(image_path, caption=f"Aperçu ({color})", width=150)
             qty = st.number_input("Quantité", min_value=1, value=1, max_value=10000, key=f"qty_{search_term}")
-            if st.button("Ajouter au Panier"):
+            can_add_item = True
+            is_available, stock_msg = check_stock(product['reference'], qty, color)
+            if not is_available:
+                st.error(stock_msg)
+                can_add_item = False
+            if st.button("Ajouter au Panier", disabled=not can_add_item):
                 item = {
                     "reference": product['reference'],
                     "denomination": product['denomination'],
