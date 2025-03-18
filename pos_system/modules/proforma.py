@@ -141,9 +141,40 @@ def proforma_page(products_df, clients_df):
             product = st.session_state.proforma_filtered[st.session_state.proforma_filtered['denomination'] == selected_product].iloc[0]
             colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
             color = st.selectbox("Couleur", colors) if colors else None
-            image_path = get_full_image_path(find_image_path_for_color(product['images'], color)) if color else None
-            if image_path:
-                st.image(image_path, caption=f"Aperçu ({color})", width=150)
+            
+            # Image selection for the chosen color
+            selected_image_path = None
+            if color and pd.notna(product['images']):
+                image_paths = [img.strip() for img in product['images'].split(',')]
+                color_images = [img for img in image_paths if color.lower() in os.path.basename(img).lower()]
+                if color_images:
+                    # Display all images for the selected color
+                    st.write(f"### Available Images for {color}")
+                    cols = st.columns(min(len(color_images), 4))
+                    image_options = {os.path.basename(img): img for img in color_images}
+                    for idx, img in enumerate(color_images):
+                        full_img_path = get_full_image_path(img)
+                        if full_img_path and os.path.exists(full_img_path):
+                            with cols[idx % 4]:
+                                st.image(full_img_path, width=100, caption=os.path.basename(full_img_path))
+                        else:
+                            with cols[idx % 4]:
+                                st.warning(f"Image not found: {img}")
+                    
+                    # Let user select one image
+                    selected_image_name = st.selectbox(
+                        f"Select Image for {color}",
+                        options=list(image_options.keys()),
+                        key=f"image_select_{product['reference']}_{color}"
+                    )
+                    selected_image_path = image_options[selected_image_name] if selected_image_name else color_images[0]  # Default to first image if none selected
+                    if selected_image_path:
+                        full_selected_path = get_full_image_path(selected_image_path)
+                        st.image(full_selected_path, caption=f"Selected: {os.path.basename(full_selected_path)}", width=150)
+                else:
+                    st.warning(f"No images found for {color}.")
+                    selected_image_path = None
+            
             qty = st.number_input("Quantité", min_value=1, value=1, max_value=10000, key=f"qty_{search_term}")
             can_add_item = True
             is_available, stock_msg = check_stock(product['reference'], qty, color)
@@ -157,7 +188,7 @@ def proforma_page(products_df, clients_df):
                     "Quantity": qty,
                     "Price": product[price_type],
                     "Color": color,
-                    "Image": image_path
+                    "Image": get_full_image_path(selected_image_path) if selected_image_path else None
                 }
                 st.session_state.proforma_items.append(item)
                 st.success("Article ajouté!")
@@ -170,7 +201,7 @@ def proforma_page(products_df, clients_df):
                     if item.get('Image'):
                         st.image(item['Image'], width=50)
                 with cols[1]:
-                    st.write(f"{item['denomination']} ({item['reference']}) - {item['Quantity']}x {item['Price']:.2f} DZD")
+                    st.write(f"{item['denomination']} ({item['reference']}) - {item['Quantity']}x {item['Price']:.2f} DZD - Color: {item['Color']}")
                 with cols[2]:
                     if st.button("Supprimer", key=f"del_{idx}"):
                         del st.session_state.proforma_items[idx]

@@ -291,7 +291,6 @@ def articles_page():
     # Tab 1: List & Edit
     with tab1:
         st.subheader("Product List")
-        # Define all columns from the products table
         all_columns = [
             'reference', 'denomination', 'quantite_initiale', 'quantite_restockee', 'quantite_vendue', 
             'quantite_actuelle', 'couleurs-dispo-usine', 'images', 'prix-super-gros', 'prix-gros', 
@@ -301,23 +300,49 @@ def articles_page():
             'last_updated', 'discontinued'
         ]
         
-        # Display the full product list with all columns
         edited_df = st.data_editor(
             products_df[all_columns],
             use_container_width=True,
             key="product_list_full",
             column_config={
-                # Optional: Customize column widths or labels if needed
                 "reference": st.column_config.TextColumn("Reference", width="medium"),
                 "denomination": st.column_config.TextColumn("Name", width="large"),
                 "quantite_actuelle": st.column_config.NumberColumn("Current Qty", width="small"),
                 "prix-détail": st.column_config.NumberColumn("Retail Price", format="%.2f"),
-                # Add more customizations as needed for readability
             }
         )
         
-        # Allow selecting a product to edit
-        selected_ref = st.selectbox("Select Product to Edit", products_df['reference'], key="edit_ref")
+        st.write("### Select Product to Edit")
+        search_query = st.text_input(
+            "Search by Reference or Name",
+            placeholder="Type reference or name...",
+            key="product_search_input"
+        )
+        
+        if search_query:
+            filtered_products = products_df[
+                products_df['reference'].str.contains(search_query, case=False, na=False) |
+                products_df['denomination'].str.contains(search_query, case=False, na=False)
+            ]
+        else:
+            filtered_products = products_df
+        
+        product_options = [
+            f"{row['reference']} - {row['denomination']}" 
+            for _, row in filtered_products.iterrows()
+        ]
+        
+        selected_product_display = st.selectbox(
+            "Matching Products",
+            options=["Select a product..."] + product_options,
+            key="edit_product_select",
+            index=0
+        )
+        
+        selected_ref = None
+        if selected_product_display != "Select a product..." and selected_product_display:
+            selected_ref = selected_product_display.split(" - ")[0]
+        
         if selected_ref:
             product = products_df[products_df['reference'] == selected_ref].iloc[0]
             with st.expander("Edit Product", expanded=True):
@@ -359,37 +384,80 @@ def articles_page():
                 }
                 
                 # Image Management
-                current_images = updated_data['images'].split(',') if updated_data['images'] else []
+                current_images = [img.strip() for img in updated_data['images'].split(',')] if updated_data['images'] else []
                 if current_images:
+                    st.write("### Current Images")
                     cols = st.columns(min(len(current_images), 4))
                     for idx, img in enumerate(current_images):
-                        if os.path.exists(img):  # Check if the file exists
+                        img_path = os.path.abspath(img)
+                        if os.path.exists(img_path):
                             with cols[idx % 4]:
-                                st.image(img, width=100)
-                                if st.button(f"Remove {os.path.basename(img)}", key=f"rm_{idx}_{selected_ref}"):
+                                st.image(img_path, width=100, caption=os.path.basename(img_path))
+                                if st.button(f"Remove {os.path.basename(img_path)}", key=f"rm_{idx}_{selected_ref}"):
                                     current_images.remove(img)
                                     updated_data['images'] = ','.join(current_images)
                                     add_or_update_product(updated_data, is_update=True)
                                     st.rerun()
                         else:
                             with cols[idx % 4]:
-                                st.warning(f"Image not found: {img}")
+                                st.warning(f"Image not found: {img_path}")
+                                st.write(f"Debug: Raw path: {img}, Normalized: {img_path}, Exists: {os.path.exists(img_path)}")
+                
+                # Color selection for new images
+                available_colors = [c.strip() for c in updated_data['couleurs-dispo-usine'].split(',')] if updated_data['couleurs-dispo-usine'] else []
+                selected_color = st.selectbox("Select Color for New Image", available_colors, key=f"color_select_{selected_ref}") if available_colors else None
                 
                 new_images = st.file_uploader("Add Images", ['jpg', 'png', 'jpeg'], accept_multiple_files=True, key=f"up_{selected_ref}")
-                if new_images:
-                    os.makedirs("images", exist_ok=True)
+                if new_images and selected_color:
+                    category = updated_data['category'] or "CHAIR"  # Default to "CHAIR" if category is empty
+                    denomination = updated_data['denomination'].replace(" ", "_")  # Replace spaces with underscores
+                    folder_path = os.path.abspath(os.path.join("images", category, denomination))
+                    os.makedirs(folder_path, exist_ok=True)
+                    
                     for img in new_images:
-                        img_path = os.path.join("images", img.name)
-                        with open(img_path, "wb") as f:
+                        ext = os.path.splitext(img.name)[1].lower()  # Get file extension
+                        base_name = f"{selected_ref}_{selected_color.upper()}"
+                        existing_images_for_color = [i for i in current_images if selected_color.upper() in os.path.basename(i).upper()]
+                        
+                        if not existing_images_for_color:
+                            # No existing image for this color, use base name
+                            new_img_name = f"{base_name}{ext}"
+                        else:
+                            # Check if base name exists without suffix
+                            base_path = os.path.join(folder_path, f"{base_name}{ext}")
+                            if base_path not in [os.path.abspath(i) for i in existing_images_for_color]:
+                                new_img_name = f"{base_name}{ext}"
+                            else:
+                                # Find next available suffix (e.g., -1, -2)
+                                suffix = 1
+                                while True:
+                                    new_img_name = f"{base_name}-{suffix}{ext}"
+                                    if os.path.join(folder_path, new_img_name) not in [os.path.abspath(i) for i in current_images]:
+                                        break
+                                    suffix += 1
+                        
+                        new_img_path = os.path.join(folder_path, new_img_name)
+                        with open(new_img_path, "wb") as f:
                             f.write(img.getbuffer())
-                        current_images.append(img_path)
+                        
+                        # Handle existing image for this color
+                        if existing_images_for_color:
+                            keep_old = st.checkbox(f"Keep existing {selected_color} image? ({os.path.basename(existing_images_for_color[0])})", key=f"keep_{selected_ref}_{selected_color}_{new_img_name}")
+                            if not keep_old:
+                                # Replace: Remove old image from list
+                                current_images = [i for i in current_images if i not in existing_images_for_color]
+                            # If keeping old, it’s already in current_images
+                        
+                        current_images.append(new_img_path)
+                        st.success(f"Added {new_img_name} to {folder_path}")
+                    
                     updated_data['images'] = ','.join(current_images)
                 
                 if st.button("Save Changes", key=f"save_{selected_ref}"):
                     add_or_update_product(updated_data, is_update=True)
                     st.rerun()
     
-    # Tab 2: Import from Excel (unchanged)
+    # [Other tabs remain unchanged for now]
     with tab2:
         st.subheader("Import Products")
         uploaded_file = st.file_uploader("Upload Excel File", ['xlsx', 'xls'])
@@ -399,7 +467,6 @@ def articles_page():
         st.download_button("Download Template", generate_excel_template(), "product_template.xlsx", 
                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     
-    # Tab 3: Add New (unchanged for brevity, but should be updated similarly to include all fields)
     with tab3:
         st.subheader("Add New Product")
         new_data = {
@@ -410,14 +477,24 @@ def articles_page():
             "prix-super-gros": st.number_input("Super Gros Price", min_value=0.0, key="new_sg"),
             "prix-gros": st.number_input("Gros Price", min_value=0.0, key="new_g"),
             "prix-détail": st.number_input("Detail Price", min_value=0.0, key="new_d"),
+            "category": st.text_input("Category", key="new_category"),
             "images": ""
         }
+        available_colors = [c.strip() for c in new_data['couleurs-dispo-usine'].split(',')] if new_data['couleurs-dispo-usine'] else []
+        selected_color = st.selectbox("Select Color for New Image", available_colors, key="new_color_select") if available_colors else None
         new_images = st.file_uploader("Add Images", ['jpg', 'png', 'jpeg'], accept_multiple_files=True, key="new_up")
-        if new_images:
-            os.makedirs("images", exist_ok=True)
+        if new_images and selected_color:
+            category = new_data['category'] or "CHAIR"
+            denomination = new_data['denomination'].replace(" ", "_")
+            folder_path = os.path.abspath(os.path.join("images", category, denomination))
+            os.makedirs(folder_path, exist_ok=True)
             image_paths = []
             for img in new_images:
-                img_path = os.path.join("images", img.name)
+                ext = os.path.splitext(img.name)[1].lower()
+                base_name = f"{new_data['reference']}_{selected_color.upper()}"
+                img_count = len([i for i in image_paths if selected_color.upper() in i.upper()])
+                new_img_name = f"{base_name}{ext}" if img_count == 0 else f"{base_name}-{img_count}{ext}"
+                img_path = os.path.join(folder_path, new_img_name)
                 with open(img_path, "wb") as f:
                     f.write(img.getbuffer())
                 image_paths.append(img_path)
@@ -430,7 +507,6 @@ def articles_page():
             add_or_update_product(new_data)
             st.rerun()
     
-    # Tab 4: Manage Discontinued (unchanged)
     with tab4:
         st.subheader("Discontinued Products")
         discontinued_df = load_products(active_only=False)
@@ -450,7 +526,6 @@ def articles_page():
                     permanently_delete(ref)
                 st.rerun()
     
-    # Tab 5: Backup (unchanged)
     with tab5:
         st.subheader("Database Backup")
         if st.button("Create Manual Backup", key="manual_backup"):
