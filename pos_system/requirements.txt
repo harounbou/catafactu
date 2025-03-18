@@ -5,4 +5,3 @@ num2words
 bcrypt==3.2.2
 pillow
 schedule
-
