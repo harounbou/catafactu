@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import json
 import os
+import sqlite3
 import bcrypt
 from datetime import datetime
 import shutil
@@ -19,11 +20,12 @@ from modules.restock import restock_page
 from modules.bon_de_commande import bon_de_commande_page
 from modules.utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path, send_email
 from modules.utils import get_db_connection
+from modules.product_management import load_products, add_or_update_product, import_products_from_excel, generate_excel_template, mark_discontinued, permanently_delete, backup_database, get_db_connection
 
 
 # Paths
 USERS_FILE = "data/users.json"
-DB_FILE = "data/query.sql"  # Assuming this is your DB path
+DB_FILE = "data/pos_system.db"  # Assuming this is your DB path
 BACKUP_DIR = "backups"
 
 # Global CSS styling (unchanged)
@@ -278,20 +280,40 @@ def run_scheduled_tasks():
         schedule.run_pending()
         time.sleep(60)  # Check every minute
 
+import streamlit as st
+import pandas as pd
+import os
+from datetime import datetime
+
 def articles_page():
+    # Permissions check
     if 'role' not in st.session_state.user or st.session_state.user['role'] not in ['admin', 'inventory_manager']:
         st.error("You need elevated privileges to access this page!")
         return
     
+    st.write(f"Debug: User role = {st.session_state.user['role']}")  # Confirm role
+    
+    # Initialize table (should already exist since data is present)
+    if 'products_initialized' not in st.session_state:
+        initialize_products_table()
+        st.session_state.products_initialized = True
+        st.write("Debug: Products table initialized")
+    
     st.title("📚 Product Management")
     products_df = load_products()
-    is_admin = st.session_state.user['role'] == 'admin'
+    st.write(f"Debug: Loaded {len(products_df)} products")  # Check row count
+    st.write("Debug: Products DataFrame preview:", products_df.head())  # Inspect data
     
+    if products_df.empty:
+        st.warning("No products loaded from the database.")
+        return
+    
+    is_admin = st.session_state.user['role'] == 'admin'
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["List & Edit", "Import from Excel", "Add New", "Manage Discontinued", "Backup"])
     
-    # Tab 1: List & Edit
     with tab1:
         st.subheader("Product List")
+        st.write("Debug: Rendering Tab 1")  # Confirm tab rendering
         all_columns = [
             'reference', 'denomination', 'quantite_initiale', 'quantite_restockee', 'quantite_vendue', 
             'quantite_actuelle', 'couleurs-dispo-usine', 'images', 'prix-super-gros', 'prix-gros', 
@@ -300,6 +322,128 @@ def articles_page():
             'garnet', 'golden', 'green', 'rose', 'note', 'category', 'quantite_vendu_actue', 
             'last_updated', 'discontinued'
         ]
+        edited_df = st.data_editor(
+            products_df[all_columns],
+            use_container_width=True,
+            key="product_list_full",
+            column_config={
+                "reference": st.column_config.TextColumn("Reference", width="medium"),
+                "denomination": st.column_config.TextColumn("Name", width="large"),
+                "quantite_actuelle": st.column_config.NumberColumn("Current Qty", width="small", disabled=True),
+                "prix-détail": st.column_config.NumberColumn("Retail Price", format="%.2f"),
+            }
+        )
+       
+    # Permissions check
+    if 'role' not in st.session_state.user or st.session_state.user['role'] not in ['admin', 'inventory_manager']:
+        st.error("You need elevated privileges to access this page!")
+        return
+    
+    # Database schema enforcement
+
+
+
+
+def initialize_products_table():
+    """Initialize the products table in the database if it doesn't exist."""
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS products (
+                reference TEXT PRIMARY KEY,
+                denomination TEXT,
+                quantite_initiale REAL DEFAULT 0,
+                quantite_restockee REAL DEFAULT 0,
+                quantite_vendue INTEGER DEFAULT 0,
+                quantite_actuelle INTEGER DEFAULT 0,
+                `couleurs-dispo-usine` TEXT,
+                images TEXT,
+                `prix-super-gros` REAL,
+                `prix-gros` REAL,
+                `prix-détail` REAL,
+                uni_colour INTEGER DEFAULT 0,
+                default_colour INTEGER DEFAULT 0,
+                brown INTEGER DEFAULT 0,
+                brown_deg INTEGER DEFAULT 0,
+                blue INTEGER DEFAULT 0,
+                white INTEGER DEFAULT 0,
+                black INTEGER DEFAULT 0,
+                green_bottle INTEGER DEFAULT 0,
+                red INTEGER DEFAULT 0,
+                grey INTEGER DEFAULT 0,
+                grey_deg INTEGER DEFAULT 0,
+                beige INTEGER DEFAULT 0,
+                yellow INTEGER DEFAULT 0,
+                orange INTEGER DEFAULT 0,
+                garnet INTEGER DEFAULT 0,
+                golden INTEGER DEFAULT 0,
+                green INTEGER DEFAULT 0,
+                rose INTEGER DEFAULT 0,
+                note TEXT,
+                category TEXT,
+                quantite_vendu_actue INTEGER DEFAULT 0,
+                last_updated TEXT,
+                discontinued BOOLEAN DEFAULT 0
+            )
+        """)
+        conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Failed to create products table: {e}")
+    finally:
+        conn.close()
+
+
+def articles_page():
+    """Render the Product Management page with tabs for listing, editing, importing, and managing products."""
+    # Permissions check
+    if 'role' not in st.session_state.user or st.session_state.user['role'] not in ['admin', 'inventory_manager']:
+        st.error("You need elevated privileges to access this page!")
+        return
+    
+    # Debug: Log user role
+    st.write(f"Debug: User role = {st.session_state.user['role']}")
+    
+    # Initialize products table on first load
+    if 'products_initialized' not in st.session_state:
+        initialize_products_table()
+        st.session_state.products_initialized = True
+        st.write("Debug: Products table initialized")
+    
+    # Page title
+    st.title("📚 Product Management")
+    
+    # Load products data
+    products_df = load_products()
+    st.write(f"Debug: Loaded {len(products_df)} products")
+    st.write("Debug: Products DataFrame preview:", products_df.head())
+    
+    if products_df.empty:
+        st.warning("No active products found in the database.")
+        return
+    
+    # Check if user is admin
+    is_admin = st.session_state.user['role'] == 'admin'
+    
+    # Define tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["List & Edit", "Import from Excel", "Add New", "Manage Discontinued", "Backup"])
+    
+    # Tab 1: List & Edit
+    with tab1:
+        st.subheader("Product List")
+        all_columns = [
+            'reference', 'denomination', 'quantite_initiale', 'quantite_restockee', 'quantite_vendue',
+            'quantite_actuelle', 'couleurs-dispo-usine', 'images', 'prix-super-gros', 'prix-gros',
+            'prix-détail', 'uni_colour', 'default_colour', 'brown', 'brown_deg', 'blue', 'white',
+            'black', 'green_bottle', 'red', 'grey', 'grey_deg', 'beige', 'yellow', 'orange',
+            'garnet', 'golden', 'green', 'rose', 'note', 'category', 'quantite_vendu_actue',
+            'last_updated', 'discontinued'
+        ]
+        
+        # Ensure all columns exist in the DataFrame
+        missing_columns = [col for col in all_columns if col not in products_df.columns]
+        if missing_columns:
+            st.error(f"Columns missing in DataFrame: {missing_columns}")
+            return
         
         edited_df = st.data_editor(
             products_df[all_columns],
@@ -308,7 +452,7 @@ def articles_page():
             column_config={
                 "reference": st.column_config.TextColumn("Reference", width="medium"),
                 "denomination": st.column_config.TextColumn("Name", width="large"),
-                "quantite_actuelle": st.column_config.NumberColumn("Current Qty", width="small"),
+                "quantite_actuelle": st.column_config.NumberColumn("Current Qty", width="small", disabled=True),
                 "prix-détail": st.column_config.NumberColumn("Retail Price", format="%.2f"),
             }
         )
@@ -329,7 +473,7 @@ def articles_page():
             filtered_products = products_df
         
         product_options = [
-            f"{row['reference']} - {row['denomination']}" 
+            f"{row['reference']} - {row['denomination']}"
             for _, row in filtered_products.iterrows()
         ]
         
@@ -340,35 +484,35 @@ def articles_page():
             index=0
         )
         
-        selected_ref = None
         if selected_product_display != "Select a product..." and selected_product_display:
             selected_ref = selected_product_display.split(" - ")[0]
-        
-        if selected_ref:
             product = products_df[products_df['reference'] == selected_ref].iloc[0]
             with st.expander("Edit Product", expanded=True):
+                color_fields = [
+                    'uni_colour', 'default_colour', 'brown', 'brown_deg', 'blue', 'white', 'black',
+                    'green_bottle', 'red', 'grey', 'grey_deg', 'beige', 'yellow', 'orange',
+                    'garnet', 'golden', 'green', 'rose'
+                ]
                 updated_data = {
                     "reference": selected_ref,
                     "denomination": st.text_input("Name", product['denomination']),
                     "quantite_initiale": st.number_input(
                         "Initial Quantity",
                         min_value=0,
-                        value=int(product['quantite_initiale']) if pd.notna(product['quantite_initiale']) else 0
+                        value=int(product['quantite_initiale']) if pd.notna(product['quantite_initiale']) else 0,
+                        format="%d"
                     ),
                     "quantite_restockee": st.number_input(
                         "Restocked Quantity",
                         min_value=0,
-                        value=int(product['quantite_restockee']) if pd.notna(product['quantite_restockee']) else 0
+                        value=int(product['quantite_restockee']) if pd.notna(product['quantite_restockee']) else 0,
+                        format="%d"
                     ),
                     "quantite_vendue": st.number_input(
                         "Sold Quantity",
                         min_value=0,
-                        value=int(product['quantite_vendue']) if pd.notna(product['quantite_vendue']) else 0
-                    ),
-                    "quantite_actuelle": st.number_input(
-                        "Current Quantity",
-                        min_value=0,
-                        value=int(product['quantite_actuelle']) if pd.notna(product['quantite_actuelle']) else 0
+                        value=int(product['quantite_vendue']) if pd.notna(product['quantite_vendue']) else 0,
+                        format="%d"
                     ),
                     "couleurs-dispo-usine": st.text_input("Available Colors", product['couleurs-dispo-usine'] or ""),
                     "images": product['images'] or "",
@@ -386,108 +530,39 @@ def articles_page():
                         "Retail Price",
                         min_value=0.0,
                         value=float(product['prix-détail']) if pd.notna(product['prix-détail']) else 0.0
-                    ),
-                    "uni_colour": st.number_input(
-                        "Uni Colour",
-                        min_value=0.0,
-                        value=float(product['uni_colour']) if pd.notna(product['uni_colour']) else 0.0
-                    ),
-                    "default_colour": st.number_input(
-                        "Default Colour",
-                        min_value=0.0,
-                        value=float(product['default_colour']) if pd.notna(product['default_colour']) else 0.0
-                    ),
-                    "brown": st.number_input(
-                        "Brown",
-                        min_value=0.0,
-                        value=float(product['brown']) if pd.notna(product['brown']) else 0.0
-                    ),
-                    "brown_deg": st.number_input(
-                        "Brown Degradé",
-                        min_value=0.0,
-                        value=float(product['brown_deg']) if pd.notna(product['brown_deg']) else 0.0
-                    ),
-                    "blue": st.number_input(
-                        "Blue",
-                        min_value=0.0,
-                        value=float(product['blue']) if pd.notna(product['blue']) else 0.0
-                    ),
-                    "white": st.number_input(
-                        "White",
-                        min_value=0.0,
-                        value=float(product['white']) if pd.notna(product['white']) else 0.0
-                    ),
-                    "black": st.number_input(
-                        "Black",
-                        min_value=0.0,
-                        value=float(product['black']) if pd.notna(product['black']) else 0.0
-                    ),
-                    "green_bottle": st.number_input(
-                        "Green Bottle",
-                        min_value=0.0,
-                        value=float(product['green_bottle']) if pd.notna(product['green_bottle']) else 0.0
-                    ),
-                    "red": st.number_input(
-                        "Red",
-                        min_value=0.0,
-                        value=float(product['red']) if pd.notna(product['red']) else 0.0
-                    ),
-                    "grey": st.number_input(
-                        "Grey",
-                        min_value=0.0,
-                        value=float(product['grey']) if pd.notna(product['grey']) else 0.0
-                    ),
-                    "grey_deg": st.number_input(
-                        "Grey Degradé",
-                        min_value=0.0,
-                        value=float(product['grey_deg']) if pd.notna(product['grey_deg']) else 0.0
-                    ),
-                    "beige": st.number_input(
-                        "Beige",
-                        min_value=0.0,
-                        value=float(product['beige']) if pd.notna(product['beige']) else 0.0
-                    ),
-                    "yellow": st.number_input(
-                        "Yellow",
-                        min_value=0.0,
-                        value=float(product['yellow']) if pd.notna(product['yellow']) else 0.0
-                    ),
-                    "orange": st.number_input(
-                        "Orange",
-                        min_value=0.0,
-                        value=float(product['orange']) if pd.notna(product['orange']) else 0.0
-                    ),
-                    "garnet": st.number_input(
-                        "Garnet",
-                        min_value=0.0,
-                        value=float(product['garnet']) if pd.notna(product['garnet']) else 0.0
-                    ),
-                    "golden": st.number_input(
-                        "Golden",
-                        min_value=0.0,
-                        value=float(product['golden']) if pd.notna(product['golden']) else 0.0
-                    ),
-                    "green": st.number_input(
-                        "Green",
-                        min_value=0.0,
-                        value=float(product['green']) if pd.notna(product['green']) else 0.0
-                    ),
-                    "rose": st.number_input(
-                        "Rose",
-                        min_value=0.0,
-                        value=float(product['rose']) if pd.notna(product['rose']) else 0.0
-                    ),
+                    )
+                }
+                
+                # Color quantities
+                for color in color_fields:
+                    updated_data[color] = st.number_input(
+                        color.replace("_", " ").title(),
+                        min_value=0,
+                        value=int(product[color]) if pd.notna(product[color]) else 0,
+                        format="%d",
+                        key=f"{color}_{selected_ref}"
+                    )
+                
+                # Calculate and display current quantity
+                quantite_actuelle = sum(updated_data[color] for color in color_fields)
+                st.write(f"**Current Quantity**: {quantite_actuelle}")
+                updated_data["quantite_actuelle"] = quantite_actuelle
+                
+                # Additional fields
+                updated_data.update({
                     "note": st.text_area("Note", product['note'] or ""),
                     "category": st.text_input("Category", product['category'] or ""),
                     "quantite_vendu_actue": st.number_input(
                         "Current Sold Qty",
                         min_value=0,
-                        value=int(product['quantite_vendu_actue']) if pd.notna(product['quantite_vendu_actue']) else 0
+                        value=int(product['quantite_vendu_actue']) if pd.notna(product['quantite_vendu_actue']) else 0,
+                        format="%d"
                     ),
                     "last_updated": product['last_updated'] or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "discontinued": product['discontinued']
-                }
+                })
                 
+                # Image handling
                 current_images = [img.strip() for img in updated_data['images'].split(',')] if updated_data['images'] else []
                 if current_images:
                     st.write("### Current Images")
@@ -505,7 +580,6 @@ def articles_page():
                         else:
                             with cols[idx % 4]:
                                 st.warning(f"Image not found: {img_path}")
-                                st.write(f"Debug: Raw path: {img}, Normalized: {img_path}, Exists: {os.path.exists(img_path)}")
                 
                 available_colors = [c.strip() for c in updated_data['couleurs-dispo-usine'].split(',')] if updated_data['couleurs-dispo-usine'] else []
                 selected_color = st.selectbox("Select Color for New Image", available_colors, key=f"color_select_{selected_ref}") if available_colors else None
@@ -521,33 +595,12 @@ def articles_page():
                         ext = os.path.splitext(img.name)[1].lower()
                         base_name = f"{selected_ref}_{selected_color.upper()}"
                         existing_images_for_color = [i for i in current_images if selected_color.upper() in os.path.basename(i).upper()]
-                        
-                        if not existing_images_for_color:
-                            new_img_name = f"{base_name}{ext}"
-                        else:
-                            base_path = os.path.join(folder_path, f"{base_name}{ext}")
-                            if base_path not in [os.path.abspath(i) for i in existing_images_for_color]:
-                                new_img_name = f"{base_name}{ext}"
-                            else:
-                                suffix = 1
-                                while True:
-                                    new_img_name = f"{base_name}-{suffix}{ext}"
-                                    if os.path.join(folder_path, new_img_name) not in [os.path.abspath(i) for i in current_images]:
-                                        break
-                                    suffix += 1
-                        
+                        new_img_name = f"{base_name}{ext}" if not existing_images_for_color else f"{base_name}-{len(existing_images_for_color) + 1}{ext}"
                         new_img_path = os.path.join(folder_path, new_img_name)
                         with open(new_img_path, "wb") as f:
                             f.write(img.getbuffer())
-                        
-                        if existing_images_for_color:
-                            keep_old = st.checkbox(f"Keep existing {selected_color} image? ({os.path.basename(existing_images_for_color[0])})", key=f"keep_{selected_ref}_{selected_color}_{new_img_name}")
-                            if not keep_old:
-                                current_images = [i for i in current_images if i not in existing_images_for_color]
-                        
                         current_images.append(new_img_path)
-                        st.success(f"Added {new_img_name} to {folder_path}")
-                    
+                        st.success(f"Added {new_img_name}")
                     updated_data['images'] = ','.join(current_images)
                 
                 if st.button("Save Changes", key=f"save_{selected_ref}"):
@@ -561,17 +614,25 @@ def articles_page():
         if uploaded_file and st.button("Import"):
             import_products_from_excel(uploaded_file)
             st.rerun()
-        st.download_button("Download Template", generate_excel_template(), "product_template.xlsx", 
-                          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        st.download_button(
+            "Download Template",
+            generate_excel_template(),
+            "product_template.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
     
     # Tab 3: Add New
     with tab3:
         st.subheader("Add New Product")
+        color_fields = [
+            'uni_colour', 'default_colour', 'brown', 'brown_deg', 'blue', 'white', 'black',
+            'green_bottle', 'red', 'grey', 'grey_deg', 'beige', 'yellow', 'orange',
+            'garnet', 'golden', 'green', 'rose'
+        ]
         new_data = {
             "reference": st.text_input("Reference", key="new_ref"),
             "denomination": st.text_input("Name", key="new_name"),
-            "quantite_actuelle": st.number_input("Quantity", min_value=0, key="new_qty"),
-            "quantite_initiale": 0,
+            "quantite_initiale": st.number_input("Initial Quantity", min_value=0, key="new_init", format="%d"),
             "quantite_restockee": 0,
             "quantite_vendue": 0,
             "quantite_vendu_actue": 0,
@@ -579,33 +640,32 @@ def articles_page():
             "prix-super-gros": st.number_input("Super Gros Price", min_value=0.0, key="new_sg"),
             "prix-gros": st.number_input("Gros Price", min_value=0.0, key="new_g"),
             "prix-détail": st.number_input("Detail Price", min_value=0.0, key="new_d"),
-            "uni_colour": 0.0,
-            "default_colour": 0.0,
-            "brown": 0.0,
-            "brown_deg": 0.0,
-            "blue": 0.0,
-            "white": 0.0,
-            "black": 0.0,
-            "green_bottle": 0.0,
-            "red": 0.0,
-            "grey": 0.0,
-            "grey_deg": 0.0,
-            "beige": 0.0,
-            "yellow": 0.0,
-            "orange": 0.0,
-            "garnet": 0.0,
-            "golden": 0.0,
-            "green": 0.0,
-            "rose": 0.0,
-            "category": st.text_input("Category", key="new_category"),
             "images": "",
-            "note": "",
+            "note": st.text_area("Note", key="new_note"),
+            "category": st.text_input("Category", key="new_category"),
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "discontinued": 0
         }
+        
+        # Color quantities
+        for color in color_fields:
+            new_data[color] = st.number_input(
+                color.replace("_", " ").title(),
+                min_value=0,
+                value=0,
+                format="%d",
+                key=f"new_{color}"
+            )
+        
+        # Calculate and display current quantity
+        quantite_actuelle = sum(new_data[color] for color in color_fields)
+        st.write(f"**Current Quantity**: {quantite_actuelle}")
+        new_data["quantite_actuelle"] = quantite_actuelle
+        
         available_colors = [c.strip() for c in new_data['couleurs-dispo-usine'].split(',')] if new_data['couleurs-dispo-usine'] else []
         selected_color = st.selectbox("Select Color for New Image", available_colors, key="new_color_select") if available_colors else None
         new_images = st.file_uploader("Add Images", ['jpg', 'png', 'jpeg'], accept_multiple_files=True, key="new_up")
+        
         if new_images and selected_color:
             category = new_data['category'] or "CHAIR"
             denomination = new_data['denomination'].replace(" ", "_")
@@ -626,6 +686,7 @@ def articles_page():
             for idx, img_path in enumerate(image_paths):
                 with cols[idx % 4]:
                     st.image(img_path, width=100, caption=os.path.basename(img_path))
+        
         if st.button("Add Product", key="add_btn"):
             add_or_update_product(new_data)
             st.session_state.add_confirmation = f"Product '{new_data['reference']} - {new_data['denomination']}' added successfully!"
@@ -661,12 +722,13 @@ def articles_page():
                 st.download_button("Download Backup", f, os.path.basename(backup_path), mime="application/octet-stream")
         st.info("Automatic backups are scheduled daily at 00:00.")
     
-    # Display confirmation message at the bottom
+    # Display confirmation message
     if "add_confirmation" in st.session_state:
         st.success(st.session_state.add_confirmation, icon="✅")
         if st.button("OK", key="clear_add_confirmation"):
             del st.session_state.add_confirmation
             st.rerun()
+
 
 def access_control_page():
     st.title("Contrôle d'accès")

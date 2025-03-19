@@ -168,8 +168,6 @@ def send_email(to_email, subject, body, attachment_path=None):
         st.error(f"Échec de l'envoi de l'email : {e}")
         return False
 
-# Add this to the end of your utils.py
-
 def find_image_path_for_color(image_paths, color):
     """
     Find the image path matching a given color from a comma-separated list of image paths.

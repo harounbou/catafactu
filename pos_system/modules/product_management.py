@@ -6,15 +6,42 @@ import os
 from datetime import datetime
 from .utils import get_db_connection
 
+
 # Configurable feature flag
 ENABLE_PRICE_HISTORY = False  # Toggle this in a config file or environment variable
 
-def load_products(active_only=True):
-    """Load products with optional filtering for active items."""
+def backup_database():
+    """Create a backup of the database."""
     conn = get_db_connection()
+    try:
+        # Assuming the database file path is known or configured
+        db_path = "path/to/your/database.db"  # Replace with actual path or fetch from config
+        backup_path = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+        import shutil
+        shutil.copy2(db_path, backup_path)
+        return backup_path
+    except Exception as e:
+        st.error(f"Backup failed: {str(e)}")
+        return None
+    finally:
+        conn.close()
+
+def load_products(active_only=True):
+    conn = get_db_connection()
+    if conn is None:
+        st.error("Debug: Failed to connect to database")
+        return pd.DataFrame()
+    
     query = "SELECT * FROM products WHERE discontinued = 0" if active_only else "SELECT * FROM products"
-    df = pd.read_sql_query(query, conn)
-    conn.close()
+    st.write(f"Debug: Executing query: {query}")  # Log query
+    try:
+        df = pd.read_sql_query(query, conn)
+        st.write(f"Debug: Raw data from DB: {df.shape}")  # Log shape of data
+    except Exception as e:
+        st.error(f"Debug: Error loading products: {e}")
+        df = pd.DataFrame()
+    finally:
+        conn.close()
     return df
 
 def import_products_from_excel(file):
@@ -197,39 +224,33 @@ def check_stock(reference, quantity_needed, color=None):
         conn.close()
 
 def update_stock(reference, quantity_change, color=None):
-    """Update the stock quantity of a product (positive or negative change), optionally for a color."""
     conn = get_db_connection()
     try:
         with conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT quantite_actuelle FROM products WHERE reference = ?", (reference,))
-            result = cursor.fetchone()
-            if result is None:
-                st.error(f"Product with reference {reference} not found!")
-                return False
-            
-            current_quantity = result[0]
-            new_quantity = current_quantity + quantity_change
-            if new_quantity < 0:
-                st.error("Cannot reduce stock below 0!")
-                return False
-            
             if color:
-                color = color.lower()
-                cursor.execute(f"SELECT `{color}` FROM products WHERE reference = ?", (reference,))
-                current_color_qty = cursor.fetchone()[0] or 0
-                new_color_qty = current_color_qty + quantity_change
-                if new_color_qty < 0:
-                    st.error(f"Cannot reduce {color} stock below 0!")
-                    return False
-                cursor.execute(f"UPDATE products SET `{color}` = ?, last_updated = ? WHERE reference = ?",
-                              (new_color_qty, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
-                st.success(f"Stock updated for {reference} ({color}): {current_color_qty} -> {new_color_qty}")
-            cursor.execute("UPDATE products SET quantite_actuelle = ?, last_updated = ? WHERE reference = ?",
-                          (new_quantity, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
+                cursor.execute(f"""
+                    UPDATE products 
+                    SET `{color}` = `{color}` + ?, 
+                        last_updated = ? 
+                    WHERE reference = ?
+                """, (quantity_change, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
+
+            # Calculate new total quantity from all colors
+            cursor.execute("SELECT * FROM products WHERE reference = ?", (reference,))
+            product = cursor.fetchone()
+            colors = [c.strip().lower() for c in product['couleurs-dispo-usine'].split(',')] if product['couleurs-dispo-usine'] else []
+            total = sum(int(product[color]) for color in colors if color in product)
+
+            cursor.execute("""
+                UPDATE products 
+                SET quantite_actuelle = ?, 
+                    last_updated = ? 
+                WHERE reference = ?
+            """, (total, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
+            
             conn.commit()
-        st.success(f"Stock updated for {reference}: {current_quantity} -> {new_quantity}")
-        return True
+            return True
     except Exception as e:
         conn.rollback()
         st.error(f"Error updating stock: {str(e)}")

@@ -1,17 +1,1 @@
--- Add new columns without non-constant defaults
-ALTER TABLE products ADD COLUMN last_updated TEXT;  -- No default here
-ALTER TABLE products ADD COLUMN discontinued BOOLEAN DEFAULT 0;
-
--- Set a default value for existing rows in last_updated
-UPDATE products SET last_updated = '2025-03-15 22:00:00' WHERE last_updated IS NULL;
-
--- Optional: Create price history table (unchanged, as it doesn’t use defaults in ALTER)
-CREATE TABLE IF NOT EXISTS price_history (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    product_ref TEXT NOT NULL,
-    price_type TEXT CHECK(price_type IN ('super_gros', 'gros', 'detail')),
-    old_price REAL,
-    new_price REAL NOT NULL,
-    changed_at TEXT NOT NULL,
-    FOREIGN KEY(product_ref) REFERENCES products(reference)
-);
+SELECT * FROM products LIMIT 5
