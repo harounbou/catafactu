@@ -65,31 +65,45 @@ def truncate_text(text, max_length=14):
     return text
 
 def get_full_image_path(image_path):
+    """Resolve the full path to an image, handling relative and absolute paths."""
+    if not image_path or pd.isna(image_path):
+        return None
+    
     IMAGE_FOLDER = os.path.join(BASE_DIR, "images")
-    if pd.notna(image_path):
-        image_path = image_path.lstrip('/').lstrip('./').lstrip('images/').strip()
-        base_path = os.path.join(IMAGE_FOLDER, image_path)
-        base, ext = os.path.splitext(base_path)
-        extensions_to_try = [ext.lower(), '.png', '.jpg', '.jpeg', '.webp']
-        for extension in extensions_to_try:
-            test_path = f"{base}{extension}"
-            if os.path.exists(test_path):
-                return test_path
-        dir_path, file_name = os.path.split(base_path)
-        if os.path.exists(dir_path):
-            for f in os.listdir(dir_path):
-                if f.lower().startswith(os.path.splitext(file_name)[0].lower()):
-                    return os.path.join(dir_path, f)
-        st.warning(f"Image path not found: {base_path}*")
-    return None
-
-def find_image_path_for_color(images_str, selected_color):
-    if pd.notna(images_str) and selected_color:
-        image_paths = [path.strip() for path in images_str.split(',')]
-        selected_color_lower = selected_color.lower()
-        for path in image_paths:
-            if selected_color_lower in path.lower():
-                return path
+    image_path = image_path.strip()  # Remove leading/trailing whitespace
+    
+    # If it's already an absolute path, use it directly if it exists
+    if os.path.isabs(image_path):
+        if os.path.exists(image_path):
+            return image_path
+        st.warning(f"Absolute image path not found: {image_path}")
+        return None
+    
+    # Clean relative path (remove redundant prefixes like './' or 'images/')
+    cleaned_path = image_path.lstrip('/').lstrip('./').lstrip('images/').strip()
+    full_path = os.path.join(IMAGE_FOLDER, cleaned_path)
+    
+    # Check if the exact path exists
+    if os.path.exists(full_path):
+        return full_path
+    
+    # Try common image extensions if the base file doesn’t exist
+    base, ext = os.path.splitext(full_path)
+    extensions_to_try = [ext.lower(), '.jpg', '.jpeg', '.png', '.webp']
+    for extension in extensions_to_try:
+        test_path = f"{base}{extension}"
+        if os.path.exists(test_path):
+            return test_path
+    
+    # If still not found, search directory for a case-insensitive match
+    dir_path, file_name = os.path.split(full_path)
+    if os.path.exists(dir_path):
+        file_base = os.path.splitext(file_name)[0].lower()
+        for f in os.listdir(dir_path):
+            if f.lower().startswith(file_base):
+                return os.path.join(dir_path, f)
+    
+    st.warning(f"Image path not found: {full_path}*")
     return None
 
 def get_image_dimensions(image_path):
@@ -153,3 +167,33 @@ def send_email(to_email, subject, body, attachment_path=None):
     except Exception as e:
         st.error(f"Échec de l'envoi de l'email : {e}")
         return False
+
+# Add this to the end of your utils.py
+
+def find_image_path_for_color(image_paths, color):
+    """
+    Find the image path matching a given color from a comma-separated list of image paths.
+    Returns the first matching full path or None if no match is found.
+    """
+    if not image_paths or not color or pd.isna(image_paths):
+        return None
+    
+    # Split and clean the image paths
+    image_list = [img.strip() for img in str(image_paths).split(',')]
+    color = color.lower().strip()
+    
+    # Look for an image containing the color in its filename
+    for img in image_list:
+        full_path = get_full_image_path(img)
+        if full_path and color in os.path.basename(full_path).lower():
+            return full_path
+    
+    # If no match, return the first valid image as a fallback (optional)
+    for img in image_list:
+        full_path = get_full_image_path(img)
+        if full_path:
+            st.warning(f"No image found for color '{color}', using default: {os.path.basename(full_path)}")
+            return full_path
+    
+    st.warning(f"No valid images found for {image_paths}")
+    return None

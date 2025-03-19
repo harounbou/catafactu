@@ -1,7 +1,4 @@
 .
-├── Proforma-1101.pdf
-├── Reçu-1102-18032025.pdf
-├── Reçu-1103-18032025.pdf
 ├── app.py
 ├── armchair.png
 ├── backups
@@ -87,6 +84,7 @@
 │   │   │       └── #1-RT0055.JPG
 │   │   ├── CHAISE_NAPOLEON
 │   │   │   ├── FR0005_BLACK.jpg
+│   │   │   ├── FR0005_GOLDEN-1.jpg
 │   │   │   ├── FR0005_GOLDEN.jpg
 │   │   │   ├── FR0005_WHITE.jpg
 │   │   │   └── Temp
@@ -102,6 +100,7 @@
 │   │   └── COUSSIN_BALLON_TRESSEE
 │   │       └── Temp
 │   │           └── COUSSIN BALLON TRESSEE.jpeg
+│   ├── FR0005_GOLDEN.jpg
 │   ├── LIGHTING
 │   │   └── plafoniere_silicon
 │   ├── MIRRORS
@@ -239,16 +238,6 @@
 │   │   └── CHAISE_NAPOLEON.jpg
 │   └── logo.png
 ├── modules
-│   ├── __pycache__
-│   │   ├── bon_de_commande.cpython-311.pyc
-│   │   ├── client_management.cpython-311.pyc
-│   │   ├── pdf_generator.cpython-311.pyc
-│   │   ├── pos.cpython-311.pyc
-│   │   ├── product_management.cpython-311.pyc
-│   │   ├── proforma.cpython-311.pyc
-│   │   ├── restock.cpython-311.pyc
-│   │   ├── transaction_management.cpython-311.pyc
-│   │   └── utils.cpython-311.pyc
 │   ├── bon_de_commande.py
 │   ├── client_management.py
 │   ├── pdf_generator.py
@@ -262,4 +251,4 @@
 ├── requirements.txt
 └── tree.txt
 
-112 directories, 151 files
+111 directories, 141 files

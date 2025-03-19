@@ -6,13 +6,13 @@ from .client_management import get_client_info, add_new_client, save_clients, up
 from .transaction_management import record_transaction, get_proformas
 from .pdf_generator import generate_proforma_pdf
 from .utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path
-from .pos import stock_checker_section  # Import stock checker
+from .pos import stock_checker_section
+from .product_management import check_stock
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 import os
-from .product_management import check_stock  # Import check_stock
 
 def send_email(to_email, subject, body, attachment_path=None):
     sender_email = st.secrets["gmail"]["email"]
@@ -142,38 +142,14 @@ def proforma_page(products_df, clients_df):
             colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
             color = st.selectbox("Couleur", colors) if colors else None
             
-            # Image selection for the chosen color
-            selected_image_path = None
+            # Simplified image selection using find_image_path_for_color
+            full_selected_path = None
             if color and pd.notna(product['images']):
-                image_paths = [img.strip() for img in product['images'].split(',')]
-                color_images = [img for img in image_paths if color.lower() in os.path.basename(img).lower()]
-                if color_images:
-                    # Display all images for the selected color
-                    st.write(f"### Available Images for {color}")
-                    cols = st.columns(min(len(color_images), 4))
-                    image_options = {os.path.basename(img): img for img in color_images}
-                    for idx, img in enumerate(color_images):
-                        full_img_path = get_full_image_path(img)
-                        if full_img_path and os.path.exists(full_img_path):
-                            with cols[idx % 4]:
-                                st.image(full_img_path, width=100, caption=os.path.basename(full_img_path))
-                        else:
-                            with cols[idx % 4]:
-                                st.warning(f"Image not found: {img}")
-                    
-                    # Let user select one image
-                    selected_image_name = st.selectbox(
-                        f"Select Image for {color}",
-                        options=list(image_options.keys()),
-                        key=f"image_select_{product['reference']}_{color}"
-                    )
-                    selected_image_path = image_options[selected_image_name] if selected_image_name else color_images[0]  # Default to first image if none selected
-                    if selected_image_path:
-                        full_selected_path = get_full_image_path(selected_image_path)
-                        st.image(full_selected_path, caption=f"Selected: {os.path.basename(full_selected_path)}", width=150)
+                full_selected_path = find_image_path_for_color(product['images'], color)
+                if full_selected_path:
+                    st.image(full_selected_path, caption=f"Selected: {os.path.basename(full_selected_path)}", width=150)
                 else:
-                    st.warning(f"No images found for {color}.")
-                    selected_image_path = None
+                    st.warning(f"No image found for color '{color}'.")
             
             qty = st.number_input("Quantité", min_value=1, value=1, max_value=10000, key=f"qty_{search_term}")
             can_add_item = True
@@ -188,7 +164,7 @@ def proforma_page(products_df, clients_df):
                     "Quantity": qty,
                     "Price": product[price_type],
                     "Color": color,
-                    "Image": get_full_image_path(selected_image_path) if selected_image_path else None
+                    "Image": full_selected_path if full_selected_path else None
                 }
                 st.session_state.proforma_items.append(item)
                 st.success("Article ajouté!")

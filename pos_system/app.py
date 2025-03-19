@@ -20,6 +20,7 @@ from modules.bon_de_commande import bon_de_commande_page
 from modules.utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path, send_email
 from modules.utils import get_db_connection
 
+
 # Paths
 USERS_FILE = "data/users.json"
 DB_FILE = "data/query.sql"  # Assuming this is your DB path
@@ -349,41 +350,144 @@ def articles_page():
                 updated_data = {
                     "reference": selected_ref,
                     "denomination": st.text_input("Name", product['denomination']),
-                    "quantite_initiale": st.number_input("Initial Quantity", min_value=0, value=int(product['quantite_initiale'] or 0)),
-                    "quantite_restockee": st.number_input("Restocked Quantity", min_value=0, value=int(product['quantite_restockee'] or 0)),
-                    "quantite_vendue": st.number_input("Sold Quantity", min_value=0, value=int(product['quantite_vendue'] or 0)),
-                    "quantite_actuelle": st.number_input("Current Quantity", min_value=0, value=int(product['quantite_actuelle'] or 0)),
+                    "quantite_initiale": st.number_input(
+                        "Initial Quantity",
+                        min_value=0,
+                        value=int(product['quantite_initiale']) if pd.notna(product['quantite_initiale']) else 0
+                    ),
+                    "quantite_restockee": st.number_input(
+                        "Restocked Quantity",
+                        min_value=0,
+                        value=int(product['quantite_restockee']) if pd.notna(product['quantite_restockee']) else 0
+                    ),
+                    "quantite_vendue": st.number_input(
+                        "Sold Quantity",
+                        min_value=0,
+                        value=int(product['quantite_vendue']) if pd.notna(product['quantite_vendue']) else 0
+                    ),
+                    "quantite_actuelle": st.number_input(
+                        "Current Quantity",
+                        min_value=0,
+                        value=int(product['quantite_actuelle']) if pd.notna(product['quantite_actuelle']) else 0
+                    ),
                     "couleurs-dispo-usine": st.text_input("Available Colors", product['couleurs-dispo-usine'] or ""),
                     "images": product['images'] or "",
-                    "prix-super-gros": st.number_input("Super Gros Price", min_value=0.0, value=float(product['prix-super-gros'] or 0)),
-                    "prix-gros": st.number_input("Gros Price", min_value=0.0, value=float(product['prix-gros'] or 0)),
-                    "prix-détail": st.number_input("Retail Price", min_value=0.0, value=float(product['prix-détail'] or 0)),
-                    "uni_colour": st.number_input("Uni Colour", min_value=0.0, value=float(product['uni_colour'] or 0)),
-                    "default_colour": st.number_input("Default Colour", min_value=0.0, value=float(product['default_colour'] or 0)),
-                    "brown": st.number_input("Brown", min_value=0.0, value=float(product['brown'] or 0)),
-                    "brown_deg": st.number_input("Brown Degradé", min_value=0.0, value=float(product['brown_deg'] or 0)),
-                    "blue": st.number_input("Blue", min_value=0.0, value=float(product['blue'] or 0)),
-                    "white": st.number_input("White", min_value=0.0, value=float(product['white'] or 0)),
-                    "black": st.number_input("Black", min_value=0.0, value=float(product['black'] or 0)),
-                    "green_bottle": st.number_input("Green Bottle", min_value=0.0, value=float(product['green_bottle'] or 0)),
-                    "red": st.number_input("Red", min_value=0.0, value=float(product['red'] or 0)),
-                    "grey": st.number_input("Grey", min_value=0.0, value=float(product['grey'] or 0)),
-                    "grey_deg": st.number_input("Grey Degradé", min_value=0.0, value=float(product['grey_deg'] or 0)),
-                    "beige": st.number_input("Beige", min_value=0.0, value=float(product['beige'] or 0)),
-                    "yellow": st.number_input("Yellow", min_value=0.0, value=float(product['yellow'] or 0)),
-                    "orange": st.number_input("Orange", min_value=0.0, value=float(product['orange'] or 0)),
-                    "garnet": st.number_input("Garnet", min_value=0.0, value=float(product['garnet'] or 0)),
-                    "golden": st.number_input("Golden", min_value=0.0, value=float(product['golden'] or 0)),
-                    "green": st.number_input("Green", min_value=0.0, value=float(product['green'] or 0)),
-                    "rose": st.number_input("Rose", min_value=0.0, value=float(product['rose'] or 0)),
+                    "prix-super-gros": st.number_input(
+                        "Super Gros Price",
+                        min_value=0.0,
+                        value=float(product['prix-super-gros']) if pd.notna(product['prix-super-gros']) else 0.0
+                    ),
+                    "prix-gros": st.number_input(
+                        "Gros Price",
+                        min_value=0.0,
+                        value=float(product['prix-gros']) if pd.notna(product['prix-gros']) else 0.0
+                    ),
+                    "prix-détail": st.number_input(
+                        "Retail Price",
+                        min_value=0.0,
+                        value=float(product['prix-détail']) if pd.notna(product['prix-détail']) else 0.0
+                    ),
+                    "uni_colour": st.number_input(
+                        "Uni Colour",
+                        min_value=0.0,
+                        value=float(product['uni_colour']) if pd.notna(product['uni_colour']) else 0.0
+                    ),
+                    "default_colour": st.number_input(
+                        "Default Colour",
+                        min_value=0.0,
+                        value=float(product['default_colour']) if pd.notna(product['default_colour']) else 0.0
+                    ),
+                    "brown": st.number_input(
+                        "Brown",
+                        min_value=0.0,
+                        value=float(product['brown']) if pd.notna(product['brown']) else 0.0
+                    ),
+                    "brown_deg": st.number_input(
+                        "Brown Degradé",
+                        min_value=0.0,
+                        value=float(product['brown_deg']) if pd.notna(product['brown_deg']) else 0.0
+                    ),
+                    "blue": st.number_input(
+                        "Blue",
+                        min_value=0.0,
+                        value=float(product['blue']) if pd.notna(product['blue']) else 0.0
+                    ),
+                    "white": st.number_input(
+                        "White",
+                        min_value=0.0,
+                        value=float(product['white']) if pd.notna(product['white']) else 0.0
+                    ),
+                    "black": st.number_input(
+                        "Black",
+                        min_value=0.0,
+                        value=float(product['black']) if pd.notna(product['black']) else 0.0
+                    ),
+                    "green_bottle": st.number_input(
+                        "Green Bottle",
+                        min_value=0.0,
+                        value=float(product['green_bottle']) if pd.notna(product['green_bottle']) else 0.0
+                    ),
+                    "red": st.number_input(
+                        "Red",
+                        min_value=0.0,
+                        value=float(product['red']) if pd.notna(product['red']) else 0.0
+                    ),
+                    "grey": st.number_input(
+                        "Grey",
+                        min_value=0.0,
+                        value=float(product['grey']) if pd.notna(product['grey']) else 0.0
+                    ),
+                    "grey_deg": st.number_input(
+                        "Grey Degradé",
+                        min_value=0.0,
+                        value=float(product['grey_deg']) if pd.notna(product['grey_deg']) else 0.0
+                    ),
+                    "beige": st.number_input(
+                        "Beige",
+                        min_value=0.0,
+                        value=float(product['beige']) if pd.notna(product['beige']) else 0.0
+                    ),
+                    "yellow": st.number_input(
+                        "Yellow",
+                        min_value=0.0,
+                        value=float(product['yellow']) if pd.notna(product['yellow']) else 0.0
+                    ),
+                    "orange": st.number_input(
+                        "Orange",
+                        min_value=0.0,
+                        value=float(product['orange']) if pd.notna(product['orange']) else 0.0
+                    ),
+                    "garnet": st.number_input(
+                        "Garnet",
+                        min_value=0.0,
+                        value=float(product['garnet']) if pd.notna(product['garnet']) else 0.0
+                    ),
+                    "golden": st.number_input(
+                        "Golden",
+                        min_value=0.0,
+                        value=float(product['golden']) if pd.notna(product['golden']) else 0.0
+                    ),
+                    "green": st.number_input(
+                        "Green",
+                        min_value=0.0,
+                        value=float(product['green']) if pd.notna(product['green']) else 0.0
+                    ),
+                    "rose": st.number_input(
+                        "Rose",
+                        min_value=0.0,
+                        value=float(product['rose']) if pd.notna(product['rose']) else 0.0
+                    ),
                     "note": st.text_area("Note", product['note'] or ""),
                     "category": st.text_input("Category", product['category'] or ""),
-                    "quantite_vendu_actue": st.number_input("Current Sold Qty", min_value=0, value=int(product['quantite_vendu_actue'] or 0)),
+                    "quantite_vendu_actue": st.number_input(
+                        "Current Sold Qty",
+                        min_value=0,
+                        value=int(product['quantite_vendu_actue']) if pd.notna(product['quantite_vendu_actue']) else 0
+                    ),
                     "last_updated": product['last_updated'] or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "discontinued": product['discontinued']
                 }
                 
-                # Image Management
                 current_images = [img.strip() for img in updated_data['images'].split(',')] if updated_data['images'] else []
                 if current_images:
                     st.write("### Current Images")
@@ -403,32 +507,28 @@ def articles_page():
                                 st.warning(f"Image not found: {img_path}")
                                 st.write(f"Debug: Raw path: {img}, Normalized: {img_path}, Exists: {os.path.exists(img_path)}")
                 
-                # Color selection for new images
                 available_colors = [c.strip() for c in updated_data['couleurs-dispo-usine'].split(',')] if updated_data['couleurs-dispo-usine'] else []
                 selected_color = st.selectbox("Select Color for New Image", available_colors, key=f"color_select_{selected_ref}") if available_colors else None
                 
                 new_images = st.file_uploader("Add Images", ['jpg', 'png', 'jpeg'], accept_multiple_files=True, key=f"up_{selected_ref}")
                 if new_images and selected_color:
-                    category = updated_data['category'] or "CHAIR"  # Default to "CHAIR" if category is empty
-                    denomination = updated_data['denomination'].replace(" ", "_")  # Replace spaces with underscores
+                    category = updated_data['category'] or "CHAIR"
+                    denomination = updated_data['denomination'].replace(" ", "_")
                     folder_path = os.path.abspath(os.path.join("images", category, denomination))
                     os.makedirs(folder_path, exist_ok=True)
                     
                     for img in new_images:
-                        ext = os.path.splitext(img.name)[1].lower()  # Get file extension
+                        ext = os.path.splitext(img.name)[1].lower()
                         base_name = f"{selected_ref}_{selected_color.upper()}"
                         existing_images_for_color = [i for i in current_images if selected_color.upper() in os.path.basename(i).upper()]
                         
                         if not existing_images_for_color:
-                            # No existing image for this color, use base name
                             new_img_name = f"{base_name}{ext}"
                         else:
-                            # Check if base name exists without suffix
                             base_path = os.path.join(folder_path, f"{base_name}{ext}")
                             if base_path not in [os.path.abspath(i) for i in existing_images_for_color]:
                                 new_img_name = f"{base_name}{ext}"
                             else:
-                                # Find next available suffix (e.g., -1, -2)
                                 suffix = 1
                                 while True:
                                     new_img_name = f"{base_name}-{suffix}{ext}"
@@ -440,13 +540,10 @@ def articles_page():
                         with open(new_img_path, "wb") as f:
                             f.write(img.getbuffer())
                         
-                        # Handle existing image for this color
                         if existing_images_for_color:
                             keep_old = st.checkbox(f"Keep existing {selected_color} image? ({os.path.basename(existing_images_for_color[0])})", key=f"keep_{selected_ref}_{selected_color}_{new_img_name}")
                             if not keep_old:
-                                # Replace: Remove old image from list
                                 current_images = [i for i in current_images if i not in existing_images_for_color]
-                            # If keeping old, it’s already in current_images
                         
                         current_images.append(new_img_path)
                         st.success(f"Added {new_img_name} to {folder_path}")
@@ -457,7 +554,7 @@ def articles_page():
                     add_or_update_product(updated_data, is_update=True)
                     st.rerun()
     
-    # [Other tabs remain unchanged for now]
+    # Tab 2: Import from Excel
     with tab2:
         st.subheader("Import Products")
         uploaded_file = st.file_uploader("Upload Excel File", ['xlsx', 'xls'])
@@ -467,18 +564,44 @@ def articles_page():
         st.download_button("Download Template", generate_excel_template(), "product_template.xlsx", 
                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     
+    # Tab 3: Add New
     with tab3:
         st.subheader("Add New Product")
         new_data = {
             "reference": st.text_input("Reference", key="new_ref"),
             "denomination": st.text_input("Name", key="new_name"),
             "quantite_actuelle": st.number_input("Quantity", min_value=0, key="new_qty"),
+            "quantite_initiale": 0,
+            "quantite_restockee": 0,
+            "quantite_vendue": 0,
+            "quantite_vendu_actue": 0,
             "couleurs-dispo-usine": st.text_input("Colors", key="new_colors"),
             "prix-super-gros": st.number_input("Super Gros Price", min_value=0.0, key="new_sg"),
             "prix-gros": st.number_input("Gros Price", min_value=0.0, key="new_g"),
             "prix-détail": st.number_input("Detail Price", min_value=0.0, key="new_d"),
+            "uni_colour": 0.0,
+            "default_colour": 0.0,
+            "brown": 0.0,
+            "brown_deg": 0.0,
+            "blue": 0.0,
+            "white": 0.0,
+            "black": 0.0,
+            "green_bottle": 0.0,
+            "red": 0.0,
+            "grey": 0.0,
+            "grey_deg": 0.0,
+            "beige": 0.0,
+            "yellow": 0.0,
+            "orange": 0.0,
+            "garnet": 0.0,
+            "golden": 0.0,
+            "green": 0.0,
+            "rose": 0.0,
             "category": st.text_input("Category", key="new_category"),
-            "images": ""
+            "images": "",
+            "note": "",
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "discontinued": 0
         }
         available_colors = [c.strip() for c in new_data['couleurs-dispo-usine'].split(',')] if new_data['couleurs-dispo-usine'] else []
         selected_color = st.selectbox("Select Color for New Image", available_colors, key="new_color_select") if available_colors else None
@@ -505,8 +628,10 @@ def articles_page():
                     st.image(img_path, width=100, caption=os.path.basename(img_path))
         if st.button("Add Product", key="add_btn"):
             add_or_update_product(new_data)
+            st.session_state.add_confirmation = f"Product '{new_data['reference']} - {new_data['denomination']}' added successfully!"
             st.rerun()
     
+    # Tab 4: Manage Discontinued
     with tab4:
         st.subheader("Discontinued Products")
         discontinued_df = load_products(active_only=False)
@@ -526,6 +651,7 @@ def articles_page():
                     permanently_delete(ref)
                 st.rerun()
     
+    # Tab 5: Backup
     with tab5:
         st.subheader("Database Backup")
         if st.button("Create Manual Backup", key="manual_backup"):
@@ -534,6 +660,13 @@ def articles_page():
             with open(backup_path, "rb") as f:
                 st.download_button("Download Backup", f, os.path.basename(backup_path), mime="application/octet-stream")
         st.info("Automatic backups are scheduled daily at 00:00.")
+    
+    # Display confirmation message at the bottom
+    if "add_confirmation" in st.session_state:
+        st.success(st.session_state.add_confirmation, icon="✅")
+        if st.button("OK", key="clear_add_confirmation"):
+            del st.session_state.add_confirmation
+            st.rerun()
 
 def access_control_page():
     st.title("Contrôle d'accès")
