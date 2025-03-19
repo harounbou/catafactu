@@ -33,10 +33,10 @@ def load_products(active_only=True):
         return pd.DataFrame()
     
     query = "SELECT * FROM products WHERE discontinued = 0" if active_only else "SELECT * FROM products"
-    st.write(f"Debug: Executing query: {query}")  # Log query
+    #st.write(f"Debug: Executing query: {query}")  # Log query
     try:
         df = pd.read_sql_query(query, conn)
-        st.write(f"Debug: Raw data from DB: {df.shape}")  # Log shape of data
+        #st.write(f"Debug: Raw data from DB: {df.shape}")  # Log shape of data
     except Exception as e:
         st.error(f"Debug: Error loading products: {e}")
         df = pd.DataFrame()

@@ -313,7 +313,7 @@ def articles_page():
     
     with tab1:
         st.subheader("Product List")
-        st.write("Debug: Rendering Tab 1")  # Confirm tab rendering
+        #st.write("Debug: Rendering Tab 1")  # Confirm tab rendering
         all_columns = [
             'reference', 'denomination', 'quantite_initiale', 'quantite_restockee', 'quantite_vendue', 
             'quantite_actuelle', 'couleurs-dispo-usine', 'images', 'prix-super-gros', 'prix-gros', 
@@ -400,29 +400,20 @@ def articles_page():
         st.error("You need elevated privileges to access this page!")
         return
     
-    # Debug: Log user role
-    st.write(f"Debug: User role = {st.session_state.user['role']}")
-    
     # Initialize products table on first load
     if 'products_initialized' not in st.session_state:
         initialize_products_table()
         st.session_state.products_initialized = True
-        st.write("Debug: Products table initialized")
     
     # Page title
     st.title("📚 Product Management")
     
     # Load products data
     products_df = load_products()
-    st.write(f"Debug: Loaded {len(products_df)} products")
-    st.write("Debug: Products DataFrame preview:", products_df.head())
-    
+    is_admin = st.session_state.user['role'] == 'admin' 
     if products_df.empty:
         st.warning("No active products found in the database.")
         return
-    
-    # Check if user is admin
-    is_admin = st.session_state.user['role'] == 'admin'
     
     # Define tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["List & Edit", "Import from Excel", "Add New", "Manage Discontinued", "Backup"])
@@ -439,23 +430,31 @@ def articles_page():
             'last_updated', 'discontinued'
         ]
         
-        # Ensure all columns exist in the DataFrame
-        missing_columns = [col for col in all_columns if col not in products_df.columns]
-        if missing_columns:
-            st.error(f"Columns missing in DataFrame: {missing_columns}")
-            return
+        # Configure columns with original database names
+        column_config = {
+            col: st.column_config.Column(width="medium") 
+            for col in all_columns
+        }
+        # Special configurations
+        column_config.update({
+            "quantite_actuelle": st.column_config.NumberColumn("quantite_actuelle", disabled=True),
+            "prix-super-gros": st.column_config.NumberColumn(format="%.2f"),
+            "prix-gros": st.column_config.NumberColumn(format="%.2f"),
+            "prix-détail": st.column_config.NumberColumn(format="%.2f"),
+        })
         
         edited_df = st.data_editor(
             products_df[all_columns],
             use_container_width=True,
-            key="product_list_full",
-            column_config={
+            column_config=column_config,
+            key="product_list_full"
+        )
+        column_config={
                 "reference": st.column_config.TextColumn("Reference", width="medium"),
                 "denomination": st.column_config.TextColumn("Name", width="large"),
                 "quantite_actuelle": st.column_config.NumberColumn("Current Qty", width="small", disabled=True),
                 "prix-détail": st.column_config.NumberColumn("Retail Price", format="%.2f"),
             }
-        )
         
         st.write("### Select Product to Edit")
         search_query = st.text_input(
