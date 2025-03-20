@@ -85,7 +85,12 @@
 │   │   ├── CHAISE_NAPOLEON
 │   │   │   ├── FR0005_BLACK.jpg
 │   │   │   ├── FR0005_GOLDEN-1.jpg
+│   │   │   ├── FR0005_GOLDEN-1.png
+│   │   │   ├── FR0005_GOLDEN-2.png
+│   │   │   ├── FR0005_GOLDEN.jpeg
 │   │   │   ├── FR0005_GOLDEN.jpg
+│   │   │   ├── FR0005_GOLDEN.png
+│   │   │   ├── FR0005_WHITE.jpeg
 │   │   │   ├── FR0005_WHITE.jpg
 │   │   │   └── Temp
 │   │   │       └── DIM CHAISE NAPOLEIN.jpg
@@ -95,7 +100,9 @@
 │   │   │   ├── ME1000_WHITE.png
 │   │   │   └── Temp
 │   │   │       └── DIM CHAISE MEDAILLON.jpg
-│   │   └── NICHE_DEMI_BALLON
+│   │   ├── NICHE_DEMI_BALLON
+│   │   └── Test_Item
+│   │       └── TEST001_BLUE.png
 │   ├── CUSHIONS_ACCESSORIES
 │   │   └── COUSSIN_BALLON_TRESSEE
 │   │       └── Temp
@@ -126,6 +133,11 @@
 │   │   ├── CHAISE_TOLIX_
 │   │   │   └── Temp
 │   │   │       └── DIM CHAISE TOLIX.jpg
+│   │   ├── PARASOL_2.50*2.50_
+│   │   │   └── UK0013_BROWN.png
+│   │   ├── PARAVENT_4_PANNEAUX_BOIS_2\012_+_THERE_ARE_3_MISSING_IN_THE\012_STOCK
+│   │   │   ├── RT0097_BROWN-1.jpg
+│   │   │   └── RT0097_BROWN.jpg
 │   │   ├── PIED_TABLE_DEMONTABLE_-_MOIN_UN_BASE
 │   │   │   └── Temp
 │   │   │       └── #1-RT0080.JPG
@@ -142,17 +154,24 @@
 │   │   │       └── transat1.png
 │   │   ├── Veilleuse_
 │   │   ├── _CHAISE_CHEBKA
-│   │   └── _Porte_Manteau_PM_
-│   │       └── Temp
-│   │           ├── PortManteau1.png
-│   │           ├── PortManteau2.png
-│   │           └── PortManteau3.png
+│   │   ├── _Porte_Manteau_PM_
+│   │   │   └── Temp
+│   │   │       ├── PortManteau1.png
+│   │   │       ├── PortManteau2.png
+│   │   │       └── PortManteau3.png
+│   │   ├── logo
+│   │   │   └── 0987654321_BLUE.png
+│   │   └── test-item
+│   │       └── 0987654321_BLUE.png
 │   ├── PARASOL_SCREENS
 │   │   ├── PARAVANTE_4_Panneaux_fer
-│   │   └── PARAVENT_4_PANNEAUX_FER
-│   │       └── Temp
-│   │           ├── PARAVENT 4 PANNEAUX.jpeg
-│   │           └── PARAVENT 4 PANNEAUX.png
+│   │   ├── PARAVENT_4_PANNEAUX_FER
+│   │   │   └── Temp
+│   │   │       ├── PARAVENT 4 PANNEAUX.jpeg
+│   │   │       └── PARAVENT 4 PANNEAUX.png
+│   │   └── PARAVON_2M_?
+│   │       ├── RT0135_WHITE-1.png
+│   │       └── RT0135_WHITE.png
 │   ├── SHELVING
 │   │   └── ETAGERE_5_ETAGES
 │   │       └── Temp
@@ -238,6 +257,16 @@
 │   │   └── CHAISE_NAPOLEON.jpg
 │   └── logo.png
 ├── modules
+│   ├── __pycache__
+│   │   ├── bon_de_commande.cpython-313.pyc
+│   │   ├── client_management.cpython-313.pyc
+│   │   ├── pdf_generator.cpython-313.pyc
+│   │   ├── pos.cpython-313.pyc
+│   │   ├── product_management.cpython-313.pyc
+│   │   ├── proforma.cpython-313.pyc
+│   │   ├── restock.cpython-313.pyc
+│   │   ├── transaction_management.cpython-313.pyc
+│   │   └── utils.cpython-313.pyc
 │   ├── bon_de_commande.py
 │   ├── client_management.py
 │   ├── pdf_generator.py
@@ -249,6 +278,6 @@
 │   ├── transaction_management.py
 │   └── utils.py
 ├── requirements.txt
-└── tree.txt
+└── tress.txt
 
-111 directories, 141 files
+118 directories, 163 files

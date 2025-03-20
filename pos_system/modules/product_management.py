@@ -25,6 +25,16 @@ def backup_database():
         return None
     finally:
         conn.close()
+    
+def calculate_current_quantity(product_row):
+    """Calculate quantite_actuelle from color quantities"""
+    color_fields = [
+        'uni_colour', 'default_colour', 'brown', 'brown_deg',
+        'blue', 'white', 'black', 'green_bottle', 'red', 'grey',
+        'grey_deg', 'beige', 'yellow', 'orange', 'garnet',
+        'golden', 'green', 'rose'
+    ]
+    return sum(int(product_row[col]) for col in color_fields if col in product_row)
 
 def load_products(active_only=True):
     conn = get_db_connection()
@@ -259,11 +269,55 @@ def update_stock(reference, quantity_change, color=None):
         conn.close()
 
 def restock_product(reference, quantity_to_add, color=None):
-    """Restock a product by adding to its current quantity, optionally for a specific color."""
-    if quantity_to_add < 0:
-        st.error("Restock quantity must be positive!")
+    """Restock a product with color-aware quantity updates"""
+    if quantity_to_add <= 0:
+        raise ValueError("Restock quantity must be positive")
+        
+    conn = get_db_connection()
+    try:
+        with conn:
+            cursor = conn.cursor()
+            
+            # Get current values for validation
+            cursor.execute("SELECT * FROM products WHERE reference = ?", (reference,))
+            product = cursor.fetchone()
+            if not product:
+                raise ValueError(f"Product {reference} not found")
+            
+            # Validate color exists if specified
+            if color and color != "total":
+                color = color.lower().replace(" ", "_")
+                if color not in product.keys():
+                    raise ValueError(f"Invalid color {color} for product {reference}")
+                
+                # Update color-specific quantity
+                cursor.execute(f"""
+                    UPDATE products 
+                    SET `{color}` = `{color}` + ?,
+                        quantite_restockee = quantite_restockee + ?,
+                        last_updated = ?
+                    WHERE reference = ?
+                """, (quantity_to_add, quantity_to_add, 
+                      datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
+            else:
+                # Update general restock quantity
+                cursor.execute("""
+                    UPDATE products 
+                    SET quantite_restockee = quantite_restockee + ?,
+                        last_updated = ?
+                    WHERE reference = ?
+                """, (quantity_to_add, 
+                      datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
+            
+            conn.commit()
+            return True
+            
+    except sqlite3.Error as e:
+        conn.rollback()
+        st.error(f"Database error during restock: {str(e)}")
         return False
-    return update_stock(reference, quantity_to_add, color)
+    finally:
+        conn.close()
 
 def generate_excel_template():
     """Generate a sample Excel template."""

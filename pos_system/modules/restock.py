@@ -1,78 +1,177 @@
 # modules/restock.py
+import datetime
 import json
 import streamlit as st
 import pandas as pd
 from .product_management import load_products, restock_product
 from .transaction_management import record_transaction
-from .utils import get_full_image_path, find_image_path_for_color
-from .pos import stock_checker_section  # Updated import
+from .pos import stock_checker_section
+from .utils import get_db_connection
+
+# Color configuration
+COLOR_MAPPING = {
+    'brown_gradient': 'brown_deg',
+    'grey_gradient': 'grey_deg',
+    'gradient_brown': 'brown_deg',
+    'gradient_grey': 'grey_deg'
+}
+
+COLOR_STYLES = {
+    'uni_colour': '#f5f5f5',
+    'default_colour': '#e0e0e0',
+    'brown': '#d7ccc8',
+    'brown_deg': '#d7ccc8',
+    'blue': '#bbdefb',
+    'white': '#ffffff',
+    'black': '#b0bec5',
+    'green_bottle': '#c8e6c9',
+    'red': '#ffcdd2',
+    'grey': '#cfd8dc',
+    'grey_deg': '#cfd8dc',
+    'beige': '#d2b48c',
+    'yellow': '#fff9c4',
+    'orange': '#ffe0b2',
+    'garnet': '#ffccbc',
+    'golden': '#fff3e0',
+    'green': '#c8e6c9',
+    'rose': '#f8bbd0',
+    'default': '#f5f5f5'
+}
+
+def get_db_color_name(display_color):
+    """Map display color names to database column names"""
+    cleaned_color = display_color.lower().replace(" ", "_")
+    return COLOR_MAPPING.get(cleaned_color, cleaned_color)
 
 def restock_page():
-    st.title("Re-stocking")
-    products_df = load_products()
-    product_options = products_df['denomination'].tolist()
+    st.title("📦 Re-stocking Manager")
     
-    # Stock checker section with unique prefix
+    @st.cache_data(ttl=0.1)
+    def get_products():
+        return load_products()
+    
+    products_df = get_products()
+
+    # Real-time stock checker
     stock_checker_section(products_df, "restock_")
     
-    # First selectbox with unique key
+    # Product selection
     selected_product = st.selectbox(
         "Select Product to Restock",
-        product_options,
-        key="restock_product_select_1"
+        products_df['denomination'].unique(),
+        key="restock_product_select"
     )
     
-    if selected_product:
-        product = products_df[products_df['denomination'] == selected_product].iloc[0]
-        st.write(f"Current Stock: {product['quantite_actuelle']}")
-        
-        colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
-        if not colors:
-            st.warning("No colors available for this product.")
-            total_quantity = st.number_input(
-                "Total Quantity to Restock",
-                min_value=0,
-                value=0,
-                key="restock_total_qty_no_color"
-            )
-            color_quantities = {"total": total_quantity}
-        else:
-            color_quantities = {}
-            for color in colors:
-                current_stock = int(product.get(color.lower(), 0)) if color.lower() in product else 0
-                st.write(f"Current {color} Stock: {current_stock}")
-                color_quantities[color] = st.number_input(
-                    f"{color} Quantity",
+    if not selected_product:
+        return
+    
+    product = products_df[products_df['denomination'] == selected_product].iloc[0]
+    colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
+    
+    # Current stock status
+    st.subheader("📊 Current Stock Status")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Quantity", f"{int(product['quantite_actuelle'])} units")
+    with col2:
+        st.metric("Total Restocked", f"{int(product['quantite_restockee'])} units")
+    with col3:
+        st.metric("Initial Stock", f"{int(product['quantite_initiale'])} units")
+    
+    # Restock controls
+    st.subheader("🚀 Restock Actions")
+    restock_btn = st.button("✅ Confirm Restock", key="confirm_restock_top")
+    
+    # Color-specific restocking
+    restock_data = {}
+    if colors:
+        st.subheader("🎨 Color-specific Restocking")
+        cols = st.columns(2)
+        for idx, color in enumerate(colors):
+            with cols[idx % 2]:
+                db_color = get_db_color_name(color)
+                current = product.get(db_color, 0)
+                bg_color = COLOR_STYLES.get(db_color, COLOR_STYLES['default'])
+                
+                st.markdown(f"""
+                <div style="background-color: {bg_color}; 
+                            padding: 12px; 
+                            border-radius: 8px;
+                            margin: 8px 0;
+                            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+                            border: 1px solid #e0e0e0;">
+                    <h4 style="margin:0; color: #2d3436;">
+                        {color.replace('_', ' ').title()}
+                    </h4>
+                    <p style="margin:4px 0 0 0; color: #636e72;">
+                        Current: {int(current)} units
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                restock_data[color] = st.number_input(
+                    "Quantity to add",
                     min_value=0,
                     value=0,
-                    key=f"restock_qty_{color}"
+                    step=1,
+                    format="%d",
+                    key=f"restock_{color}"
                 )
+    else:
+        st.subheader("📦 General Restocking")
+        restock_data['total'] = st.number_input(
+            "Quantity to Restock",
+            min_value=0,
+            value=0,
+            step=1,
+            format="%d",
+            key="restock_total"
+        )
+    
+    # Validation and submission
+    if restock_btn:
+        try:
+            total_restocked = 0
+            has_valid_entries = False
             
-            total_quantity = sum(color_quantities.values())
-            st.number_input(
-                "Total Quantity to Restock",
-                value=total_quantity,
-                disabled=True,
-                key="restock_total_qty"
-            )
-        
-        if st.button("Restock", key="restock_submit"):
-            restock_items = []
-            for color, qty in color_quantities.items():
+            for display_color, qty in restock_data.items():
+                qty = int(qty)
                 if qty > 0:
-                    success = restock_product(product['reference'], qty, color if color != "total" else None)
-                    if success:
-                        restock_items.append({
-                            "denomination": selected_product,
-                            "reference": product['reference'],
-                            "color": color if color != "total" else None,
-                            "quantity": qty
-                        })
-            if restock_items:
+                    has_valid_entries = True
+                    db_color = get_db_color_name(display_color)
+                    
+                    if db_color not in product:
+                        raise ValueError(f"Invalid color '{display_color}' for product {product['reference']}")
+                    
+                    if restock_product(product['reference'], qty, db_color):
+                        total_restocked += qty
+            
+            if not has_valid_entries:
+                st.warning("⚠️ Please enter quantities to restock")
+            elif total_restocked > 0:
                 record_transaction(
                     None,
-                    json.dumps(restock_items),
-                    "N/A", 0.0, 0.0, "restock", st.session_state['user']['username']
+                    json.dumps({
+                        "type": "restock",
+                        "reference": product['reference'],
+                        "quantities": restock_data
+                    }),
+                    "restock",
+                    total_restocked,
+                    0.0,
+                    "N/A",
+                    st.session_state['user']['username']
                 )
-                st.success(f"Restocked {selected_product} successfully!")
+                st.balloons()
+                st.success(f"🎉 Successfully restocked {int(total_restocked)} units!")
+                get_products.clear()
                 st.rerun()
+            else:
+                st.error("❌ Restock failed - please check database connection")
+                
+        except Exception as e:
+            st.error(f"❌ Restock failed: {str(e)}")
+
+    # Visual separator
+    st.markdown("---")
+    st.caption("ℹ️ Color gradients are automatically converted to database columns (e.g., 'brown_gradient' → 'brown_deg')")

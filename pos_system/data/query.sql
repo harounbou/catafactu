@@ -1,1 +1,1 @@
-SELECT * FROM products LIMIT 5
+SELECT sql FROM sqlite_master WHERE type = 'trigger';

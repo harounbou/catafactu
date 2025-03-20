@@ -341,9 +341,6 @@ def articles_page():
     
     # Database schema enforcement
 
-
-
-
 def initialize_products_table():
     """Initialize the products table in the database if it doesn't exist."""
     conn = get_db_connection()
