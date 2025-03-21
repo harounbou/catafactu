@@ -1,1 +1,2 @@
-SELECT sql FROM sqlite_master WHERE type = 'trigger';
+ALTER TABLE transactions ADD COLUMN tva_applied BOOLEAN DEFAULT 0;
+ALTER TABLE transactions ADD COLUMN tva_amount REAL DEFAULT 0;

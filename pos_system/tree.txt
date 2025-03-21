@@ -3,13 +3,16 @@
 ├── armchair.png
 ├── backups
 │   ├── backup_20250316_021702.sqlite
-│   └── backup_20250316_024447.sqlite
+│   ├── backup_20250316_024447.sqlite
+│   ├── backup_20250320_000023.sqlite
+│   └── backup_20250321_000012.sqlite
 ├── data
 │   ├── db_structure.py
 │   ├── db_structure.txt
 │   ├── pos_system.db
 │   ├── query.sql
 │   └── users.json
+├── db_structure.txt
 ├── images
 │   ├── BEDS
 │   │   └── Lit_Bebe
@@ -257,16 +260,6 @@
 │   │   └── CHAISE_NAPOLEON.jpg
 │   └── logo.png
 ├── modules
-│   ├── __pycache__
-│   │   ├── bon_de_commande.cpython-313.pyc
-│   │   ├── client_management.cpython-313.pyc
-│   │   ├── pdf_generator.cpython-313.pyc
-│   │   ├── pos.cpython-313.pyc
-│   │   ├── product_management.cpython-313.pyc
-│   │   ├── proforma.cpython-313.pyc
-│   │   ├── restock.cpython-313.pyc
-│   │   ├── transaction_management.cpython-313.pyc
-│   │   └── utils.cpython-313.pyc
 │   ├── bon_de_commande.py
 │   ├── client_management.py
 │   ├── pdf_generator.py
@@ -278,6 +271,6 @@
 │   ├── transaction_management.py
 │   └── utils.py
 ├── requirements.txt
-└── tress.txt
+└── tree.txt
 
-118 directories, 163 files
+117 directories, 157 files

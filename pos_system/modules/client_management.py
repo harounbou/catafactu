@@ -27,10 +27,14 @@ def add_new_client_info(clients_df, client_info):
             clients_df = pd.concat([clients_df, pd.DataFrame([client_info])], ignore_index=True)
             save_df_to_db(clients_df, 'clients')
             client_id = client_info['id_client']
-            if client_id not in st.session_state['recent_clients']:
-                st.session_state['recent_clients'].insert(0, client_id)
-                if len(st.session_state['recent_clients']) > 5:
-                    st.session_state['recent_clients'].pop()
+            # Ensure no duplicates in recent_clients
+            if 'recent_clients' not in st.session_state:
+                st.session_state['recent_clients'] = []
+            if client_id in st.session_state['recent_clients']:
+                st.session_state['recent_clients'].remove(client_id)  # Remove existing entry
+            st.session_state['recent_clients'].insert(0, client_id)  # Add to front
+            if len(st.session_state['recent_clients']) > 5:
+                st.session_state['recent_clients'].pop()  # Keep only 5 most recent
             conn.close()
             return clients_df
         except sqlite3.Error as e:

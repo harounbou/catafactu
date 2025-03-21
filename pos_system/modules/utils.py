@@ -10,11 +10,51 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
+
+
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\d{10}$'
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # Points to pos_system/
 DB_PATH = os.path.join(BASE_DIR, "data", "pos_system.db")
+
+# modules/utils.py
+
+# Add these to existing utils.py
+COLOR_MAPPING = {
+    'brown_gradient': 'brown_deg',
+    'grey_gradient': 'grey_deg',
+    'gradient_brown': 'brown_deg',
+    'gradient_grey': 'grey_deg'
+}
+
+COLOR_STYLES = {
+    'uni_colour': '#f5f5f5',
+    'default_colour': '#e0e0e0',
+    'brown': '#d7ccc8',
+    'brown_deg': '#d7ccc8',
+    'blue': '#bbdefb',
+    'white': '#ffffff',
+    'black': '#b0bec5',
+    'green_bottle': '#c8e6c9',
+    'red': '#ffcdd2',
+    'grey': '#cfd8dc',
+    'grey_deg': '#cfd8dc',
+    'beige': '#d2b48c',
+    'yellow': '#fff9c4',
+    'orange': '#ffe0b2',
+    'garnet': '#ffccbc',
+    'golden': '#fff3e0',
+    'green': '#c8e6c9',
+    'rose': '#f8bbd0',
+    'default': '#f5f5f5'
+}
+
+def get_db_color_name(display_color: str) -> str:
+    """Map display color names to database column names"""
+    cleaned_color = display_color.lower().replace(" ", "_")
+    return COLOR_MAPPING.get(cleaned_color, cleaned_color)
+
 
 def get_db_connection():
     """Establish a connection to the SQLite database."""

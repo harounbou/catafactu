@@ -6,37 +6,9 @@ import pandas as pd
 from .product_management import load_products, restock_product
 from .transaction_management import record_transaction
 from .pos import stock_checker_section
-from .utils import get_db_connection
+from .utils import COLOR_MAPPING, get_db_connection
+from .utils import get_db_color_name, COLOR_STYLES  # Add this import
 
-# Color configuration
-COLOR_MAPPING = {
-    'brown_gradient': 'brown_deg',
-    'grey_gradient': 'grey_deg',
-    'gradient_brown': 'brown_deg',
-    'gradient_grey': 'grey_deg'
-}
-
-COLOR_STYLES = {
-    'uni_colour': '#f5f5f5',
-    'default_colour': '#e0e0e0',
-    'brown': '#d7ccc8',
-    'brown_deg': '#d7ccc8',
-    'blue': '#bbdefb',
-    'white': '#ffffff',
-    'black': '#b0bec5',
-    'green_bottle': '#c8e6c9',
-    'red': '#ffcdd2',
-    'grey': '#cfd8dc',
-    'grey_deg': '#cfd8dc',
-    'beige': '#d2b48c',
-    'yellow': '#fff9c4',
-    'orange': '#ffe0b2',
-    'garnet': '#ffccbc',
-    'golden': '#fff3e0',
-    'green': '#c8e6c9',
-    'rose': '#f8bbd0',
-    'default': '#f5f5f5'
-}
 
 def get_db_color_name(display_color):
     """Map display color names to database column names"""

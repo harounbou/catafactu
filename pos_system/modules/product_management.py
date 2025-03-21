@@ -5,6 +5,7 @@ import sqlite3
 import os
 from datetime import datetime
 from .utils import get_db_connection
+from .utils import get_db_color_name  # <-- KEY FIX
 
 
 # Configurable feature flag
@@ -202,36 +203,31 @@ def permanently_delete(reference):
     finally:
         conn.close()
 
-def check_stock(reference, quantity_needed, color=None):
-    """Check if sufficient stock is available, optionally for a specific color."""
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT quantite_actuelle, `couleurs-dispo-usine` FROM products WHERE reference = ?", (reference,))
-        result = cursor.fetchone()
-        if result is None:
-            return False, f"Product {reference} not found."
-        current_stock = result[0]
-        colors = [c.strip().lower() for c in result[1].split(',')] if result[1] else []
+# modules/product_management.py
+def check_stock(reference, quantity, color=None):
+    """Check stock for a specific product and color"""
+    products_df = load_products()
+    product = products_df[products_df['reference'] == reference]
+    
+    if product.empty:
+        return False, "Product not found"
         
-        if color:
-            color = color.lower()
-            if color not in colors:
-                return False, f"Color {color} not available for {reference}."
-            cursor.execute(f"SELECT `{color}` FROM products WHERE reference = ?", (reference,))
-            color_stock = cursor.fetchone()
-            if color_stock is None or color_stock[0] is None:
-                return False, f"Stock for {color} not defined for {reference}."
-            color_stock = color_stock[0]
-            if color_stock < quantity_needed:
-                return False, f"Insufficient stock for {reference} ({color}): {color_stock} available, {quantity_needed} needed."
-            return True, color_stock
-        else:
-            if current_stock < quantity_needed:
-                return False, f"Insufficient stock for {reference}: {current_stock} available, {quantity_needed} needed."
-            return True, current_stock
-    finally:
-        conn.close()
+    if color:
+        # Get database column name for the color
+        db_color = get_db_color_name(color)
+        if db_color not in product.columns:
+            return False, f"Color {color} not available"
+            
+        stock = product[db_color].values[0]
+        if pd.isna(stock) or stock < quantity:
+            return False, f"Only {stock} units available in {color}"
+    else:
+        # Check total stock if no color specified
+        stock = product['quantite_actuelle'].values[0]
+        if pd.isna(stock) or stock < quantity:
+            return False, f"Only {stock} units available in total"
+    
+    return True, "In stock"
 
 def update_stock(reference, quantity_change, color=None):
     conn = get_db_connection()

@@ -71,41 +71,28 @@ def fetch_df_from_db(table_name):
     finally:
         conn.close()
 
-def record_transaction(client_info, items, payment_details, payment_amount, 
-                      total_amount, status, performed_by, proforma_id=None):
-    """Record any type of transaction (proforma or sale)"""
-    initialize_db()
+def record_transaction(client_info, items, total_amount, payment_details, final_amount, status, performed_by, tva_applied=False, tva_amount=0.0):
+    """Record a transaction with TVA support"""
     conn = get_db_connection()
-    c = conn.cursor()
-
     try:
-        # Get next transaction ID
-        transaction_id = c.execute("SELECT MAX(transaction_id) FROM transactions").fetchone()[0] or 1000
-        transaction_id += 1
-
-        c.execute("""
-            INSERT INTO transactions 
-            (transaction_id, client_id, items, payment_details, payment_amount,
-             total_amount, status, transaction_date, performed_by, linked_proforma_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            transaction_id,
-            client_info.get('id_client') if client_info else None,
-            json.dumps(items),
-            payment_details,
-            payment_amount,
-            total_amount,
-            status,
-            datetime.now().strftime("%d/%m/%Y %H:%M"),
-            performed_by,
-            proforma_id
-        ))
-
+        items_json = json.dumps(items)
+        payment_json = json.dumps(payment_details)
+        
+        conn.execute('''INSERT INTO transactions 
+                      (client_id, items, total_amount, payment_details, 
+                      payment_amount, transaction_date, performed_by, status,
+                      tva_applied, tva_amount)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                      (client_info['id_client'], items_json, total_amount,
+                       payment_json, final_amount, 
+                       datetime.now().strftime("%d/%m/%Y %H:%M"),
+                       performed_by, status, tva_applied, tva_amount))
         conn.commit()
-        return transaction_id
-    except sqlite3.Error as e:
+        return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    except Exception as e:
         conn.rollback()
-        raise Exception(f"Database error: {str(e)}")
+        st.error(f"Error recording transaction: {str(e)}")
+        return None
     finally:
         conn.close()
 

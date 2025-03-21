@@ -27,6 +27,8 @@ Columns:
   - transaction_date (TEXT)
   - performed_by (TEXT)
   - linked_proforma_id (INTEGER)
+  - tva_applied (BOOLEAN)
+  - tva_amount (REAL)
 
 Table: expenditures
 Columns:
