@@ -260,6 +260,18 @@
 │   │   └── CHAISE_NAPOLEON.jpg
 │   └── logo.png
 ├── modules
+│   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-313.pyc
+│   │   ├── bon_de_commande.cpython-313.pyc
+│   │   ├── client_management.cpython-313.pyc
+│   │   ├── pdf_generator.cpython-313.pyc
+│   │   ├── pos.cpython-313.pyc
+│   │   ├── product_management.cpython-313.pyc
+│   │   ├── proforma.cpython-313.pyc
+│   │   ├── restock.cpython-313.pyc
+│   │   ├── transaction_management.cpython-313.pyc
+│   │   └── utils.cpython-313.pyc
 │   ├── bon_de_commande.py
 │   ├── client_management.py
 │   ├── pdf_generator.py
@@ -273,4 +285,4 @@
 ├── requirements.txt
 └── tree.txt
 
-117 directories, 157 files
+118 directories, 168 files

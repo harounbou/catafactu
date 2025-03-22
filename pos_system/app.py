@@ -10,20 +10,56 @@ import shutil
 import threading
 import schedule
 import time
-from modules.client_management import initialize_clients_df, get_client_info, add_new_client, save_clients, update_client
-from modules.product_management import add_or_update_product, generate_excel_template, import_products_from_excel, load_products, mark_discontinued, permanently_delete, update_stock, restock_product
-from modules.transaction_management import record_transaction, record_expenditure, record_staff_payment, get_till_balance, fetch_df_from_db
-from modules.pdf_generator import generate_receipt_pdf, generate_proforma_pdf, generate_order_pdf
+
+from modules.client_management import (
+    initialize_clients_df,
+    get_client_info,
+    add_new_client,
+    save_clients,
+    update_client
+)
+
+from modules.product_management import (
+    add_or_update_product,
+    generate_excel_template,
+    import_products_from_excel,
+    load_products,
+    mark_discontinued,
+    permanently_delete,
+    update_stock,
+    restock_product,
+    backup_database
+)
+
+from modules.transaction_management import (
+    record_transaction,
+    record_expenditure,
+    record_staff_payment,
+    get_till_balance,
+    fetch_df_from_db
+)
+
+from modules.pdf_generator import (
+    generate_receipt_pdf,
+    generate_proforma_pdf,
+    generate_order_pdf
+)
+
 from modules.proforma import proforma_page
 from modules.pos import pos_page
 from modules.restock import restock_page
 from modules.bon_de_commande import bon_de_commande_page
-from modules.utils import validate_email, validate_phone, find_image_path_for_color, get_full_image_path, send_email
-from modules.utils import get_db_connection
-from modules.product_management import load_products, add_or_update_product, import_products_from_excel, generate_excel_template, mark_discontinued, permanently_delete, backup_database, get_db_connection
+
+from modules.utils import (
+    validate_email,
+    validate_phone,
+    find_image_path_for_color,
+    get_full_image_path,
+    send_email,
+    get_db_connection
+)
 
 
-# Paths
 USERS_FILE = "data/users.json"
 DB_FILE = "data/pos_system.db"  # Assuming this is your DB path
 BACKUP_DIR = "backups"

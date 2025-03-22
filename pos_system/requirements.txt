@@ -1,9 +1,11 @@
 streamlit
 pandas
-fpdf
 num2words
 bcrypt==3.2.2
 pillow
 schedule
 openpyxl
-qrcode\[pil\]
+qrcode[pil]
+sqlite3
+python-dotenv
+fpdf2
