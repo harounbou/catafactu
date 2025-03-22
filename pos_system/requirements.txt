@@ -6,6 +6,5 @@ pillow
 schedule
 openpyxl
 qrcode[pil]
-sqlite3
 python-dotenv
 fpdf2

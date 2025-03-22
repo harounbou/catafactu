@@ -1,2 +1,2 @@
-ALTER TABLE transactions ADD COLUMN tva_applied BOOLEAN DEFAULT 0;
-ALTER TABLE transactions ADD COLUMN tva_amount REAL DEFAULT 0;
+from modules.transaction_management import initialize_db
+initialize_db()

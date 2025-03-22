@@ -190,22 +190,22 @@ def dashboard_page():
     transactions_df = fetch_df_from_db('transactions')
     products_df = load_products()
 
-    # Check if transactions_df is empty
     if transactions_df.empty:
         st.info("Aucune transaction enregistrée pour le moment.")
     else:
-        total_sales = transactions_df[transactions_df['status'] == "completed"]['payment_amount'].sum()
-        st.write(f"**Ventes Totales :** {total_sales:.2f} DZD")
+        # Use 'final_amount' instead of 'payment_amount'
+        total_sales = transactions_df[transactions_df['status'] == "completed"]['final_amount'].sum()
+        st.write(f"**Ventes Totales :** {total_sales:,.2f} DZD")
+        
         completed_items = []
-        for items_json in transactions_df[transactions_df['status'] == "completed"]['items']:
-            try:
-                items = json.loads(items_json)
-                if isinstance(items, list):
-                    for item in items:
-                        if isinstance(item, dict) and 'denomination' in item and 'Quantity' in item:
-                            completed_items.append(item)
-            except json.JSONDecodeError as e:
-                st.warning(f"Failed to parse items JSON: {e}")
+        for items in transactions_df[transactions_df['status'] == "completed"]['items']:
+            if isinstance(items, list):  # items is already a list from safe_json_loads
+                for item in items:
+                    if isinstance(item, dict) and 'denomination' in item and 'Quantity' in item:
+                        completed_items.append(item)
+            else:
+                st.warning(f"Unexpected items format: {items}")
+        
         if completed_items:
             top_items = pd.DataFrame(completed_items).groupby('denomination')['Quantity'].sum().nlargest(5)
             st.write("**Top 5 Articles Vendus :**")
@@ -214,7 +214,7 @@ def dashboard_page():
             st.write("**Top 5 Articles Vendus :** Aucun article vendu trouvé.")
     
     till_balance = get_till_balance()
-    st.write(f"**Solde de la Caisse :** {till_balance:.2f} DZD")
+    st.write(f"**Solde de la Caisse :** {till_balance:,.2f} DZD")
 
 def invoice_history_page():
     st.title("Historique des Factures")
@@ -837,7 +837,7 @@ def main():
         return
     
     st.sidebar.title(f"Menu - {user['username']} ({user['role'].capitalize()})")
-    if st.sidebar.button("Déconnexion", key="logout_button"):  # Added unique key
+    if st.sidebar.button("Déconnexion", key="logout_button"):
         st.session_state['logged_in'] = False
         st.session_state['user'] = None
         st.rerun()
@@ -858,7 +858,7 @@ def main():
     elif page == "📋 Proforma":
         proforma_page(products_df, clients_df)
     elif page == "🛒 POS":
-        pos_page()
+        pos_page(products_df, clients_df)  # Fixed here
     elif page == "📦 Restock":
         restock_page()
     elif page == "👥 Clients":

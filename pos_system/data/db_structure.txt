@@ -29,6 +29,8 @@ Columns:
   - linked_proforma_id (INTEGER)
   - tva_applied (BOOLEAN)
   - tva_amount (REAL)
+  - client_info (TEXT)
+  - final_amount (REAL)
 
 Table: expenditures
 Columns:
@@ -57,16 +59,6 @@ Columns:
   - payment_option (TEXT)
   - created_by (TEXT)
   - status (TEXT)
-
-Table: clients
-Columns:
-  - id_client (INTEGER)
-  - nom_client (TEXT)
-  - prenom_client (TEXT)
-  - telephone_client (TEXT)
-  - address_client (TEXT)
-  - email_client (TEXT)
-  - entreprise_client (TEXT)
 
 Table: price_history
 Columns:
@@ -113,3 +105,13 @@ Columns:
   - quantite_vendu_actue (INTEGER)
   - last_updated (TEXT)
   - discontinued (BOOLEAN)
+
+Table: clients
+Columns:
+  - id_client (INTEGER)
+  - nom_client (TEXT)
+  - prenom_client (TEXT)
+  - telephone_client (TEXT)
+  - address_client (TEXT)
+  - email_client (TEXT)
+  - entreprise_client (TEXT)

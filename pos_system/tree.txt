@@ -2,17 +2,13 @@
 ├── app.py
 ├── armchair.png
 ├── backups
-│   ├── backup_20250316_021702.sqlite
-│   ├── backup_20250316_024447.sqlite
-│   ├── backup_20250320_000023.sqlite
-│   └── backup_20250321_000012.sqlite
 ├── data
 │   ├── db_structure.py
 │   ├── db_structure.txt
 │   ├── pos_system.db
 │   ├── query.sql
 │   └── users.json
-├── db_structure.txt
+├── generated_pdfs
 ├── images
 │   ├── BEDS
 │   │   └── Lit_Bebe
@@ -252,13 +248,13 @@
 │   │   └── table_gigogne_050_x_050
 │   │       └── Temp
 │   │           └── #1-RT0060.JPG
-│   ├── armchair.png
 │   ├── benchmarking
 │   │   ├── CHAISE_BOLERO.jpg
 │   │   ├── CHAISE_ETOILE.png
 │   │   ├── CHAISE_MEDAILLON.jpg
 │   │   └── CHAISE_NAPOLEON.jpg
-│   └── logo.png
+│   ├── logo.png
+│   └── nature.png
 ├── modules
 │   ├── __init__.py
 │   ├── __pycache__
@@ -285,4 +281,4 @@
 ├── requirements.txt
 └── tree.txt
 
-118 directories, 168 files
+119 directories, 163 files
