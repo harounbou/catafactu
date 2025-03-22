@@ -62,7 +62,6 @@ def pos_page(products_df, clients_df):
     st.title("💰 Point de Vente (POS)")
     username = st.session_state['user']['username']
 
-    # Reset Button
     if st.button("🔄 Réinitialiser Transaction", type="secondary", key="reset_transaction_button"):
         st.session_state.pos_items = []
         st.session_state.pos_client = None
@@ -73,7 +72,6 @@ def pos_page(products_df, clients_df):
         st.success("Transaction réinitialisée avec succès!")
         st.rerun()
 
-    # Initialize session state
     if 'pos_items' not in st.session_state:
         st.session_state.pos_items = []
     if 'pos_client' not in st.session_state:
@@ -87,7 +85,6 @@ def pos_page(products_df, clients_df):
     if 'remaining_amount' not in st.session_state:
         st.session_state.remaining_amount = 0.0
 
-    # Custom CSS Styling
     st.markdown("""
     <style>
     .pos-section {
@@ -107,13 +104,11 @@ def pos_page(products_df, clients_df):
     </style>
     """, unsafe_allow_html=True)
 
-    # Search Section
     with st.container():
         search_term = st.text_input("Rechercher produit", key="search_input_pos")
         if st.button("🔍 Rechercher", key="search_button_pos"):
-            pass  # Placeholder for future search functionality
+            pass
 
-    # Retrieve Previous Documents
     with st.container():
         st.markdown('<div class="pos-section"><h3 class="pos-title">📜 Récupérer un Document</h3>', unsafe_allow_html=True)
         doc_type = st.selectbox("Type de Document", ["Facture", "Proforma", "Bon de Commande"], key="retrieve_doc_type_pos")
@@ -161,7 +156,8 @@ def pos_page(products_df, clients_df):
                             st.session_state.pos_client = {
                                 'id_client': row['client_id'], 'nom_client': row['nom_client'],
                                 'prenom_client': row['prenom_client'], 'telephone_client': row['telephone_client'],
-                                'address_client': row['address_client'], 'email_client': row['email_client'],
+                                'address_client': row['address_client'],
+                                # 'email_client': row['email_client'],
                                 'entreprise_client': row['entreprise_client']
                             }
                             date_str = row['transaction_date'].replace('/', '')
@@ -184,13 +180,11 @@ def pos_page(products_df, clients_df):
                             st.error("PDF non trouvé.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Stock Checker Section
     with st.container():
         st.markdown('<div class="pos-section"><h3 class="pos-title">🔍 Vérificateur de Stock</h3>', unsafe_allow_html=True)
         stock_checker_section(products_df, "pos_")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Configuration Section
     with st.container():
         st.markdown('<div class="pos-section"><h3 class="pos-title">⚙️ Configuration</h3>', unsafe_allow_html=True)
         cols = st.columns([1, 1, 2])
@@ -206,7 +200,6 @@ def pos_page(products_df, clients_df):
             notes = st.text_area("Notes", height=80, key="pos_notes")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Client Management Section
     with st.container():
         st.markdown('<div class="pos-section"><h3 class="pos-title">👤 Gestion Client</h3>', unsafe_allow_html=True)
         client_action = st.radio("Action", ["Nouveau Client", "Client Existant"], horizontal=True, label_visibility="collapsed")
@@ -239,7 +232,7 @@ def pos_page(products_df, clients_df):
                     'prenom_client': cols[1].text_input("Prénom", key="pos_new_prenom"),
                     'entreprise_client': cols[0].text_input("Entreprise", key="pos_new_entreprise"),
                     'telephone_client': cols[1].text_input("Téléphone*", key="pos_new_telephone"),
-                    'email_client': cols[0].text_input("Email", key="pos_new_email"),
+                    # 'email_client': cols[0].text_input("Email", key="pos_new_email"),
                     'address_client': cols[1].text_input("Adresse", key="pos_new_address")
                 }
                 if st.form_submit_button("Enregistrer Nouveau Client", type="primary"):
@@ -251,7 +244,6 @@ def pos_page(products_df, clients_df):
                         st.error("Les champs 'Nom' et 'Téléphone' sont obligatoires.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Item Selection Section
     with st.container():
         st.markdown('<div class="pos-section"><h3 class="pos-title">🛒 Sélection d\'Articles</h3>', unsafe_allow_html=True)
         search_cols = st.columns([3, 1])
@@ -304,7 +296,6 @@ def pos_page(products_df, clients_df):
                     st.success("Article ajouté au panier!")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Cart Display and Validation
     if st.session_state.pos_items:
         with st.container():
             st.markdown(f'<div class="pos-section"><h3 class="pos-title">📦 Panier ({len(st.session_state.pos_items)} articles)</h3>', unsafe_allow_html=True)
@@ -331,7 +322,6 @@ def pos_page(products_df, clients_df):
             tva_amount = taxable * 0.19 if apply_tva else 0
             total = taxable + tva_amount
             
-            # Transaction Summary
             st.subheader("Récapitulatif de la Transaction")
             st.write(f"**Subtotal:** {subtotal:.2f} DZD")
             st.write(f"**Remise:** {discount:.2f} DZD")
@@ -354,7 +344,6 @@ def pos_page(products_df, clients_df):
             if st.session_state.panier_valide:
                 if st.button("💳 Finaliser Transaction", type="primary", use_container_width=True, disabled=not st.session_state.pos_client):
                     try:
-                        # Enhanced Payment Section
                         payment_type = st.radio("Type de Paiement", ["Paiement Complet", "Acompte"], horizontal=True, key="payment_type")
                         deposit_amount = 0.0
                         remaining_amount = 0.0
@@ -382,12 +371,10 @@ def pos_page(products_df, clients_df):
                                 st.error(f"Le total des paiements ({total_paid:.2f} DZD) doit égaler le total ({total:.2f} DZD)!")
                                 return
 
-                        # Update stock only on full payment
                         if status == "completed":
                             for item in st.session_state.pos_items:
                                 update_stock(item['reference'], -item['Quantity'], item['Color'].lower() if item['Color'] else None)
 
-                        # Prepare data for serialization
                         items = replace_nan_with_none(st.session_state.pos_items)
                         client_info = replace_nan_with_none(st.session_state.pos_client)
                         payment_details = replace_nan_with_none(payments)
@@ -417,7 +404,7 @@ def pos_page(products_df, clients_df):
                                 discount_amount=discount,
                                 tva_amount=tva_amount,
                                 total=total,
-                                payment_details=payment_details,
+                                payment_details=json.dumps(payments),  # Ensure proper serialization
                                 client_info=st.session_state.pos_client,
                                 tva_enabled=apply_tva,
                                 language=language,
@@ -431,7 +418,6 @@ def pos_page(products_df, clients_df):
                     except Exception as e:
                         st.error(f"Erreur lors de la finalisation: {str(e)}")
 
-                # Handle Remaining Payment
                 if st.session_state.transaction_status == "deposit_paid":
                     st.markdown("### Paiement du Solde")
                     remaining = st.session_state.remaining_amount
@@ -483,7 +469,7 @@ def pos_page(products_df, clients_df):
                                         discount_amount=discount,
                                         tva_amount=tva_amount,
                                         total=total,
-                                        payment_details=updated_payment_details,
+                                        payment_details=json.dumps(updated_payment_details),  # Ensure proper serialization
                                         client_info=st.session_state.pos_client,
                                         tva_enabled=apply_tva,
                                         language=language,
@@ -499,7 +485,6 @@ def pos_page(products_df, clients_df):
             
             st.markdown('</div>', unsafe_allow_html=True)
 
-    # PDF Actions
     if st.session_state.get('generated_pdf'):
         pdf_path = st.session_state.generated_pdf
         cols = st.columns([1, 1, 1, 2])
@@ -509,19 +494,20 @@ def pos_page(products_df, clients_df):
         with cols[1]:
             st.markdown(f'<a href="file://{pdf_path}" target="_blank"><button>🖨️ Imprimer PDF</button></a>', unsafe_allow_html=True)
         with cols[2]:
-            client_email = st.session_state.pos_client.get('email_client', '')
-            if client_email and validate_email(client_email):
-                if st.button("📧 Envoyer par email", type="primary"):
-                    subject = f"Facture #{transaction_id}"
-                    body = f"""Bonjour {st.session_state.pos_client.get('nom_client', '')},
-                    
-Voici votre facture #{transaction_id}.
-Montant total: {total:.2f} DZD
-Effectué par: {username}
-
-Cordialement,
-Takideco"""
-                    if send_email(client_email, subject, body, pdf_path):
-                        st.success("Email envoyé avec succès!")
-                    else:
-                        st.error("Échec de l'envoi de l'email.")
+            # client_email = st.session_state.pos_client.get('email_client', '')
+            # if client_email and validate_email(client_email):
+            #     if st.button("📧 Envoyer par email", type="primary"):
+            #         subject = f"Facture #{transaction_id}"
+            #         body = f"""Bonjour {st.session_state.pos_client.get('nom_client', '')},
+            #         
+            # Voici votre facture #{transaction_id}.
+            # Montant total: {total:.2f} DZD
+            # Effectué par: {username}
+            # 
+            # Cordialement,
+            # Takideco"""
+            #         if send_email(client_email, subject, body, pdf_path):
+            #             st.success("Email envoyé avec succès!")
+            #         else:
+            #             st.error("Échec de l'envoi de l'email.")
+            pass  # Email functionality removed

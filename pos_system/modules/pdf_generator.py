@@ -19,26 +19,9 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
-# Commented out barcode imports as per request
-# from barcode import Code128
-# from barcode.writer import ImageWriter
 from .client_management import get_client_info, add_new_client, save_clients
 from .transaction_management import record_transaction
 import qrcode
-# Commented out dynamic barcode class import
-# from barcode import get_barcode_class
-# Code128 = get_barcode_class('code128')
-
-
-# Commented out the generate_barcode function since barcode references are to be removed
-# def generate_barcode(reference):
-#     """Generate a barcode image for a given reference."""
-#     output_dir = "generated_pdfs"
-#     os.makedirs(output_dir, exist_ok=True)
-#     barcode_path = os.path.join(output_dir, f"barcode_{reference}.png")
-#     barcode = Code128(str(reference), writer=ImageWriter())
-#     barcode.save(barcode_path[:-4])  # Remove .png extension as ImageWriter adds it
-#     return barcode_path
 
 def send_email(to_email, subject, body, attachment_path=None):
     """Send an email with an optional PDF attachment using Gmail SMTP."""
@@ -100,7 +83,7 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
         f"Nom: {client_info.get('nom_client', '')} {client_info.get('prenom_client', '')}",
         f"Entreprise: {client_info.get('entreprise_client', '')}",
         f"Tél: {client_info.get('telephone_client', '')}",
-        f"Email: {client_info.get('email_client', '')}",
+        # f"Email: {client_info.get('email_client', '')}",
         f"Adresse: {client_info.get('address_client', '')}"
     ]
     
@@ -246,11 +229,6 @@ def generate_receipt_pdf(transaction_info, items, subtotal, discount_amount,
                 pdf.set_x(RIGHT_COL_X)
                 pdf.cell(80, 6, f"{method_text}: {amount:,.2f} DZD", 0, 1, 'R')
 
-    # Commented out barcode generation and insertion
-    # barcode_img = generate_barcode(transaction_info['transaction_number'])
-    # pdf.image(barcode_img, x=150, y=BARCODE_Y, w=30)
-    # os.remove(barcode_img)
-
     payment_status = "completed" if total <= sum(payment_dict.values()) else "deposit_paid"
     pdf.set_font("Arial", "B", 50)
     pdf.set_text_color(0, 255 if payment_status == "completed" else 0, 0 if payment_status == "completed" else 255, 0)
@@ -263,7 +241,6 @@ def generate_receipt_pdf(transaction_info, items, subtotal, discount_amount,
     pdf.rotate(0)
     pdf.set_text_color(0, 0, 0)
 
-    # Header
     pdf.set_font("Arial", "B", 20)
     pdf.set_y(10)
     pdf.cell(0, 10, "Reçu - Takideco", 0, 1, 'C')
@@ -274,7 +251,6 @@ def generate_receipt_pdf(transaction_info, items, subtotal, discount_amount,
                    f"Préparé par: {transaction_info['performed_by']}", 0, 1, 'C')
     pdf.ln(10)
 
-    # Client Info
     if client_info:
         pdf.set_font("Arial", "B", 12)
         pdf.cell(90, 8, "Client:", 0, 1)
@@ -283,12 +259,11 @@ def generate_receipt_pdf(transaction_info, items, subtotal, discount_amount,
             f"Nom: {client_info.get('nom_client', '')} {client_info.get('prenom_client', '')}",
             f"Entreprise: {client_info.get('entreprise_client', '')}",
             f"Tél: {client_info.get('telephone_client', '')}",
-            f"Email: {client_info.get('email_client', '')}",
+            # f"Email: {client_info.get('email_client', '')}",
         ]
         for field in client_fields:
             pdf.cell(90, 6, field, 0, 1)
 
-    # Items Table
     col_widths = [60, 25, 25, 40]
     headers = ["Description", "Qté", "Prix Unitaire", "Total"]
     pdf.ln(10)
@@ -305,7 +280,6 @@ def generate_receipt_pdf(transaction_info, items, subtotal, discount_amount,
         pdf.cell(col_widths[3], 10, f"{item['Price'] * item['Quantity']:,.2f}", border=1, align='R')
         pdf.ln()
 
-    # Totals
     pdf.ln(5)
     pdf.set_font("Arial", size=12)
     pdf.cell(0, 8, f"Sous-total: {subtotal:,.2f} DZD", 0, 1, 'R')
@@ -316,7 +290,6 @@ def generate_receipt_pdf(transaction_info, items, subtotal, discount_amount,
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(0, 10, f"Total: {total:,.2f} DZD", 0, 1, 'R')
 
-    # Amount in words
     total_int = int(total)
     total_dec = int(round((total - total_int) * 100))
     amount_words = num2words(total_int, lang='fr' if language == "French" else 'ar').replace('et', '').replace('-', ' ') + " Dinars Algériens"
@@ -358,16 +331,13 @@ def generate_receipt_pdf(
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    # Colored Header Band
-    pdf.set_fill_color(144, 238, 144)  # Light green
+    pdf.set_fill_color(144, 238, 144)
     pdf.rect(0, 0, 210, 10, 'F')
 
-    # Logo (Top Left)
     logo_path = get_full_image_path("logo.png")
     if os.path.exists(logo_path):
         pdf.image(logo_path, x=10, y=12, w=30)
 
-    # QR Code (Top Right)
     qr = qrcode.QRCode(version=1, box_size=2, border=1)
     qr.add_data(f"Facture #{transaction_info['transaction_number']} - Total: {total:.2f} DZD - Date: {transaction_info['transaction_date']}")
     qr.make(fit=True)
@@ -377,17 +347,14 @@ def generate_receipt_pdf(
     pdf.image(qr_path, x=170, y=12, w=30)
     os.remove(qr_path)
 
-    # Header
     pdf.set_font("Arial", "B", 20)
     pdf.set_y(40)
     pdf.cell(0, 10, "Facture - Takideco" if language == "French" else "فاتورة - تاكيديكو", 0, 1, 'C')
 
-    # Transaction Info
     pdf.set_font("Arial", size=10)
     pdf.cell(0, 6, f"N° Facture: {transaction_info['transaction_number']}  |  Date: {transaction_info['transaction_date']}  |  Vendeur: {transaction_info['performed_by']}", 0, 1, 'C')
     pdf.ln(10)
 
-    # Client and Takideco Info Side-by-Side
     pdf.set_y(60)
     pdf.set_font("Arial", "B", 12)
     pdf.set_x(10)
@@ -397,14 +364,13 @@ def generate_receipt_pdf(
         f"Nom: {client_info.get('nom_client', '')} {client_info.get('prenom_client', '')}" if language == "French" else f"الاسم: {client_info.get('nom_client', '')} {client_info.get('prenom_client', '')}",
         f"Entreprise: {client_info.get('entreprise_client', '')}" if language == "French" else f"الشركة: {client_info.get('entreprise_client', '')}",
         f"Tél: {client_info.get('telephone_client', '')}" if language == "French" else f"الهاتف: {client_info.get('telephone_client', '')}",
-        f"Email: {client_info.get('email_client', '')}" if language == "French" else f"البريد الإلكتروني: {client_info.get('email_client', '')}"
+        # f"Email: {client_info.get('email_client', '')}" if language == "French" else f"البريد الإلكتروني: {client_info.get('email_client', '')}"
     ]
     line_height = 6
     pdf.set_x(10)
     for field in client_fields:
         pdf.cell(90, line_height, field, 0, 1)
 
-    # Takideco Info (Right Side)
     pdf.set_y(60)
     pdf.set_x(120)
     pdf.set_font("Arial", "B", 10)
@@ -422,7 +388,6 @@ def generate_receipt_pdf(
     )
     pdf.multi_cell(80, line_height, takideco_info, align='R')
 
-    # Items Table
     col_widths = [22, 58, 25, 25, 25, 35]
     headers = [
         "Image", "Description", "Réf.", "Couleur", "Qté", "Prix (DZD)"
@@ -461,7 +426,6 @@ def generate_receipt_pdf(
         pdf.cell(col_widths[5], row_height, f"{price_total:,.2f}", border=1, align='R')
         pdf.ln(row_height)
 
-    # Totals
     pdf.ln(10)
     pdf.set_font("Arial", size=12)
     pdf.cell(0, 8, f"Sous-total: {subtotal:,.2f} DZD" if language == "French" else f"المجموع الفرعي: {subtotal:,.2f} دج", 0, 1, 'R')
@@ -472,7 +436,6 @@ def generate_receipt_pdf(
     pdf.set_font("Arial", "B", 14)
     pdf.cell(0, 10, f"Total Général: {total:,.2f} DZD" if language == "French" else f"المجموع العام: {total:,.2f} دج", 0, 1, 'R')
 
-    # Amount in Words
     pdf.set_font("Arial", 'I', 10)
     total_int = int(total)
     total_dec = int(round((total - total_int) * 100))
@@ -486,7 +449,6 @@ def generate_receipt_pdf(
             amount_words += f" و {num2words(total_dec, lang='ar')} سنتيم"
     pdf.cell(0, 6, f"Montant en lettres: {amount_words}" if language == "French" else f"المبلغ بالحروف: {amount_words}", 0, 1)
 
-    # Payment Details without Barcode
     payment_dict = json.loads(payment_details)
     pdf.ln(5)
     pdf.set_font("Arial", size=10)
@@ -496,28 +458,17 @@ def generate_receipt_pdf(
             if amount > 0:
                 method_ar = {"Espèces": "نقداً", "Virement": "تحويل بنكي", "Chèque": "شيك"}.get(method, method)
                 pdf.cell(50, 6, f"{method if language == 'French' else method_ar}: {amount:,.2f} DZD", 0, 1)
-                # Removed barcode generation under "Espèces" payment method
-                # if method == "Espèces":
-                #     barcode_img = generate_barcode(transaction_info['transaction_number'])
-                #     pdf.image(barcode_img, x=150, y=y_position, w=30)
-                #     os.remove(barcode_img)
-                #     nature_path = get_full_image_path("nature.png")
-                #     if os.path.exists(nature_path):
-                #         pdf.image(nature_path, x=10, y=y_position, w=30)
 
-    # Notes
     if notes:
         pdf.ln(5)
         pdf.set_font("Arial", size=10)
         pdf.multi_cell(0, 5, f"Notes: {notes}" if language == "French" else f"ملاحظات: {notes}")
 
-    # Digital Signature
     signature_path = get_full_image_path("signature.png")
     if os.path.exists(signature_path):
         pdf.ln(10)
         pdf.image(signature_path, x=150, y=pdf.get_y(), w=40)
 
-    # "PAYÉ" Watermark (only if fully paid)
     payment_total = sum(payment_dict.values())
     if payment_total >= total:
         pdf.set_font("Arial", "B", 50)
@@ -536,7 +487,6 @@ def generate_receipt_pdf(
         pdf.rotate(0)
         pdf.set_text_color(0, 0, 0)
 
-    # Footer
     pdf.set_y(-40)
     pdf.set_font("Arial", "I", 9)
     footer_text = (
@@ -568,19 +518,16 @@ def generate_order_pdf(items, transaction_info, client_info=None, notes="", lang
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
-    # Header
-    pdf.set_fill_color(144, 238, 144)  # Light green
+    pdf.set_fill_color(144, 238, 144)
     pdf.rect(0, 0, 210, 10, 'F')
     pdf.set_font("Arial", "B", 20)
     pdf.set_y(10)
     pdf.cell(0, 10, "Bon de Commande - Takideco" if language == "French" else "أمر شراء - تاكيديكو", 0, 1, 'C')
 
-    # Transaction Info
     pdf.set_font("Arial", size=10)
     pdf.cell(0, 6, f"N° Commande: {transaction_info['transaction_number']}  |  Date: {transaction_info['transaction_date']}  |  Préparé par: {transaction_info['performed_by']}", 0, 1, 'C')
     pdf.ln(10)
 
-    # Client Info (if provided)
     if client_info:
         pdf.set_font("Arial", "B", 12)
         pdf.cell(90, 8, "Client:" if language == "French" else "العميل:", 0, 1)
@@ -589,12 +536,11 @@ def generate_order_pdf(items, transaction_info, client_info=None, notes="", lang
             f"Nom: {client_info.get('nom_client', '')} {client_info.get('prenom_client', '')}",
             f"Entreprise: {client_info.get('entreprise_client', '')}",
             f"Tél: {client_info.get('telephone_client', '')}",
-            f"Email: {client_info.get('email_client', '')}"
+            # f"Email: {client_info.get('email_client', '')}"
         ]
         for field in client_fields:
             pdf.cell(90, 6, field, 0, 1)
 
-    # Items Table
     col_widths = [22, 78, 25, 25, 40]
     headers = ["Image", "Description", "Réf.", "Couleur", "Quantité"] if language == "French" else ["صورة", "الوصف", "المرجع", "اللون", "الكمية"]
     pdf.ln(10)
@@ -627,13 +573,11 @@ def generate_order_pdf(items, transaction_info, client_info=None, notes="", lang
         pdf.cell(col_widths[4], row_height, str(item['Quantity']), border=1, align='C')
         pdf.ln(row_height)
 
-    # Notes
     if notes:
         pdf.ln(10)
         pdf.set_font("Arial", size=10)
         pdf.multi_cell(0, 5, f"Notes: {notes}" if language == "French" else f"ملاحظات: {notes}")
 
-    # Footer
     pdf.set_y(-40)
     pdf.set_font("Arial", "I", 9)
     footer_text = "Merci pour votre commande chez Takideco !" if language == "French" else "شكرًا لطلبكم من تاكيديكو!"
