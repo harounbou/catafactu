@@ -1,9 +1,9 @@
 # modules/transaction_management.py
-# modules/transaction_management.py
 import streamlit as st
 import sqlite3
 import json
 import pandas as pd
+import numpy as np
 from datetime import datetime
 from .utils import get_db_connection
 
@@ -83,26 +83,57 @@ def record_transaction(client_info, items, total_amount, payment_details, final_
     """Record a transaction with support for deposits and partial payments"""
     conn = get_db_connection()
     try:
-        items_json = json.dumps(items)
-        payment_json = json.dumps(payment_details)
-        client_info_json = json.dumps(client_info)
-        
-        conn.execute('''INSERT INTO transactions 
-                      (client_id, items, total_amount, payment_details, final_amount,
-                      status, transaction_date, performed_by, tva_applied, tva_amount,
-                      deposit_amount, remaining_amount, client_info)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                      (client_info.get('id_client', None), items_json, total_amount,
-                       payment_json, final_amount, status, 
-                       datetime.now().strftime("%d/%m/%Y %H:%M"),
-                       performed_by, tva_applied, tva_amount,
-                       deposit_amount, remaining_amount, client_info_json))
+        # Enhanced converter for JSON serialization
+        def convert(o):
+            if isinstance(o, (np.int64, np.int32)):
+                return int(o)
+            if isinstance(o, (np.float64, np.float32)):
+                if np.isnan(o):
+                    return None  # Handle NaN explicitly
+                return float(o)
+            if isinstance(o, np.ndarray):
+                return o.tolist()  # Convert NumPy arrays to lists
+            raise TypeError(f"Object of type {type(o)} is not JSON serializable")
+
+        # Serialize with error handling
+        try:
+            items_json = json.dumps(items, default=convert)
+        except Exception as e:
+            st.error(f"Error serializing items: {str(e)}")
+            raise
+
+        try:
+            payment_json = json.dumps(payment_details, default=convert)
+        except Exception as e:
+            st.error(f"Error serializing payment_details: {str(e)}")
+            raise
+
+        try:
+            client_info_json = json.dumps(client_info, default=convert)
+        except Exception as e:
+            st.error(f"Error serializing client_info: {str(e)}")
+            raise
+
+        c = conn.cursor()
+        transaction_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute('''
+            INSERT INTO transactions (
+                client_id, items, payment_details, total_amount, final_amount, 
+                status, transaction_date, performed_by, tva_applied, tva_amount, 
+                deposit_amount, remaining_amount, client_info
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            client_info.get('id_client'), items_json, payment_json, total_amount, final_amount, 
+            status, transaction_date, performed_by, tva_applied, tva_amount, 
+            deposit_amount, remaining_amount, client_info_json
+        ))
+        transaction_id = c.lastrowid
         conn.commit()
-        return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        return transaction_id
     except Exception as e:
         conn.rollback()
         st.error(f"Error recording transaction: {str(e)}")
-        return None
+        raise
     finally:
         conn.close()
 
@@ -135,6 +166,7 @@ def complete_transaction(transaction_id, payment_details):
         )
         
         if trans_df.empty:
+            st.error(f"Transaction {transaction_id} not found.")
             return False
 
         trans = trans_df.iloc[0]
@@ -144,7 +176,8 @@ def complete_transaction(transaction_id, payment_details):
         
         total_paid = sum(updated_payments.values())
         
-        conn.execute('''
+        c = conn.cursor()
+        c.execute('''
             UPDATE transactions
             SET payment_details = ?,
                 status = 'completed',
@@ -173,6 +206,9 @@ def get_proformas():
             WHERE status = 'proforma'
         """)
         return c.fetchall()
+    except Exception as e:
+        st.error(f"Error fetching proformas: {str(e)}")
+        return []
     finally:
         conn.close()
 
@@ -229,5 +265,8 @@ def get_till_balance():
         total_staff_payments = c.fetchone()[0] or 0.0
 
         return total_sales - total_expenditures - total_staff_payments
+    except Exception as e:
+        st.error(f"Error calculating till balance: {str(e)}")
+        return 0.0
     finally:
         conn.close()

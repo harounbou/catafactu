@@ -1,3 +1,4 @@
+## modules/pos.py
 import streamlit as st
 import pandas as pd
 import os
@@ -14,6 +15,17 @@ from .utils import (
     fetch_df_from_db
 )
 from .product_management import load_products, update_stock, check_stock
+
+def replace_nan_with_none(data):
+    """Recursively replace NaN with None in data structures for JSON serialization"""
+    if isinstance(data, dict):
+        return {k: replace_nan_with_none(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [replace_nan_with_none(i) for i in data]
+    elif pd.isna(data):
+        return None
+    else:
+        return data
 
 def stock_checker_section(products_df, prefix=""):
     st.markdown('<h3 class="pos-title">🔍 Vérificateur de Stock</h3>', unsafe_allow_html=True)
@@ -55,84 +67,25 @@ def pos_page(products_df, clients_df):
         st.session_state.pos_items = []
         st.session_state.pos_client = None
         st.session_state.panier_valide = False
+        st.session_state.generated_pdf = None
+        st.session_state.transaction_status = None
+        st.session_state.remaining_amount = 0.0
         st.success("Transaction réinitialisée avec succès!")
         st.rerun()
 
-    # Search Section
-    with st.container():
-        search_term = st.text_input("Rechercher produit", key="search_input_pos")
-        if st.button("🔍 Rechercher", key="search_button_pos"):
-            pass
-
-    # Retrieve Previous Documents
-    with st.container():
-        st.markdown('<div class="pos-section"><h3 class="pos-title">📜 Récupérer un Document</h3>', unsafe_allow_html=True)
-        doc_type = st.selectbox("Type de Document", ["Facture", "Proforma", "Bon de Commande"], key="retrieve_doc_type_pos")
-        search_term = st.text_input("Rechercher (Nom Client ou ID)", key="retrieve_search_pos", placeholder="Entrez nom client ou ID")
-        
-        if st.button("🔍 Chercher", key="retrieve_button_pos"):
-            transactions_df = fetch_df_from_db("transactions")
-            orders_df = fetch_df_from_db("orders")
-            clients_df = fetch_df_from_db("clients")
-            
-            if doc_type == "Facture":
-                filtered = transactions_df[transactions_df['status'].isin(['completed', 'deposit_paid'])]
-                filtered = filtered.merge(clients_df, left_on='client_id', right_on='id_client', how='left')
-            elif doc_type == "Proforma":
-                filtered = transactions_df[transactions_df['status'] == 'proforma']
-                filtered = filtered.merge(clients_df, left_on='client_id', right_on='id_client', how='left')
-            else:
-                filtered = orders_df
-            
-            if search_term:
-                if doc_type in ["Facture", "Proforma"]:
-                    filtered = filtered[
-                        (filtered['nom_client'].str.contains(search_term, case=False, na=False)) |
-                        (filtered['transaction_id'].astype(str).str.contains(search_term, na=False))
-                    ]
-                else:
-                    filtered = filtered[
-                        (filtered['order_id'].astype(str).str.contains(search_term, na=False))
-                    ]
-            if not filtered.empty:
-                if doc_type in ["Facture", "Proforma"]:
-                    options = [
-                        f"{row['transaction_id']} - {row['nom_client'] or 'Unknown'} - {row['transaction_date']} - {row['status']}"
-                        for _, row in filtered.iterrows()
-                    ]
-                else:
-                    options = [f"{row['order_id']} - {row['order_date']}" for _, row in filtered.iterrows()]
-                
-                selected_doc = st.selectbox("Documents Trouvés", options, key="retrieve_select_pos")
-                if st.button("Charger Document", key="load_doc_btn_pos"):
-                    if doc_type in ["Facture", "Proforma"]:
-                        row = filtered[filtered['transaction_id'] == int(selected_doc.split(' - ')[0])].iloc[0]
-                        st.session_state.pos_items = json.loads(row['items'])
-                        st.session_state.pos_client = {
-                            'id_client': row['client_id'], 'nom_client': row['nom_client'],
-                            'prenom_client': row['prenom_client'], 'telephone_client': row['telephone_client'],
-                            'address_client': row['address_client'], 'email_client': row['email_client'],
-                            'entreprise_client': row['entreprise_client']
-                        }
-                        date_str = row['transaction_date'].replace('/', '')
-                        client_name = row['nom_client'] or 'Unknown'
-                        pdf_name = f"{doc_type}-{client_name}-{row['transaction_id']}-{date_str}.pdf"
-                        st.session_state.transaction_status = row['status']
-                        st.session_state.remaining_amount = row.get('remaining_amount', 0.0)
-                    else:
-                        row = filtered[filtered['order_id'] == int(selected_doc.split(' - ')[0])].iloc[0]
-                        st.session_state.pos_items = json.loads(row['items'])
-                        st.session_state.pos_client = None
-                        date_str = row['order_date'].replace('/', '')
-                        pdf_name = f"Bon-de-commande-{row['order_id']}-{date_str}.pdf"
-                    
-                    pdf_path = os.path.join("generated_pdfs", pdf_name)
-                    if os.path.exists(pdf_path):
-                        st.session_state.generated_pdf = pdf_path
-                        st.success(f"{doc_type} chargé avec succès!")
-                    else:
-                        st.error("PDF non trouvé.")
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Initialize session state
+    if 'pos_items' not in st.session_state:
+        st.session_state.pos_items = []
+    if 'pos_client' not in st.session_state:
+        st.session_state.pos_client = None
+    if 'panier_valide' not in st.session_state:
+        st.session_state.panier_valide = False
+    if 'generated_pdf' not in st.session_state:
+        st.session_state.generated_pdf = None
+    if 'transaction_status' not in st.session_state:
+        st.session_state.transaction_status = None
+    if 'remaining_amount' not in st.session_state:
+        st.session_state.remaining_amount = 0.0
 
     # Custom CSS Styling
     st.markdown("""
@@ -154,19 +107,82 @@ def pos_page(products_df, clients_df):
     </style>
     """, unsafe_allow_html=True)
 
-    # Initialize session state
-    if 'pos_items' not in st.session_state:
-        st.session_state.pos_items = []
-    if 'pos_client' not in st.session_state:
-        st.session_state.pos_client = None
-    if 'panier_valide' not in st.session_state:
-        st.session_state.panier_valide = False
-    if 'generated_pdf' not in st.session_state:
-        st.session_state.generated_pdf = None
-    if 'transaction_status' not in st.session_state:
-        st.session_state.transaction_status = None
-    if 'remaining_amount' not in st.session_state:
-        st.session_state.remaining_amount = 0.0
+    # Search Section
+    with st.container():
+        search_term = st.text_input("Rechercher produit", key="search_input_pos")
+        if st.button("🔍 Rechercher", key="search_button_pos"):
+            pass  # Placeholder for future search functionality
+
+    # Retrieve Previous Documents
+    with st.container():
+        st.markdown('<div class="pos-section"><h3 class="pos-title">📜 Récupérer un Document</h3>', unsafe_allow_html=True)
+        doc_type = st.selectbox("Type de Document", ["Facture", "Proforma", "Bon de Commande"], key="retrieve_doc_type_pos")
+        search_term = st.text_input("Rechercher (Nom Client ou ID)", key="retrieve_search_pos", placeholder="Entrez nom client ou ID")
+        
+        if st.button("🔍 Chercher", key="retrieve_button_pos"):
+            with st.spinner("Chargement des documents..."):
+                transactions_df = fetch_df_from_db("transactions")
+                orders_df = fetch_df_from_db("orders")
+                clients_df = fetch_df_from_db("clients")
+                
+                if doc_type == "Facture":
+                    filtered = transactions_df[transactions_df['status'].isin(['completed', 'deposit_paid'])]
+                    filtered = filtered.merge(clients_df, left_on='client_id', right_on='id_client', how='left')
+                elif doc_type == "Proforma":
+                    filtered = transactions_df[transactions_df['status'] == 'proforma']
+                    filtered = filtered.merge(clients_df, left_on='client_id', right_on='id_client', how='left')
+                else:
+                    filtered = orders_df
+                
+                if search_term:
+                    if doc_type in ["Facture", "Proforma"]:
+                        filtered = filtered[
+                            (filtered['nom_client'].str.contains(search_term, case=False, na=False)) |
+                            (filtered['transaction_id'].astype(str).str.contains(search_term, na=False))
+                        ]
+                    else:
+                        filtered = filtered[
+                            (filtered['order_id'].astype(str).str.contains(search_term, na=False))
+                        ]
+                if not filtered.empty:
+                    if doc_type in ["Facture", "Proforma"]:
+                        options = [
+                            f"{row['transaction_id']} - {row['nom_client'] or 'Unknown'} - {row['transaction_date']} - {row['status']}"
+                            for _, row in filtered.iterrows()
+                        ]
+                    else:
+                        options = [f"{row['order_id']} - {row['order_date']}" for _, row in filtered.iterrows()]
+                    
+                    selected_doc = st.selectbox("Documents Trouvés", options, key="retrieve_select_pos")
+                    if st.button("Charger Document", key="load_doc_btn_pos"):
+                        if doc_type in ["Facture", "Proforma"]:
+                            row = filtered[filtered['transaction_id'] == int(selected_doc.split(' - ')[0])].iloc[0]
+                            st.session_state.pos_items = json.loads(row['items'])
+                            st.session_state.pos_client = {
+                                'id_client': row['client_id'], 'nom_client': row['nom_client'],
+                                'prenom_client': row['prenom_client'], 'telephone_client': row['telephone_client'],
+                                'address_client': row['address_client'], 'email_client': row['email_client'],
+                                'entreprise_client': row['entreprise_client']
+                            }
+                            date_str = row['transaction_date'].replace('/', '')
+                            client_name = row['nom_client'] or 'Unknown'
+                            pdf_name = f"{doc_type}-{client_name}-{row['transaction_id']}-{date_str}.pdf"
+                            st.session_state.transaction_status = row['status']
+                            st.session_state.remaining_amount = row.get('remaining_amount', 0.0)
+                        else:
+                            row = filtered[filtered['order_id'] == int(selected_doc.split(' - ')[0])].iloc[0]
+                            st.session_state.pos_items = json.loads(row['items'])
+                            st.session_state.pos_client = None
+                            date_str = row['order_date'].replace('/', '')
+                            pdf_name = f"Bon-de-commande-{row['order_id']}-{date_str}.pdf"
+                        
+                        pdf_path = os.path.join("generated_pdfs", pdf_name)
+                        if os.path.exists(pdf_path):
+                            st.session_state.generated_pdf = pdf_path
+                            st.success(f"{doc_type} chargé avec succès!")
+                        else:
+                            st.error("PDF non trouvé.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # Stock Checker Section
     with st.container():
@@ -202,9 +218,9 @@ def pos_page(products_df, clients_df):
             with search_cols[1]:
                 if st.button("🔍 Rechercher", use_container_width=True, key="pos_search_button"):
                     filtered_clients = clients_df[
-                        (clients_df['nom_client'].str.contains(search_input, case=False)) |
-                        (clients_df['entreprise_client'].str.contains(search_input, case=False)) |
-                        (clients_df['telephone_client'].str.contains(search_input))
+                        (clients_df['nom_client'].str.contains(search_input, case=False, na=False)) |
+                        (clients_df['entreprise_client'].str.contains(search_input, case=False, na=False)) |
+                        (clients_df['telephone_client'].str.contains(search_input, na=False))
                     ]
                     st.session_state.filtered_clients = filtered_clients if not filtered_clients.empty else None
             
@@ -310,13 +326,24 @@ def pos_page(products_df, clients_df):
                     )          
             st.markdown("---")
             subtotal = sum(item['Price'] * item['Quantity'] for item in st.session_state.pos_items)
+            discount = subtotal * (discount_value / 100) if discount_type == "Pourcentage" else discount_value
+            taxable = subtotal - discount
+            tva_amount = taxable * 0.19 if apply_tva else 0
+            total = taxable + tva_amount
+            
+            # Transaction Summary
+            st.subheader("Récapitulatif de la Transaction")
+            st.write(f"**Subtotal:** {subtotal:.2f} DZD")
+            st.write(f"**Remise:** {discount:.2f} DZD")
+            st.write(f"**TVA (19%):** {tva_amount:.2f} DZD" if apply_tva else "**TVA:** Non appliquée")
+            st.write(f"**Total:** {total:.2f} DZD")
             
             if st.button("✅ Valider Panier", type="primary", use_container_width=True, key="pos_validate_cart"):
                 stock_ok = True
                 for item in st.session_state.pos_items:
                     available = int(products_df[products_df['reference'] == item['reference']].iloc[0].get(item['Color'].lower() if item['Color'] else 'quantite_actuelle', 0) or 0)
                     if available < item['Quantity']:
-                        st.error(f"Stock insuffisant pour {item['denomination']} ({item['Color']})! Disponible: {available}")
+                        st.error(f"Stock insuffisant pour {item['denomination']} ({item['Color'] or 'N/A'})! Disponible: {available}")
                         stock_ok = False
                 if stock_ok:
                     st.session_state.panier_valide = True
@@ -327,84 +354,75 @@ def pos_page(products_df, clients_df):
             if st.session_state.panier_valide:
                 if st.button("💳 Finaliser Transaction", type="primary", use_container_width=True, disabled=not st.session_state.pos_client):
                     try:
-                        subtotal = sum(item['Price'] * item['Quantity'] for item in st.session_state.pos_items)
-                        discount = subtotal * (discount_value / 100) if discount_type == "Pourcentage" else discount_value
-                        taxable = subtotal - discount
-                        tva_amount = taxable * 0.19 if apply_tva else 0
-                        total = taxable + tva_amount
-
-                        # Payment Scenarios
+                        # Enhanced Payment Section
                         payment_type = st.radio("Type de Paiement", ["Paiement Complet", "Acompte"], horizontal=True, key="payment_type")
                         deposit_amount = 0.0
                         remaining_amount = 0.0
                         status = "completed"
 
+                        payment_methods = ["Espèces", "Carte", "Virement", "Chèque"]
+                        payments = {}
+                        payment_cols = st.columns(len(payment_methods))
+                        for i, method in enumerate(payment_methods):
+                            with payment_cols[i]:
+                                payments[method] = st.number_input(f"{method}", min_value=0.0, value=0.0, key=f"payment_{method.lower()}")
+
+                        total_paid = sum(payments.values())
+
                         if payment_type == "Acompte":
                             deposit_amount = st.number_input("Montant Acompte", min_value=0.0, max_value=total, value=min(4000.0, total), key="deposit_amount")
                             remaining_amount = total - deposit_amount
                             status = "deposit_paid"
+                            if total_paid != deposit_amount:
+                                st.error(f"Le total des paiements ({total_paid:.2f} DZD) doit égaler l'acompte ({deposit_amount:.2f} DZD)!")
+                                return
                             st.info(f"Reste à payer à la collecte: {remaining_amount:.2f} DZD")
-
-                        payments = {"Espèces": 0.0, "Virement": 0.0, "Chèque": 0.0}
-                        if payment_type == "Paiement Complet":
-                            payment_cols = st.columns(3)
-                            with payment_cols[0]:
-                                payments["Espèces"] = st.number_input("Espèces", min_value=0.0, value=total, key="pos_cash_full")
-                            with payment_cols[1]:
-                                if st.checkbox("Virement", key="pos_virement_checkbox"):
-                                    payments["Virement"] = st.number_input("Montant Virement", min_value=0.0, max_value=total, value=0.0, key="pos_virement")
-                                    payments["Espèces"] = total - payments["Virement"]
-                            with payment_cols[2]:
-                                if st.checkbox("Chèque", key="pos_cheque_checkbox"):
-                                    payments["Chèque"] = st.number_input("Montant Chèque", min_value=0.0, max_value=total, value=0.0, key="pos_cheque")
-                                    payments["Espèces"] = max(total - payments["Virement"] - payments["Chèque"], 0.0)
                         else:
-                            payments["Espèces"] = deposit_amount
-
-                        payment_total = sum(payments.values())
-                        if payment_type == "Paiement Complet" and payment_total != total:
-                            st.error("Le montant total des paiements doit égaler le total!")
-                            return
-                        elif payment_type == "Acompte" and payment_total != deposit_amount:
-                            st.error("Le montant des paiements doit égaler l'acompte!")
-                            return
+                            if total_paid != total:
+                                st.error(f"Le total des paiements ({total_paid:.2f} DZD) doit égaler le total ({total:.2f} DZD)!")
+                                return
 
                         # Update stock only on full payment
                         if status == "completed":
                             for item in st.session_state.pos_items:
                                 update_stock(item['reference'], -item['Quantity'], item['Color'].lower() if item['Color'] else None)
 
-                        payment_details = json.dumps(payments)
-                        transaction_id = record_transaction(
-                            client_info=st.session_state.pos_client,
-                            items=st.session_state.pos_items,
-                            total_amount=subtotal,
-                            payment_details=payment_details,
-                            final_amount=total,
-                            status=status,
-                            performed_by=username,
-                            tva_applied=apply_tva,
-                            tva_amount=tva_amount,
-                            deposit_amount=deposit_amount,
-                            remaining_amount=remaining_amount
-                        )
-                        pdf_path = generate_receipt_pdf(
-                            transaction_info={
-                                "transaction_number": transaction_id,
-                                "transaction_date": datetime.now().strftime("%d/%m/%Y"),
-                                "performed_by": username
-                            },
-                            items=st.session_state.pos_items,
-                            subtotal=subtotal,
-                            discount_amount=discount,
-                            tva_amount=tva_amount,
-                            total=total,
-                            payment_details=payment_details,
-                            client_info=st.session_state.pos_client,
-                            tva_enabled=apply_tva,
-                            language=language,
-                            notes=notes
-                        )
+                        # Prepare data for serialization
+                        items = replace_nan_with_none(st.session_state.pos_items)
+                        client_info = replace_nan_with_none(st.session_state.pos_client)
+                        payment_details = replace_nan_with_none(payments)
+
+                        with st.spinner("Enregistrement de la transaction..."):
+                            transaction_id = record_transaction(
+                                client_info=client_info,
+                                items=items,
+                                total_amount=subtotal,
+                                payment_details=payment_details,
+                                final_amount=total,
+                                status=status,
+                                performed_by=username,
+                                tva_applied=apply_tva,
+                                tva_amount=tva_amount,
+                                deposit_amount=deposit_amount,
+                                remaining_amount=remaining_amount
+                            )
+                            pdf_path = generate_receipt_pdf(
+                                transaction_info={
+                                    "transaction_number": transaction_id,
+                                    "transaction_date": datetime.now().strftime("%d/%m/%Y"),
+                                    "performed_by": username
+                                },
+                                items=st.session_state.pos_items,
+                                subtotal=subtotal,
+                                discount_amount=discount,
+                                tva_amount=tva_amount,
+                                total=total,
+                                payment_details=payment_details,
+                                client_info=st.session_state.pos_client,
+                                tva_enabled=apply_tva,
+                                language=language,
+                                notes=notes
+                            )
                         st.session_state.generated_pdf = pdf_path
                         st.success(f"Facture {transaction_id} générée! Status: {status}")
                         st.session_state.pos_items = []
@@ -419,66 +437,65 @@ def pos_page(products_df, clients_df):
                     remaining = st.session_state.remaining_amount
                     st.write(f"Reste à payer: {remaining:.2f} DZD")
                     if st.button("Payer le Solde", key="pay_remaining"):
-                        remaining_payments = {"Espèces": 0.0, "Virement": 0.0, "Chèque": 0.0}
-                        payment_cols = st.columns(3)
-                        with payment_cols[0]:
-                            remaining_payments["Espèces"] = st.number_input("Espèces", min_value=0.0, value=remaining, key="pos_cash_remain")
-                        with payment_cols[1]:
-                            if st.checkbox("Virement (Solde)", key="pos_virement_remain"):
-                                remaining_payments["Virement"] = st.number_input("Montant Virement", min_value=0.0, max_value=remaining, value=0.0, key="pos_virement_remain")
-                                remaining_payments["Espèces"] = remaining - remaining_payments["Virement"]
-                        with payment_cols[2]:
-                            if st.checkbox("Chèque (Solde)", key="pos_cheque_remain"):
-                                remaining_payments["Chèque"] = st.number_input("Montant Chèque", min_value=0.0, max_value=remaining, value=0.0, key="pos_cheque_remain")
-                                remaining_payments["Espèces"] = max(remaining - remaining_payments["Virement"] - remaining_payments["Chèque"], 0.0)
+                        remaining_payments = {}
+                        payment_cols = st.columns(len(payment_methods))
+                        for i, method in enumerate(payment_methods):
+                            with payment_cols[i]:
+                                remaining_payments[method] = st.number_input(f"{method} (Solde)", min_value=0.0, value=0.0 if method != "Espèces" else remaining, key=f"remaining_payment_{method.lower()}")
 
-                        if sum(remaining_payments.values()) != remaining:
-                            st.error("Le montant total doit égaler le solde restant!")
+                        total_remaining_paid = sum(remaining_payments.values())
+                        if total_remaining_paid != remaining:
+                            st.error(f"Le total des paiements ({total_remaining_paid:.2f} DZD) doit égaler le solde restant ({remaining:.2f} DZD)!")
                         else:
-                            # Update transaction
-                            transactions_df = fetch_df_from_db("transactions")
-                            transaction = transactions_df[transactions_df['transaction_id'] == int(selected_doc.split(' - ')[0])].iloc[0]
-                            current_payments = json.loads(transaction['payment_details'])
-                            for method, amount in remaining_payments.items():
-                                current_payments[method] = current_payments.get(method, 0.0) + amount
-                            updated_payment_details = json.dumps(current_payments)
-                            for item in st.session_state.pos_items:
-                                update_stock(item['reference'], -item['Quantity'], item['Color'].lower() if item['Color'] else None)
-                            transaction_id = record_transaction(
-                                client_info=st.session_state.pos_client,
-                                items=st.session_state.pos_items,
-                                total_amount=subtotal,
-                                payment_details=updated_payment_details,
-                                final_amount=total,
-                                status="completed",
-                                performed_by=username,
-                                tva_applied=apply_tva,
-                                tva_amount=tva_amount,
-                                deposit_amount=transaction['deposit_amount'],
-                                remaining_amount=0.0
-                            )
-                            pdf_path = generate_receipt_pdf(
-                                transaction_info={
-                                    "transaction_number": transaction_id,
-                                    "transaction_date": datetime.now().strftime("%d/%m/%Y"),
-                                    "performed_by": username
-                                },
-                                items=st.session_state.pos_items,
-                                subtotal=subtotal,
-                                discount_amount=discount,
-                                tva_amount=tva_amount,
-                                total=total,
-                                payment_details=updated_payment_details,
-                                client_info=st.session_state.pos_client,
-                                tva_enabled=apply_tva,
-                                language=language,
-                                notes=notes
-                            )
-                            st.session_state.generated_pdf = pdf_path
-                            st.success(f"Transaction {transaction_id} complétée!")
-                            st.session_state.transaction_status = "completed"
-                            st.session_state.remaining_amount = 0.0
-                            st.rerun()
+                            try:
+                                transactions_df = fetch_df_from_db("transactions")
+                                transaction = transactions_df[transactions_df['transaction_id'] == int(selected_doc.split(' - ')[0])].iloc[0]
+                                current_payments = json.loads(transaction['payment_details'])
+                                for method, amount in remaining_payments.items():
+                                    current_payments[method] = current_payments.get(method, 0.0) + amount
+                                updated_payment_details = replace_nan_with_none(current_payments)
+                                
+                                for item in st.session_state.pos_items:
+                                    update_stock(item['reference'], -item['Quantity'], item['Color'].lower() if item['Color'] else None)
+                                
+                                with st.spinner("Finalisation du paiement..."):
+                                    transaction_id = record_transaction(
+                                        client_info=st.session_state.pos_client,
+                                        items=st.session_state.pos_items,
+                                        total_amount=subtotal,
+                                        payment_details=updated_payment_details,
+                                        final_amount=total,
+                                        status="completed",
+                                        performed_by=username,
+                                        tva_applied=apply_tva,
+                                        tva_amount=tva_amount,
+                                        deposit_amount=transaction['deposit_amount'],
+                                        remaining_amount=0.0
+                                    )
+                                    pdf_path = generate_receipt_pdf(
+                                        transaction_info={
+                                            "transaction_number": transaction_id,
+                                            "transaction_date": datetime.now().strftime("%d/%m/%Y"),
+                                            "performed_by": username
+                                        },
+                                        items=st.session_state.pos_items,
+                                        subtotal=subtotal,
+                                        discount_amount=discount,
+                                        tva_amount=tva_amount,
+                                        total=total,
+                                        payment_details=updated_payment_details,
+                                        client_info=st.session_state.pos_client,
+                                        tva_enabled=apply_tva,
+                                        language=language,
+                                        notes=notes
+                                    )
+                                st.session_state.generated_pdf = pdf_path
+                                st.success(f"Transaction {transaction_id} complétée!")
+                                st.session_state.transaction_status = "completed"
+                                st.session_state.remaining_amount = 0.0
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erreur lors du paiement du solde: {str(e)}")
             
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -506,3 +523,5 @@ Cordialement,
 Takideco"""
                     if send_email(client_email, subject, body, pdf_path):
                         st.success("Email envoyé avec succès!")
+                    else:
+                        st.error("Échec de l'envoi de l'email.")
