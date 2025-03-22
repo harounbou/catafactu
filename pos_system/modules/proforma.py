@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import json
 from datetime import datetime
 from modules.client_management import get_client_info, add_new_client, save_clients
 from modules.transaction_management import record_transaction
@@ -11,15 +12,96 @@ from modules.utils import (
     validate_phone,
     find_image_path_for_color,
     get_full_image_path,
-    send_email
+    send_email,
+    fetch_df_from_db
 )
 from modules.product_management import check_stock
 from modules.pos import stock_checker_section
 
 def proforma_page(products_df, clients_df):
-    """Main proforma page component"""
     st.title("📄 Générateur de Facture Proforma")
     username = st.session_state['user']['username']
+
+    # Reset Button (unchanged)
+    if st.button("🔄 Réinitialiser Proforma", type="secondary"):
+        st.session_state.proforma_items = []
+        st.session_state.proforma_client = None
+        st.session_state.panier_valide = False
+        st.session_state.generated_pdf = None
+        st.session_state.pop('proforma_filtered', None)
+        st.session_state.pop('filtered_clients', None)
+        st.success("Proforma réinitialisée avec succès!")
+        st.rerun()
+
+    # Retrieve Previous Documents (Updated)
+    with st.container():
+        st.markdown('<div class="proforma-section"><h3 class="proforma-title">📜 Récupérer un Document</h3>', unsafe_allow_html=True)
+        doc_type = st.selectbox("Type de Document", ["Proforma", "Facture", "Bon de Commande"], key="retrieve_doc_type")
+        search_term = st.text_input("Rechercher (Nom Client ou ID)", key="retrieve_search", placeholder="Entrez nom client ou ID")
+        
+        if st.button("🔍 Chercher", key="retrieve_button"):
+            transactions_df = fetch_df_from_db("transactions")
+            orders_df = fetch_df_from_db("orders")
+            clients_df = fetch_df_from_db("clients")
+            
+            if doc_type == "Proforma":
+                filtered = transactions_df[transactions_df['status'] == 'proforma']
+                filtered = filtered.merge(clients_df, left_on='client_id', right_on='id_client', how='left')
+            elif doc_type == "Facture":
+                filtered = transactions_df[transactions_df['status'] == 'completed']
+                filtered = filtered.merge(clients_df, left_on='client_id', right_on='id_client', how='left')
+            else:  # Bon de Commande
+                filtered = orders_df
+            
+            # Filter by search term if provided, otherwise show all
+            if search_term:
+                if doc_type in ["Proforma", "Facture"]:
+                    filtered = filtered[
+                        (filtered['nom_client'].str.contains(search_term, case=False, na=False)) |
+                        (filtered['transaction_id'].astype(str).str.contains(search_term, na=False))
+                    ]
+                else:
+                    filtered = filtered[
+                        (filtered['order_id'].astype(str).str.contains(search_term, na=False))
+                    ]
+            # If no search term, show all documents
+            if not filtered.empty:
+                if doc_type in ["Proforma", "Facture"]:
+                    options = [
+                        f"{row['transaction_id']} - {row['nom_client'] or 'Unknown'} - {row['transaction_date']}"
+                        for _, row in filtered.iterrows()
+                    ]
+                else:
+                    options = [f"{row['order_id']} - {row['order_date']}" for _, row in filtered.iterrows()]
+                
+                selected_doc = st.selectbox("Documents Trouvés", options, key="retrieve_select")
+                if st.button("Charger Document", key="load_doc_btn"):
+                    if doc_type in ["Proforma", "Facture"]:
+                        row = filtered[filtered['transaction_id'] == int(selected_doc.split(' - ')[0])].iloc[0]
+                        st.session_state.proforma_items = json.loads(row['items'])
+                        st.session_state.proforma_client = {
+                            'id_client': row['client_id'], 'nom_client': row['nom_client'],
+                            'prenom_client': row['prenom_client'], 'telephone_client': row['telephone_client'],
+                            'address_client': row['address_client'], 'email_client': row['email_client'],
+                            'entreprise_client': row['entreprise_client']
+                        }
+                        date_str = row['transaction_date'].replace('/', '')
+                        client_name = row['nom_client'] or 'Unknown'
+                        pdf_name = f"{doc_type}-{client_name}-{row['transaction_id']}-{date_str}.pdf"
+                    else:
+                        row = filtered[filtered['order_id'] == int(selected_doc.split(' - ')[0])].iloc[0]
+                        st.session_state.proforma_items = json.loads(row['items'])
+                        st.session_state.proforma_client = None
+                        date_str = row['order_date'].replace('/', '')
+                        pdf_name = f"Bon-de-commande-{row['order_id']}-{date_str}.pdf"
+                    
+                    pdf_path = os.path.join("generated_pdfs", pdf_name)
+                    if os.path.exists(pdf_path):
+                        st.session_state.generated_pdf = pdf_path
+                        st.success(f"{doc_type} chargé avec succès!")
+                    else:
+                        st.error("PDF non trouvé.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # Custom CSS Styling
     st.markdown("""
@@ -68,7 +150,7 @@ def proforma_page(products_df, clients_df):
             discount_value = st.number_input("Valeur Remise", min_value=0.0, format="%.2f", step=0.5)
         with cols[2]:
             apply_tva = st.checkbox("Appliquer TVA 19%")
-            show_onama = st.checkbox("Basculer à l'Onama", help="Afficher le format ONAMA standard")
+            show_onama = st.checkbox("Basculer à l'Onama", help="Ajoute le numéro ONAMA au contact")
             delivery_days = st.slider("Délai Livraison (jours)", 0, 30, 5)
             custom_notes = st.text_area("Notes", height=80)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -192,15 +274,8 @@ def proforma_page(products_df, clients_df):
             subtotal = sum(item['Price'] * item['Quantity'] for item in st.session_state.proforma_items)
             
             if st.button("✅ Valider Panier", type="primary", use_container_width=True):
-                all_in_stock = True
-                for item in st.session_state.proforma_items:
-                    available, message = check_stock(item['reference'], item['Quantity'], item.get('Color'))
-                    if not available:
-                        st.error(f"Stock insuffisant: {message}")
-                        all_in_stock = False
-                if all_in_stock:
-                    st.session_state.panier_valide = True
-                    st.success("Panier validé - Prêt pour génération!")
+                st.session_state.panier_valide = True
+                st.success("Panier validé - Prêt pour génération!")
             
             if st.session_state.panier_valide:
                 if st.button("📄 Générer Proforma", type="primary", use_container_width=True, disabled=not st.session_state.proforma_client):

@@ -24,7 +24,6 @@ from .client_management import get_client_info, add_new_client, save_clients
 from .transaction_management import record_transaction
 import qrcode
 
-
 def generate_barcode(reference):
     """Generate a barcode image for a given reference."""
     barcode = Code128(reference, writer=ImageWriter())
@@ -57,7 +56,6 @@ def send_email(to_email, subject, body, attachment_path=None):
         st.error(f"Échec de l'envoi de l'email : {e}")
         return False
 
-
 def generate_proforma_pdf(items, price_type, client_info, transaction_info, apply_tva=False, 
                          discount_type="Pourcentage", discount_value=0.0, show_onama=False, 
                          delivery_days=5, notes=""):
@@ -69,11 +67,17 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
 
+    # Logo Above Client
+    logo_path = get_full_image_path("logo.png")
+    if os.path.exists(logo_path):
+        pdf.image(logo_path, x=10, y=8, w=30)
+
     # Header
     pdf.set_font("Arial", "B", 20)
+    pdf.set_y(10)
     pdf.cell(0, 10, "Facture Proforma - Takideco", 0, 1, 'C')
 
-    # Transaction Info (on one line, centered)
+    # Transaction Info
     pdf.set_font("Arial", size=10)
     transaction_line = (
         f"N° Proforma: {transaction_info['transaction_number']}  |  "
@@ -83,19 +87,7 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
     pdf.cell(0, 6, transaction_line, 0, 1, 'C')
     pdf.ln(10)
 
-    # Company Information (Right Column)
-    pdf.set_y(40)
-    pdf.set_x(120)
-    pdf.set_font("Arial", size=10)
-    pdf.multi_cell(80, 5,
-        "Takideco\n"
-        "Tél: 0542918226 | 0698077751\n"
-        "Adresse: Cité El Houari, El Eulma\n"
-        "Email: contact@takideco.dz",
-        align='R')
-
-    # Client Information (Left Column, aligned)
-    pdf.set_y(40)
+    # Client Information (Left Column)
     pdf.set_font("Arial", "B", 12)
     pdf.cell(90, 8, "Client:", 0, 1)
     pdf.set_font("Arial", size=10)
@@ -109,15 +101,33 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
     ]
     
     line_height = 6
-    pdf.set_x(10)  # Reset x position to ensure alignment
+    pdf.set_x(10)
     for field in client_fields:
-        pdf.cell(90, line_height, field, 0, 1)  # Use cell instead of multi_cell for single-line alignment
+        pdf.cell(90, line_height, field, 0, 1)
+
+    # Company Information (Right Column, Opposite Client)
+    pdf.set_y(30)
+    pdf.set_x(120)
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(80, 8, "Takideco", 0, 1, 'R')
+    pdf.set_font("Arial", size=10)
+    pdf.set_x(120)
+    if show_onama:
+        pdf.multi_cell(80, line_height,
+            "Tél: 0542918226 | 0698077751 | 0542310057\n"
+            "Adresse: Cité El Houari, El Eulma\n"
+            "Email: contact@takideco.dz",
+            align='R')
+    else:
+        pdf.multi_cell(80, line_height,
+            "Tél: 0542918226 | 0698077751\n"
+            "Adresse: Cité El Houari, El Eulma\n"
+            "Email: contact@takideco.dz",
+            align='R')
 
     # Items Table
     col_widths = [22, 58, 25, 25, 25, 35]
     headers = ["Image", "Description", "Réf.", "Couleur", "Qté", "Prix (DZD)"]
-    
-    # Position table after client info
     pdf.set_y(40 + (len(client_fields) * line_height) + 10)
     
     # Table Header
@@ -126,39 +136,36 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
         pdf.cell(width, 10, header, border=1, align='C')
     pdf.ln()
 
-    # Table Rows (fix overlapping and alignment)
+    # Table Rows
     pdf.set_font("Arial", size=10)
     for item in items:
-        row_height = 20  # Default row height
-        start_x = pdf.get_x()  # Store starting x position for alignment
+        row_height = 20
+        start_x = pdf.get_x()
         
-        # Image handling
         if item.get('Image'):
             full_img_path = get_full_image_path(item['Image'])
             if full_img_path and os.path.exists(full_img_path):
                 try:
                     img_width, img_height = calculate_image_dimensions(full_img_path, max_width_mm=22, max_height_mm=20)
-                    row_height = max(row_height, img_height + 2)  # Adjust row height based on image
+                    row_height = max(row_height, img_height + 2)
                     x = start_x + (col_widths[0] - img_width) / 2
                     y = pdf.get_y() + (row_height - img_height) / 2
                     pdf.image(full_img_path, x=x, y=y, w=img_width, h=img_height)
-                except Exception as e:
+                except Exception:
                     pdf.cell(col_widths[0], row_height, "Image N/A", border=1, align='C')
             else:
                 pdf.cell(col_widths[0], row_height, "No Image", border=1, align='C')
         else:
             pdf.cell(col_widths[0], row_height, "", border=1)
         
-        # Move to next column without overlapping
         pdf.set_xy(start_x + col_widths[0], pdf.get_y())
-        
-        # Table cells with proper positioning
         pdf.cell(col_widths[1], row_height, truncate_text(item['denomination'], 35), border=1, align='L')
         pdf.cell(col_widths[2], row_height, item['reference'], border=1, align='C')
         pdf.cell(col_widths[3], row_height, item.get('Color', ''), border=1, align='C')
         pdf.cell(col_widths[4], row_height, str(item['Quantity']), border=1, align='C')
-        pdf.cell(col_widths[5], row_height, f"{item['Price'] * item['Quantity']:.2f}", border=1, align='R')
-        pdf.ln(row_height)  # Move to next row with proper height
+        price_total = item['Price'] * item['Quantity']
+        pdf.cell(col_widths[5], row_height, f"{price_total:,.2f}", border=1, align='R')
+        pdf.ln(row_height)
 
     # Calculations
     subtotal = sum(item['Price'] * item['Quantity'] for item in items)
@@ -167,17 +174,24 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
     tva_amount = taxable * 0.19 if apply_tva else 0
     total = taxable + tva_amount
 
-    # Total Section
+    # Total Section with Formatted Numbers
     pdf.ln(10)
+    pdf.set_font("Arial", size=12)
+    pdf.cell(0, 8, f"Sous-total: {subtotal:,.2f} DZ", 0, 1, 'R')
+    if discount > 0:
+        pdf.cell(0, 8, f"Remise ({discount_type}): -{discount:,.2f} DZ", 0, 1, "R")
+    if apply_tva:
+        pdf.cell(0, 8, f"TVA 19%: {tva_amount:,.2f} DZ", 0, 1, 'R')
     pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, f"Total Général: {total:.2f} DZD", 0, 1, 'R')
+    pdf.cell(0, 10, f"Total Général: {total:,.2f} DZ", 0, 1, 'R')
     
-    # Amount in words
+    # Amount in Words (Fixed)
     pdf.set_font("Arial", 'I', 10)
-    try:
-        amount_words = num2words(total, lang='fr') + " Dinars Algériens"
-    except:
-        amount_words = "Montant très élevé"
+    total_int = int(total)  # Integer part
+    total_dec = int(round((total - total_int) * 100))  # Decimal part (centimes)
+    amount_words = num2words(total_int, lang='fr').replace('et', '').replace('-', ' ') + " Dinars Algériens"
+    if total_dec > 0:
+        amount_words += f" et {num2words(total_dec, lang='fr').replace('et', '').replace('-', ' ')} centimes"
     pdf.cell(0, 6, f"Montant en lettres: {amount_words}", 0, 1)
 
     # Legal Terms Section
@@ -195,18 +209,13 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
         pdf.ln(3)
 
     # Generate filename and save
-    filename = f"Proforma_{transaction_info['transaction_number']}.pdf"
+    client_name = client_info.get('nom_client', 'Unknown')
+    date_str = transaction_info['transaction_date'].replace('/', '')
+    filename = f"Proforma-{client_name}-{transaction_info['transaction_number']}-{date_str}.pdf"
     pdf_path = os.path.join(output_dir, filename)
     pdf.output(pdf_path)
     
     return pdf_path
-
-def truncate_text(text, max_length=35):
-    """Truncate text with ellipsis if exceeds max length"""
-    return (text[:max_length] + '...') if len(text) > max_length else text
-
-def truncate_text(text, max_length=35):
-    return (text[:max_length] + '...') if len(text) > max_length else text
 
 def generate_receipt_pdf(transaction_info, items, payment_amount, discount_amount=0.0, payment_details="", client_info=None, tva_enabled=False):
     """Generate a receipt PDF with barcode images."""
@@ -249,7 +258,7 @@ def generate_receipt_pdf(transaction_info, items, payment_amount, discount_amoun
         pdf.cell(col_widths[3], 10, str(item['Quantity']), border=1)
         pdf.cell(col_widths[4], 10, f"{item['Quantity'] * item['Price']:.2f}", border=1)
         pdf.ln()
-        os.remove(barcode_img)  # Clean up temporary barcode file
+        os.remove(barcode_img)
 
     # Totals Section
     pdf.set_y(pdf.get_y() + 10)
@@ -277,7 +286,9 @@ def generate_receipt_pdf(transaction_info, items, payment_amount, discount_amoun
     total_amount_words = num2words(int(final_amount), lang='fr') if final_amount <= 999999 else "Montant très élevé"
     pdf.cell(0, 10, f"Arrêté à la somme de: {total_amount_words} dinars", ln=1)
 
-    pdf_filename = f"Reçu-{transaction_info['transaction_number']}.pdf"
+    client_name = client_info.get('nom_client', 'Unknown') if client_info else 'Unknown'
+    date_str = transaction_info['transaction_date'].replace('/', '')
+    pdf_filename = f"Facture-{client_name}-{transaction_info['transaction_number']}-{date_str}.pdf"
     pdf.output(pdf_filename)
     return pdf_filename
 
@@ -342,6 +353,11 @@ def generate_order_pdf(order_id, city, order_date, delivery_address, items, ship
     )
     pdf.multi_cell(0, 5, txt=sanitize_text(default_terms))
 
-    pdf_filename = f"BonDeCommande-{order_id}-{order_date.replace('/', '')}.pdf"
+    date_str = order_date.replace('/', '')
+    pdf_filename = f"Bon-de-commande-{order_id}-{date_str}.pdf"
     pdf.output(pdf_filename)
-    return pdf_filename 
+    return pdf_filename
+
+def truncate_text(text, max_length=35):
+    """Truncate text with ellipsis if exceeds max length"""
+    return (text[:max_length] + '...') if len(text) > max_length else text
