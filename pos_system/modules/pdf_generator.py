@@ -19,22 +19,26 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
-from barcode import Code128
-from barcode.writer import ImageWriter
+# Commented out barcode imports as per request
+# from barcode import Code128
+# from barcode.writer import ImageWriter
 from .client_management import get_client_info, add_new_client, save_clients
 from .transaction_management import record_transaction
 import qrcode
+# Commented out dynamic barcode class import
+# from barcode import get_barcode_class
+# Code128 = get_barcode_class('code128')
 
 
-
-def generate_barcode(reference):
-    """Generate a barcode image for a given reference."""
-    output_dir = "generated_pdfs"
-    os.makedirs(output_dir, exist_ok=True)
-    barcode_path = os.path.join(output_dir, f"barcode_{reference}.png")
-    barcode = Code128(str(reference), writer=ImageWriter())
-    barcode.save(barcode_path[:-4])  # Remove .png extension as ImageWriter adds it
-    return barcode_path
+# Commented out the generate_barcode function since barcode references are to be removed
+# def generate_barcode(reference):
+#     """Generate a barcode image for a given reference."""
+#     output_dir = "generated_pdfs"
+#     os.makedirs(output_dir, exist_ok=True)
+#     barcode_path = os.path.join(output_dir, f"barcode_{reference}.png")
+#     barcode = Code128(str(reference), writer=ImageWriter())
+#     barcode.save(barcode_path[:-4])  # Remove .png extension as ImageWriter adds it
+#     return barcode_path
 
 def send_email(to_email, subject, body, attachment_path=None):
     """Send an email with an optional PDF attachment using Gmail SMTP."""
@@ -242,9 +246,10 @@ def generate_receipt_pdf(transaction_info, items, subtotal, discount_amount,
                 pdf.set_x(RIGHT_COL_X)
                 pdf.cell(80, 6, f"{method_text}: {amount:,.2f} DZD", 0, 1, 'R')
 
-    barcode_img = generate_barcode(transaction_info['transaction_number'])
-    pdf.image(barcode_img, x=150, y=BARCODE_Y, w=30)
-    os.remove(barcode_img)
+    # Commented out barcode generation and insertion
+    # barcode_img = generate_barcode(transaction_info['transaction_number'])
+    # pdf.image(barcode_img, x=150, y=BARCODE_Y, w=30)
+    # os.remove(barcode_img)
 
     payment_status = "completed" if total <= sum(payment_dict.values()) else "deposit_paid"
     pdf.set_font("Arial", "B", 50)
@@ -332,7 +337,6 @@ def generate_receipt_pdf(transaction_info, items, subtotal, discount_amount,
     pdf.output(pdf_path)
     
     return pdf_path
-
 
 def generate_receipt_pdf(
         transaction_info,
@@ -482,26 +486,24 @@ def generate_receipt_pdf(
             amount_words += f" و {num2words(total_dec, lang='ar')} سنتيم"
     pdf.cell(0, 6, f"Montant en lettres: {amount_words}" if language == "French" else f"المبلغ بالحروف: {amount_words}", 0, 1)
 
-    # Payment Details with Barcode
+    # Payment Details without Barcode
     payment_dict = json.loads(payment_details)
     pdf.ln(5)
     pdf.set_font("Arial", size=10)
     if payment_dict:
         pdf.cell(0, 6, "Paiement:" if language == "French" else "الدفع:", 0, 1)
-        y_position = pdf.get_y()
         for method, amount in payment_dict.items():
             if amount > 0:
                 method_ar = {"Espèces": "نقداً", "Virement": "تحويل بنكي", "Chèque": "شيك"}.get(method, method)
                 pdf.cell(50, 6, f"{method if language == 'French' else method_ar}: {amount:,.2f} DZD", 0, 1)
-                if method == "Espèces":
-                    # Place barcode under "Espèces" and opposite nature.png
-                    barcode_img = generate_barcode(transaction_info['transaction_number'])
-                    pdf.image(barcode_img, x=150, y=y_position, w=30)  # Smaller barcode (w=30)
-                    os.remove(barcode_img)
-                    # Place nature.png opposite barcode
-                    nature_path = get_full_image_path("nature.png")
-                    if os.path.exists(nature_path):
-                        pdf.image(nature_path, x=10, y=y_position, w=30)
+                # Removed barcode generation under "Espèces" payment method
+                # if method == "Espèces":
+                #     barcode_img = generate_barcode(transaction_info['transaction_number'])
+                #     pdf.image(barcode_img, x=150, y=y_position, w=30)
+                #     os.remove(barcode_img)
+                #     nature_path = get_full_image_path("nature.png")
+                #     if os.path.exists(nature_path):
+                #         pdf.image(nature_path, x=10, y=y_position, w=30)
 
     # Notes
     if notes:
@@ -648,9 +650,3 @@ def generate_order_pdf(items, transaction_info, client_info=None, notes="", lang
 
 def truncate_text(text, max_length=35):
     return (text[:max_length] + '...') if len(text) > max_length else text
-
-
-
-
-
-

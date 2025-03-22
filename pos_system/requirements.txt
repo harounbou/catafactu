@@ -8,3 +8,4 @@ openpyxl
 qrcode[pil]
 python-dotenv
 fpdf2
+barcode
