@@ -1,2 +1,0 @@
-from modules.transaction_management import initialize_db
-initialize_db()

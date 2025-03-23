@@ -1,24 +1,12 @@
-#pdf_generator.py
+# modules/pdf_generator.py
 from fpdf import FPDF
 import os
 import json
 from datetime import datetime
-from .utils import get_full_image_path, calculate_image_dimensions, truncate_text
 from num2words import num2words
-
-
-from modules.utils import (
-    get_full_image_path,
-    calculate_image_dimensions,
-    sanitize_text,
-    truncate_text,
-    find_image_path_for_color,
-    validate_email,
-    fetch_df_from_db
-)
+from .utils import get_full_image_path, calculate_image_dimensions, truncate_text, find_image_path_for_color
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -87,7 +75,6 @@ def generate_proforma_pdf(items, price_type, client_info, transaction_info, appl
         f"Nom: {client_info.get('nom_client', '')} {client_info.get('prenom_client', '')}",
         f"Entreprise: {client_info.get('entreprise_client', '')}",
         f"Tél: {client_info.get('telephone_client', '')}",
-        # f"Email: {client_info.get('email_client', '')}",
         f"Adresse: {client_info.get('address_client', '')}"
     ]
     
@@ -393,102 +380,8 @@ def generate_receipt_pdf(
     pdf.output(pdf_path)
     return pdf_path
 
-
-    output_dir = "generated_pdfs"
-    os.makedirs(output_dir, exist_ok=True)
-    
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
-
-    pdf.set_fill_color(144, 238, 144)
-    pdf.rect(0, 0, 210, 10, 'F')
-    pdf.set_font("Arial", "B", 20)
-    pdf.set_y(10)
-    pdf.cell(0, 10, "Bon de Commande - Takideco" if language == "French" else "أمر شراء - تاكيديكو", 0, 1, 'C')
-
-    pdf.set_font("Arial", size=10)
-    pdf.cell(0, 6, f"N° Commande: {transaction_info['transaction_number']}  |  Date: {transaction_info['transaction_date']}  |  Préparé par: {transaction_info['performed_by']}", 0, 1, 'C')
-    pdf.ln(10)
-
-    if client_info:
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(90, 8, "Client:" if language == "French" else "العميل:", 0, 1)
-        pdf.set_font("Arial", size=10)
-        client_fields = [
-            f"Nom: {client_info.get('nom_client', '')} {client_info.get('prenom_client', '')}",
-            f"Entreprise: {client_info.get('entreprise_client', '')}",
-            f"Tél: {client_info.get('telephone_client', '')}",
-            # f"Email: {client_info.get('email_client', '')}"
-        ]
-        for field in client_fields:
-            pdf.cell(90, 6, field, 0, 1)
-
-    col_widths = [22, 78, 25, 25, 40]
-    headers = ["Image", "Description", "Réf.", "Couleur", "Quantité"] if language == "French" else ["صورة", "الوصف", "المرجع", "اللون", "الكمية"]
-    pdf.ln(10)
-    pdf.set_font("Arial", "B", 11)
-    for width, header in zip(col_widths, headers):
-        pdf.cell(width, 10, header, border=1, align='C')
-    pdf.ln()
-
-    pdf.set_font("Arial", size=10)
-    for item in items:
-        row_height = 20
-        start_x = pdf.get_x()
-        if item.get('Image'):
-            full_img_path = get_full_image_path(item['Image'])
-            if full_img_path and os.path.exists(full_img_path):
-                img_width, img_height = calculate_image_dimensions(full_img_path, max_width_mm=22, max_height_mm=20)
-                row_height = max(row_height, img_height + 2)
-                x = start_x + (col_widths[0] - img_width) / 2
-                y = pdf.get_y() + (row_height - img_height) / 2
-                pdf.image(full_img_path, x=x, y=y, w=img_width, h=img_height)
-            else:
-                pdf.cell(col_widths[0], row_height, "No Image", border=1, align='C')
-        else:
-            pdf.cell(col_widths[0], row_height, "", border=1)
-        
-        pdf.set_xy(start_x + col_widths[0], pdf.get_y())
-        pdf.cell(col_widths[1], row_height, truncate_text(item['denomination'], 45), border=1, align='L')
-        pdf.cell(col_widths[2], row_height, item['reference'], border=1, align='C')
-        pdf.cell(col_widths[3], row_height, item.get('Color', ''), border=1, align='C')
-        pdf.cell(col_widths[4], row_height, str(item['Quantity']), border=1, align='C')
-        pdf.ln(row_height)
-
-    if notes:
-        pdf.ln(10)
-        pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 5, f"Notes: {notes}" if language == "French" else f"ملاحظات: {notes}")
-
-    pdf.set_y(-40)
-    pdf.set_font("Arial", "I", 9)
-    footer_text = "Merci pour votre commande chez Takideco !" if language == "French" else "شكرًا لطلبكم من تاكيديكو!"
-    pdf.cell(0, 5, footer_text, 0, 1, 'C')
-    pdf.set_fill_color(144, 238, 144)
-    pdf.rect(0, 287, 210, 10, 'F')
-
-    client_name = client_info.get('nom_client', 'Unknown') if client_info else 'Unknown'
-    date_str = transaction_info['transaction_date'].replace('/', '')
-    pdf_filename = f"Bon-de-commande-{transaction_info['transaction_number']}-{date_str}.pdf"
-    pdf_path = os.path.join(output_dir, pdf_filename)
-    pdf.output(pdf_path)
-    return pdf_path
-
-def truncate_text(text, max_length=35):
-
-    return (text[:max_length] + '...') if len(text) > max_length else text 
-
-def generate_order_pdf(
-    order_info,
-    items,
-    subtotal,
-    total,
-    supplier_info=None,
-    language="French",
-    notes=""
-):
-    """Generate a purchase order PDF for supplier orders."""
+def generate_order_pdf(order_id, city, order_date, delivery_address, items, shipping_method, payment_option, created_by, manufacturing_notes=""):
+    """Generate a purchase order PDF for manufacturing orders."""
     output_dir = "generated_pdfs"
     os.makedirs(output_dir, exist_ok=True)
     
@@ -505,50 +398,38 @@ def generate_order_pdf(
 
     # Title and Order Info
     pdf.set_font("Arial", "B", 20)
-    pdf.set_y(40)
-    pdf.cell(0, 10, "Bon de Commande - Takideco" if language == "French" else "أمر شراء - تاكيديكو", 0, 1, 'C')
+    pdf.set_y(10)
+    pdf.cell(0, 10, "Bon de Commande - Takideco", 0, 1, 'C')
     pdf.set_font("Arial", size=10)
-    pdf.cell(0, 6, f"N° Commande: {order_info['order_number']}  |  Date: {order_info['order_date']}  |  Émise par: {order_info['performed_by']}", 0, 1, 'C')
+    pdf.cell(0, 6, f"N° Commande: {order_id}  |  Date: {order_date}  |  Émise par: {created_by}", 0, 1, 'C')
     pdf.ln(10)
 
-    # Supplier Info
-    if supplier_info:
-        pdf.set_y(60)
-        pdf.set_font("Arial", "B", 12)
-        pdf.set_x(10)
-        pdf.cell(90, 8, "Fournisseur:" if language == "French" else "المورد:", 0, 1)
-        pdf.set_font("Arial", size=10)
-        supplier_fields = [
-            f"Nom: {supplier_info.get('name', '')}",
-            f"Entreprise: {supplier_info.get('company', '')}",
-            f"Tél: {supplier_info.get('phone', '')}",
-            f"Adresse: {supplier_info.get('address', '')}"
-        ]
-        for field in supplier_fields:
-            pdf.cell(90, 6, field, 0, 1)
+    # Order Details
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(90, 8, "Détails:", 0, 1)
+    pdf.set_font("Arial", size=10)
+    order_fields = [
+        f"Ville: {city}",
+        f"Adresse de Livraison: {delivery_address or 'Non spécifiée'}",
+        f"Méthode de Livraison: {shipping_method}",
+        f"Option de Paiement: {payment_option}"
+    ]
+    for field in order_fields:
+        pdf.cell(90, 6, field, 0, 1)
 
     # Company Info
-    pdf.set_y(60)
+    pdf.set_y(30)
     pdf.set_x(120)
     pdf.set_font("Arial", "B", 10)
-    pdf.cell(80, 8, "Takideco" if language == "French" else "تاكيديكو", 0, 1, 'R')
+    pdf.cell(80, 8, "Takideco", 0, 1, 'R')
     pdf.set_font("Arial", size=10)
     pdf.set_x(120)
-    takideco_info = (
-        "Tél: 0542918226 | 0698077751\n"
-        "Adresse: Cité El Houari, El Eulma\n"
-        "Email: contact@takideco.dz"
-    ) if language == "French" else (
-        "الهاتف: 0542918226 | 0698077751\n"
-        "العنوان: مدينة الهواري، العلمة\n"
-        "البريد الإلكتروني: contact@takideco.dz"
-    )
-    pdf.multi_cell(80, 6, takideco_info, align='R')
+    pdf.multi_cell(80, 6, "Tél: 0542918226 | 0698077751\nAdresse: Cité El Houari, El Eulma\nEmail: contact@takideco.dz", align='R')
 
     # Items Table
-    col_widths = [22, 58, 25, 25, 35]
-    headers = ["Image", "Description", "Réf.", "Qté", "Prix (DZD)"] if language == "French" else ["صورة", "الوصف", "المرجع", "الكمية", "السعر (دج)"]
-    pdf.set_y(100)
+    col_widths = [22, 78, 25, 25, 40]
+    headers = ["Image", "Description", "Réf.", "Couleur", "Quantité"]
+    pdf.set_y(70)
     pdf.set_font("Arial", "B", 11)
     for width, header in zip(col_widths, headers):
         pdf.cell(width, 10, header, border=1, align='C')
@@ -558,8 +439,8 @@ def generate_order_pdf(
     for item in items:
         row_height = 20
         start_x = pdf.get_x()
-        if item.get('Image'):
-            full_img_path = get_full_image_path(item['Image'])
+        if item.get('images'):  # Match bon_de_commande.py item structure
+            full_img_path = get_full_image_path(find_image_path_for_color(item['images'], item.get('color')))
             if full_img_path and os.path.exists(full_img_path):
                 img_width, img_height = calculate_image_dimensions(full_img_path, max_width_mm=22, max_height_mm=20)
                 row_height = max(row_height, img_height + 2)
@@ -572,58 +453,33 @@ def generate_order_pdf(
             pdf.cell(col_widths[0], row_height, "", border=1)
         
         pdf.set_xy(start_x + col_widths[0], pdf.get_y())
-        pdf.cell(col_widths[1], row_height, truncate_text(item['denomination'], 35), border=1, align='L')
+        pdf.cell(col_widths[1], row_height, truncate_text(item['denomination'], 45), border=1, align='L')
         pdf.cell(col_widths[2], row_height, item['reference'], border=1, align='C')
-        pdf.cell(col_widths[3], row_height, str(item['Quantity']), border=1, align='C')
-        price_total = item['Price'] * item['Quantity']
-        pdf.cell(col_widths[4], row_height, f"{price_total:,.2f}", border=1, align='R')
+        pdf.cell(col_widths[3], row_height, item.get('color', ''), border=1, align='C')
+        pdf.cell(col_widths[4], row_height, str(item['quantity']), border=1, align='C')
         pdf.ln(row_height)
 
-    # Summary
+    # Manufacturing Notes
     pdf.ln(10)
-    pdf.set_font("Arial", size=12)
-    pdf.cell(0, 8, f"Sous-total: {subtotal:,.2f} DZD" if language == "French" else f"المجموع الفرعي: {subtotal:,.2f} دج", 0, 1, 'R')
-    pdf.set_font("Arial", "B", 14)
-    pdf.cell(0, 10, f"Total Général: {total:,.2f} DZD" if language == "French" else f"المجموع العام: {total:,.2f} دج", 0, 1, 'R')
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 8, "Notes de Fabrication:", 0, 1)
+    pdf.set_font("Arial", size=10)
+    pdf.multi_cell(0, 6, manufacturing_notes or "Aucune")
 
-    # Amount in Words
-    total_int = int(total)
-    total_dec = int(round((total - total_int) * 100))
-    if language == "French":
-        amount_words = num2words(total_int, lang='fr').replace('et', '').replace('-', ' ') + " Dinars Algériens"
-        if total_dec > 0:
-            amount_words += f" et {num2words(total_dec, lang='fr').replace('et', '').replace('-', ' ')} centimes"
-    else:
-        amount_words = num2words(total_int, lang='ar') + " دينار جزائري"
-        if total_dec > 0:
-            amount_words += f" و {num2words(total_dec, lang='ar')} سنتيم"
-    pdf.set_font("Arial", 'I', 10)
-    pdf.cell(0, 6, f"Montant en lettres: {amount_words}" if language == "French" else f"المبلغ بالحروف: {amount_words}", 0, 1)
-
-    # Notes and Footer
-    if notes:
-        pdf.ln(5)
-        pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 5, f"Notes: {notes}" if language == "French" else f"ملاحظات: {notes}")
-    
+    # Footer
     pdf.set_y(-40)
     pdf.set_font("Arial", "I", 9)
-    footer_text = (
-        "Merci de confirmer la réception et la disponibilité des articles.\n"
-        "Pour toute question, contactez-nous à contact@takideco.dz ou au 0542918226."
-    ) if language == "French" else (
-        "يرجى تأكيد الاستلام وتوافر المواد.\n"
-        "لأي استفسار، تواصلوا معنا على contact@takideco.dz أو 0542918226."
-    )
+    footer_text = "Merci de confirmer la réception et la disponibilité des articles.\nPour toute question, contactez-nous à contact@takideco.dz ou au 0542918226."
     pdf.multi_cell(0, 5, footer_text, align='C')
-
     pdf.set_fill_color(144, 238, 144)
     pdf.rect(0, 287, 210, 10, 'F')
 
     # File Naming and Output
-    supplier_name = supplier_info.get('name', 'Unknown') if supplier_info else 'Unknown'
-    date_str = order_info['order_date'].replace('/', '')
-    pdf_filename = f"Order-{supplier_name}-{order_info['order_number']}-{date_str}.pdf"
+    date_str = order_date.replace('/', '')
+    pdf_filename = f"BonDeCommande-{order_id}-{date_str}.pdf"
     pdf_path = os.path.join(output_dir, pdf_filename)
     pdf.output(pdf_path)
     return pdf_path
+
+def truncate_text(text, max_length=35):
+    return (text[:max_length] + '...') if len(text) > max_length else text 
