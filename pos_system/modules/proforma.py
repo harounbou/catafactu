@@ -8,11 +8,11 @@ from modules.client_management import get_client_info, add_new_client, save_clie
 from modules.transaction_management import record_transaction
 from modules.pdf_generator import generate_proforma_pdf
 from modules.utils import (
-    validate_email,
+    #validate_email,
     validate_phone,
     find_image_path_for_color,
     get_full_image_path,
-    send_email,
+    #send_email,
     fetch_df_from_db
 )
 from modules.product_management import check_stock
@@ -335,18 +335,18 @@ def proforma_page(products_df, clients_df):
                 st.download_button("💾 Télécharger PDF", f, file_name=os.path.basename(pdf_path), mime="application/pdf")
         with cols[1]:
             st.markdown(f'<a href="file://{pdf_path}" target="_blank"><button>🖨️ Imprimer PDF</button></a>', unsafe_allow_html=True)
-        with cols[2]:
-            client_email = st.session_state.proforma_client.get('email_client', '')
-            if client_email and validate_email(client_email):
-                if st.button("📧 Envoyer par email", type="primary"):
-                    subject = f"Facture Proforma #{transaction_id}"
-                    body = f"""Bonjour {st.session_state.proforma_client.get('nom_client', '')},
+       # with cols[2]:
+       #    client_email = st.session_state.proforma_client.get('email_client', '')
+       #   if client_email and validate_email(client_email):
+       #      if st.button("📧 Envoyer par email", type="primary"):
+       #         subject = f"Facture Proforma #{transaction_id}"
+       #        body = f"""Bonjour {st.session_state.proforma_client.get('nom_client', '')},
                     
-Voici votre facture proforma #{transaction_id}.
-Montant total: {total:.2f} DZD
-Effectué par: {username}
+#Voici votre facture proforma #{transaction_id}.
+#Montant total: {total:.2f} DZD
+#Effectué par: {username}
 
-Cordialement,
-Takideco"""
-                    if send_email(client_email, subject, body, pdf_path):
-                        st.success("Email envoyé avec succès!")
+#Cordialement,
+#Takideco"""
+#                    if send_email(client_email, subject, body, pdf_path):
+ #                       st.success("Email envoyé avec succès!")

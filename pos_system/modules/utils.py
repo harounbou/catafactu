@@ -6,9 +6,9 @@ from PIL import Image
 import streamlit as st
 import pandas as pd
 import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
+#from email.mime.multipart import MIMEMultipart
+#from email.mime.text import MIMEText
+#from email.mime.application import MIMEApplication
 
 
 
@@ -179,8 +179,8 @@ def validate_phone(phone):
         return True
     return bool(re.match(PHONE_REGEX, phone))
 
-def send_email(to_email, subject, body, attachment_path=None):
-    """Send an email with optional attachment."""
+"""def send_email(to_email, subject, body, attachment_path=None):
+    """"Send an email with optional attachment.""""""
     sender_email = st.secrets["gmail"]["email"]
     sender_password = st.secrets["gmail"]["password"]
     
@@ -205,7 +205,7 @@ def send_email(to_email, subject, body, attachment_path=None):
         return True
     except Exception as e:
         st.error(f"Échec de l'envoi de l'email : {e}")
-        return False
+        return False"""
 
 def find_image_path_for_color(image_paths, color):
     """

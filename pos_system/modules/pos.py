@@ -6,10 +6,11 @@ import json
 from datetime import datetime
 from .client_management import get_client_info, add_new_client, save_clients, update_client
 from .transaction_management import record_transaction
-from .pdf_generator import generate_receipt_pdf, send_email
+#from .pdf_generator import send_email
+from .pdf_generator import generate_receipt_pdf
 from .utils import get_db_color_name  # Ensure this import works
 from .utils import (
-    validate_email,
+   # validate_email,
     validate_phone,
     find_image_path_for_color,
     get_full_image_path,

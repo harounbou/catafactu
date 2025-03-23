@@ -54,7 +54,7 @@ from modules.utils import (
     validate_phone,
     find_image_path_for_color,
     get_full_image_path,
-    send_email,
+    #send_email,
     get_db_connection
 )
 

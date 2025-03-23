@@ -8,15 +8,15 @@ from .utils import get_full_image_path, calculate_image_dimensions, truncate_tex
 import streamlit as st
 import pandas as pd
 import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
+#from email.mime.multipart import MIMEMultipart
+#from email.mime.text import MIMEText
+#from email.mime.application import MIMEApplication
 from .client_management import get_client_info, add_new_client, save_clients
 from .transaction_management import record_transaction
 import qrcode
 
-def send_email(to_email, subject, body, attachment_path=None):
-    """Send an email with an optional PDF attachment using Gmail SMTP."""
+"""def send_email(to_email, subject, body, attachment_path=None):
+    """"Send an email with an optional PDF attachment using Gmail SMTP.""""
     sender_email = st.secrets["gmail"]["email"]
     sender_password = st.secrets["gmail"]["password"]
     msg = MIMEMultipart()
@@ -38,7 +38,7 @@ def send_email(to_email, subject, body, attachment_path=None):
         return True
     except Exception as e:
         st.error(f"Échec de l'envoi de l'email : {e}")
-        return False
+        return False"""
 
 def generate_proforma_pdf(items, price_type, client_info, transaction_info, apply_tva=False, 
                          discount_type="Pourcentage", discount_value=0.0, show_onama=False, 
