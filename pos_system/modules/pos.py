@@ -75,8 +75,7 @@ def pos_page(products_df, clients_df):
         st.markdown('<div class="pos-section"><h3 class="pos-title">⚙️ Configuration</h3>', unsafe_allow_html=True)
         cols = st.columns([1, 1, 2])
         with cols[0]:
-            price_type = "prix-détail"
-            st.write("Type de prix: prix-détail")
+            price_type = st.radio("Type de prix", ["prix-super-gros", "prix-gros", "prix-détail"], horizontal=True, key="pos_price_type")
         with cols[1]:
             discount_type = st.selectbox("Type de remise", ["Pourcentage", "Montant fixe"], key="pos_discount_type")
             discount_value = st.number_input("Valeur Remise", min_value=0.0, format="%.2f", step=0.5, key="pos_discount_value")
