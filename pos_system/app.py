@@ -41,8 +41,7 @@ from modules.transaction_management import (
 
 from modules.pdf_generator import (
     generate_receipt_pdf,
-    generate_proforma_pdf,
-    generate_order_pdf
+    generate_proforma_pdf
 )
 
 from modules.proforma import proforma_page

@@ -50,11 +50,10 @@ COLOR_STYLES = {
     'default': '#f5f5f5'
 }
 
-def get_db_color_name(display_color: str) -> str:
+def get_db_color_name(display_color):
     """Map display color names to database column names"""
     cleaned_color = display_color.lower().replace(" ", "_")
     return COLOR_MAPPING.get(cleaned_color, cleaned_color)
-
 
 def get_db_connection():
     """Establish a connection to the SQLite database."""
