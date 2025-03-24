@@ -16,6 +16,7 @@ from .utils import (
     fetch_df_from_db,
     get_db_color_name
 )
+
 from .product_management import load_products, update_stock, check_stock
 
 def replace_nan_with_none(data):
@@ -75,6 +76,18 @@ def display_stock_matrix(product, colors):
     if sold_qty > 0:
         st.info(f"📉 Tendance: {sold_qty} unités vendues récemment.")
 
+def stock_checker_section(products_df, prefix=""):
+    """Display a standalone stock checker with enhanced stock features."""
+    st.subheader("Vérifier la Disponibilité")
+    
+    product_options = ["Sélectionnez un produit..."] + products_df['denomination'].tolist()
+    selected_product = st.selectbox("Produit", product_options, key=f"{prefix}stock_product")
+    
+    if selected_product != "Sélectionnez un produit...":
+        product = products_df[products_df['denomination'] == selected_product].iloc[0]
+        colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
+        display_stock_matrix(product, colors)
+
 def pos_page(products_df, clients_df):
     """
     Render the Point of Sale (POS) page in Streamlit for issuing receipts and managing transactions.
@@ -87,7 +100,7 @@ def pos_page(products_df, clients_df):
         'pos_items': [],
         'pos_client': None,
         'panier_valide': False,
-        'generated_pdf': None,
+        'pos_generated_pdf': None,
         'transaction_status': None,
         'remaining_amount': 0.0,
         'payment_type': None,
@@ -100,7 +113,7 @@ def pos_page(products_df, clients_df):
     # Reset Transaction
     if st.button("🔄 Réinitialiser Transaction", type="secondary", key="reset_transaction_button"):
         reset_keys = [
-            'pos_items', 'pos_client', 'panier_valide', 'generated_pdf',
+            'pos_items', 'pos_client', 'panier_valide', 'pos_generated_pdf',
             'transaction_status', 'remaining_amount', 'payment_type',
             'reservation_expiry', 'pos_filtered', 'filtered_clients',
             'pos_price_type', 'pos_discount_type', 'pos_discount_value',
@@ -281,7 +294,7 @@ def pos_page(products_df, clients_df):
                     if not st.session_state.pos_client:
                         st.error("Veuillez sélectionner ou ajouter un client avant de finaliser.")
                     else:
-                        transaction_types = ["Achat Immédiat", "Commande Personnalisée", "Achat en Compte"]
+                        transaction_types = ["Achat Immédiat", "Commande Personnalisée", "Achat en Compte", "Générer Bon de Commande"]
                         scenario = st.radio("Type de Transaction", transaction_types, key="pos_transaction_type")
                         
                         payment_methods = ["Espèces", "Virement", "CCP", "Chèque"]
@@ -339,7 +352,6 @@ def pos_page(products_df, clients_df):
                                     )
                                     pdf_paths.append(pdf_path)
                                 elif doc_type in ["Bon de Commande", "Bon d'Achat"]:
-                                    # Generate order PDF without watermark
                                     order_pdf_path = generate_order_pdf(
                                         order_id=transaction_id,
                                         city="Unknown",
@@ -349,11 +361,10 @@ def pos_page(products_df, clients_df):
                                         shipping_method="To be specified",
                                         payment_option="Partial Payment" if deposit_amount > 0 else "Full Payment",
                                         created_by=username,
-                                        watermark=None  # No watermark for order document
+                                        watermark=None
                                     )
                                     pdf_paths.append(order_pdf_path)
                                     
-                                    # Generate receipt PDF with watermark for deposit scenarios
                                     if status == "deposit_paid":
                                         receipt_pdf_path = generate_receipt_pdf(
                                             transaction_info={
@@ -373,11 +384,11 @@ def pos_page(products_df, clients_df):
                                             notes=notes,
                                             deposit_amount=deposit_amount,
                                             remaining_amount=remaining_amount,
-                                            watermark=receipt_watermark  # Watermark for receipt
+                                            watermark=receipt_watermark
                                         )
                                         pdf_paths.append(receipt_pdf_path)
                                 
-                                st.session_state.generated_pdf = pdf_paths
+                                st.session_state.pos_generated_pdf = pdf_paths
                                 st.session_state.transaction_status = status
                                 st.session_state.remaining_amount = remaining_amount
                                 st.success(f"Transaction {transaction_id} enregistrée! Statut: {status}")
@@ -385,7 +396,44 @@ def pos_page(products_df, clients_df):
                                 st.session_state.panier_valide = False
                                 st.rerun()
 
-                        if scenario == "Achat Immédiat":
+                        if scenario == "Générer Bon de Commande":
+                            # Generate Bon de Commande without payment or stock deduction
+                            if st.button("Générer Bon de Commande", type="primary", key="generate_order"):
+                                transaction_id = record_transaction(
+                                    client_info=replace_nan_with_none(st.session_state.pos_client),
+                                    items=replace_nan_with_none(st.session_state.pos_items),
+                                    total_amount=subtotal,
+                                    payment_details={},  # No payment details
+                                    final_amount=total,
+                                    status="order_generated",  # Custom status for Bon de Commande
+                                    performed_by=username,
+                                    tva_applied=apply_tva,
+                                    tva_amount=tva_amount,
+                                    deposit_amount=0.0,  # No deposit
+                                    remaining_amount=0.0  # No remaining amount
+                                )
+                                
+                                # Generate Bon de Commande PDF
+                                order_pdf_path = generate_order_pdf(
+                                    order_id=transaction_id,
+                                    city="Unknown",  # You can customize this
+                                    order_date=datetime.now().strftime("%d/%m/%Y"),
+                                    delivery_address="To be specified",  # You can customize this
+                                    items=st.session_state.pos_items,
+                                    shipping_method="To be specified",  # You can customize this
+                                    payment_option="Non applicable",  # No payment for Bon de Commande
+                                    created_by=username,
+                                    watermark=""
+                                )
+                                
+                                st.session_state.pos_generated_pdf = [order_pdf_path]
+                                st.session_state.transaction_status = "order_generated"
+                                st.success(f"Bon de Commande {transaction_id} généré avec succès!")
+                                st.session_state.pos_items = []
+                                st.session_state.panier_valide = False
+                                st.rerun()
+
+                        elif scenario == "Achat Immédiat":
                             stock_ok = all(
                                 int(products_df[products_df['reference'] == item['reference']].iloc[0].get(
                                     get_db_color_name(item['Color']).lower() if item['Color'] else 'quantite_actuelle', 0) or 0
@@ -491,33 +539,45 @@ def pos_page(products_df, clients_df):
                     st.markdown('</div>', unsafe_allow_html=True)
 
     # PDF Download
-    if st.session_state.get('generated_pdf'):
-        pdf_paths = st.session_state.generated_pdf
-        if isinstance(pdf_paths, list):
-            zip_buffer = BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                for pdf_path in pdf_paths:
-                    with open(pdf_path, 'rb') as f:
-                        zip_file.writestr(os.path.basename(pdf_path), f.read())
-            zip_buffer.seek(0)
-            st.download_button(
-                "💾 Télécharger les Documents",
-                data=zip_buffer,
-                file_name="documents.zip",
-                mime="application/zip"
-            )
-        else:
-            with open(pdf_paths, "rb") as f:
-                st.download_button("💾 Télécharger PDF", f, file_name=os.path.basename(pdf_paths), mime="application/pdf")
+    if st.session_state.get('pos_generated_pdf'):
+        pdf_paths = st.session_state.pos_generated_pdf
 
-def stock_checker_section(products_df, prefix=""):
-    """Display a standalone stock checker with enhanced stock features."""
-    st.subheader("Vérifier la Disponibilité")
-    
-    product_options = ["Sélectionnez un produit..."] + products_df['denomination'].tolist()
-    selected_product = st.selectbox("Produit", product_options, key=f"{prefix}stock_product")
-    
-    if selected_product != "Sélectionnez un produit...":
-        product = products_df[products_df['denomination'] == selected_product].iloc[0]
-        colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
-        display_stock_matrix(product, colors)
+        # Ensure pdf_paths is a list for consistent handling
+        if isinstance(pdf_paths, str):
+            pdf_paths = [pdf_paths]  # Convert single string to a list with one item
+
+        if len(pdf_paths) == 1:
+            # Single PDF: Download directly as a PDF file
+            pdf_path = pdf_paths[0]
+            with open(pdf_path, "rb") as f:
+                st.download_button(
+                    label="💾 Télécharger le Document",
+                    data=f,
+                    file_name=os.path.basename(pdf_path),
+                    mime="application/pdf",
+                    key="download_single_pdf"
+                )
+        elif len(pdf_paths) == 2:
+            # Two PDFs: Provide two separate download buttons
+            for pdf_path in pdf_paths:
+                pdf_filename = os.path.basename(pdf_path)
+                # Determine a descriptive label based on the filename
+                if "Facture" in pdf_filename:
+                    label = "💾 Télécharger la Facture"
+                elif "BonDeCommande" in pdf_filename:
+                    label = "💾 Télécharger le Bon de Commande"
+                elif "BonDAchat" in pdf_filename:
+                    label = "💾 Télécharger le Bon d'Achat"
+                else:
+                    label = f"💾 Télécharger {pdf_filename}"
+                
+                with open(pdf_path, "rb") as f:
+                    st.download_button(
+                        label=label,
+                        data=f,
+                        file_name=pdf_filename,
+                        mime="application/pdf",
+                        key=f"download_{pdf_filename}"  # Unique key for each button
+                    )
+        else:
+            st.warning("Nombre inattendu de fichiers PDF générés. Contactez le support.")

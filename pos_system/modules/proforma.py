@@ -224,14 +224,23 @@ def proforma_page(products_df, clients_df):
                 st.session_state.proforma_filtered['denomination'] == selected_product
             ].iloc[0]
             
-            # Total quantity across all colors
-            total_quantity = int(product['quantite_actuelle']) if pd.notna(product['quantite_actuelle']) else 0
-            
             # Parse available colors
             colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
             color = None
             color_quantity = None
             full_selected_path = None
+            
+            # Calculate total quantity correctly
+            if colors:
+                color_stock = {
+                    c: int(product[get_db_color_name(c).lower()]) 
+                    if get_db_color_name(c).lower() in product and pd.notna(product[get_db_color_name(c).lower()]) 
+                    else 0 
+                    for c in colors
+                }
+                total_quantity = sum(color_stock.values())
+            else:
+                total_quantity = int(product['quantite_actuelle']) if pd.notna(product['quantite_actuelle']) else 0
             
             if colors:
                 color_cols = st.columns([2, 1])
@@ -268,12 +277,6 @@ def proforma_page(products_df, clients_df):
             # 4. Color Availability Overview
             if colors:
                 st.write("**Disponibilité par couleur**:")
-                color_stock = {
-                    c: int(product[get_db_color_name(c).lower()]) 
-                    if get_db_color_name(c).lower() in product and pd.notna(product[get_db_color_name(c).lower()]) 
-                    else 0 
-                    for c in colors
-                }
                 for c, qty in color_stock.items():
                     st.write(f"- {c}: {qty} unités")
 
@@ -296,6 +299,8 @@ def proforma_page(products_df, clients_df):
                 st.session_state.proforma_items.append(item)
                 st.success("Article ajouté au panier!")
         st.markdown('</div>', unsafe_allow_html=True)
+
+
 
     # Cart Display and Validation
     if st.session_state.proforma_items:
