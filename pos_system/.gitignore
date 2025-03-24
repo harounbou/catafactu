@@ -1,1 +1,20 @@
+# Existing
 .env
+
+# Virtual environment
+venv/
+
+# Backups and databases
+backups/
+
+# Generated files
+generated_pdfs/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Optional: Ignore images if hosted externally
+# images/
