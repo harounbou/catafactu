@@ -8,21 +8,27 @@ from modules.client_management import get_client_info, add_new_client, save_clie
 from modules.transaction_management import record_transaction
 from modules.pdf_generator import generate_proforma_pdf
 from modules.utils import (
-    #validate_email,
     validate_phone,
     find_image_path_for_color,
     get_full_image_path,
-    #send_email,
+    get_db_color_name,
     fetch_df_from_db
 )
 from modules.product_management import check_stock
 from modules.pos import stock_checker_section
 
 def proforma_page(products_df, clients_df):
+    """
+    Render the Proforma Invoice Generator page in Streamlit.
+    
+    Args:
+        products_df (pd.DataFrame): DataFrame containing product data from the database.
+        clients_df (pd.DataFrame): DataFrame containing client data from the database.
+    """
     st.title("📄 Générateur de Facture Proforma")
     username = st.session_state['user']['username']
 
-    # Reset Button (unchanged)
+    # Reset Button
     if st.button("🔄 Réinitialiser Proforma", type="secondary"):
         st.session_state.proforma_items = []
         st.session_state.proforma_client = None
@@ -33,7 +39,7 @@ def proforma_page(products_df, clients_df):
         st.success("Proforma réinitialisée avec succès!")
         st.rerun()
 
-    # Retrieve Previous Documents (Updated)
+    # Retrieve Previous Documents (unchanged)
     with st.container():
         st.markdown('<div class="proforma-section"><h3 class="proforma-title">📜 Récupérer un Document</h3>', unsafe_allow_html=True)
         doc_type = st.selectbox("Type de Document", ["Proforma", "Facture", "Bon de Commande"], key="retrieve_doc_type")
@@ -53,7 +59,6 @@ def proforma_page(products_df, clients_df):
             else:  # Bon de Commande
                 filtered = orders_df
             
-            # Filter by search term if provided, otherwise show all
             if search_term:
                 if doc_type in ["Proforma", "Facture"]:
                     filtered = filtered[
@@ -64,7 +69,6 @@ def proforma_page(products_df, clients_df):
                     filtered = filtered[
                         (filtered['order_id'].astype(str).str.contains(search_term, na=False))
                     ]
-            # If no search term, show all documents
             if not filtered.empty:
                 if doc_type in ["Proforma", "Facture"]:
                     options = [
@@ -200,7 +204,7 @@ def proforma_page(products_df, clients_df):
                         st.error("Les champs 'Nom' et 'Téléphone' sont obligatoires.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Item Selection Section
+    # Item Selection Section with Enhanced Stock Features
     with st.container():
         st.markdown('<div class="proforma-section"><h3 class="proforma-title">🛒 Sélection d\'Articles</h3>', unsafe_allow_html=True)
         search_cols = st.columns([3, 1])
@@ -220,8 +224,13 @@ def proforma_page(products_df, clients_df):
                 st.session_state.proforma_filtered['denomination'] == selected_product
             ].iloc[0]
             
+            # Total quantity across all colors
+            total_quantity = int(product['quantite_actuelle']) if pd.notna(product['quantite_actuelle']) else 0
+            
+            # Parse available colors
             colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
             color = None
+            color_quantity = None
             full_selected_path = None
             
             if colors:
@@ -233,6 +242,45 @@ def proforma_page(products_df, clients_df):
                         full_selected_path = find_image_path_for_color(product['images'], color)
                         if full_selected_path:
                             st.image(get_full_image_path(full_selected_path), caption=color, width=80)
+                        # Get quantity for the selected color
+                        db_color = get_db_color_name(color).lower()
+                        color_quantity = int(product[db_color]) if db_color in product and pd.notna(product[db_color]) else 0
+            
+            # --- Enhanced Stock Features ---
+            # 1. Stock Information Display
+            st.write(f"**Stock Total ({product['denomination']})**: {total_quantity} unités")
+            if color and color_quantity is not None:
+                st.write(f"**Stock pour {color}**: {color_quantity} unités")
+            elif color:
+                st.warning(f"Aucune donnée de stock pour la couleur {color}")
+
+            # 2. Low Stock Warning
+            if total_quantity < 10:
+                st.warning(f"⚠️ Stock faible: seulement {total_quantity} unités restantes au total!")
+            if color_quantity is not None and color_quantity < 5:
+                st.warning(f"⚠️ Stock faible pour {color}: seulement {color_quantity} unités restantes!")
+
+            # 3. Stock Trend Indicator
+            sold_qty = int(product['quantite_vendue']) if pd.notna(product['quantite_vendue']) else 0
+            if sold_qty > 0:
+                st.info(f"📉 Tendance: {sold_qty} unités vendues récemment.")
+
+            # 4. Color Availability Overview
+            if colors:
+                st.write("**Disponibilité par couleur**:")
+                color_stock = {
+                    c: int(product[get_db_color_name(c).lower()]) 
+                    if get_db_color_name(c).lower() in product and pd.notna(product[get_db_color_name(c).lower()]) 
+                    else 0 
+                    for c in colors
+                }
+                for c, qty in color_stock.items():
+                    st.write(f"- {c}: {qty} unités")
+
+            # 5. Last Updated Timestamp
+            last_updated = product['last_updated'] if pd.notna(product['last_updated']) else "Inconnu"
+            st.write(f"**Dernière mise à jour du stock**: {last_updated}")
+            # --- End of Enhanced Stock Features ---
 
             qty = st.number_input("Quantité", min_value=1, value=1)
             
@@ -335,18 +383,3 @@ def proforma_page(products_df, clients_df):
                 st.download_button("💾 Télécharger PDF", f, file_name=os.path.basename(pdf_path), mime="application/pdf")
         with cols[1]:
             st.markdown(f'<a href="file://{pdf_path}" target="_blank"><button>🖨️ Imprimer PDF</button></a>', unsafe_allow_html=True)
-       # with cols[2]:
-       #    client_email = st.session_state.proforma_client.get('email_client', '')
-       #   if client_email and validate_email(client_email):
-       #      if st.button("📧 Envoyer par email", type="primary"):
-       #         subject = f"Facture Proforma #{transaction_id}"
-       #        body = f"""Bonjour {st.session_state.proforma_client.get('nom_client', '')},
-                    
-#Voici votre facture proforma #{transaction_id}.
-#Montant total: {total:.2f} DZD
-#Effectué par: {username}
-
-#Cordialement,
-#Takideco"""
-#                    if send_email(client_email, subject, body, pdf_path):
- #                       st.success("Email envoyé avec succès!")
