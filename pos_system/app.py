@@ -653,76 +653,135 @@ def articles_page():
         )
     
     # Tab 3: Add New
+
+    
+
     with tab3:
         st.subheader("Add New Product")
-        color_fields = [
-            'uni_colour', 'default_colour', 'brown', 'brown_deg', 'blue', 'white', 'black',
-            'green_bottle', 'red', 'grey', 'grey_deg', 'beige', 'yellow', 'orange',
-            'garnet', 'golden', 'green', 'rose'
-        ]
-        new_data = {
-            "reference": st.text_input("Reference", key="new_ref"),
-            "denomination": st.text_input("Name", key="new_name"),
-            "quantite_initiale": st.number_input("Initial Quantity", min_value=0, key="new_init", format="%d"),
-            "quantite_restockee": 0,
-            "quantite_vendue": 0,
-            "quantite_vendu_actue": 0,
-            "couleurs-dispo-usine": st.text_input("Colors", key="new_colors"),
-            "prix-super-gros": st.number_input("Super Gros Price", min_value=0.0, key="new_sg"),
-            "prix-gros": st.number_input("Gros Price", min_value=0.0, key="new_g"),
-            "prix-détail": st.number_input("Detail Price", min_value=0.0, key="new_d"),
-            "images": "",
-            "note": st.text_area("Note", key="new_note"),
-            "category": st.text_input("Category", key="new_category"),
-            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "discontinued": 0
-        }
+        new_data = {}  # Collect form data
+        
+        # Required fields
+        cols = st.columns(3)
+        new_data['reference'] = cols[0].text_input("Reference*", key="new_ref")
+        new_data['denomination'] = cols[1].text_input("Name*", key="new_name")
+        new_data['category'] = cols[2].text_input("Category*", key="new_category")
+        
+        # Validation
+        errors = validate_product_data(new_data)
+        if errors:
+            for error in errors:
+                st.error(error)
+            return
         
         # Color quantities
-        for color in color_fields:
-            new_data[color] = st.number_input(
-                color.replace("_", " ").title(),
-                min_value=0,
-                value=0,
-                format="%d",
-                key=f"new_{color}"
-            )
+        color_fields = [c for c in COLOR_STYLES.keys() if c not in ['default', 'uni_colour']]
+        color_quantities = {}
+        st.write("### Color Quantities")
+        cols = st.columns(4)
+        for idx, color in enumerate(color_fields):
+            with cols[idx % 4]:
+                color_quantities[color] = st.number_input(
+                    color.replace("_", " ").title(),
+                    min_value=0,
+                    value=0,
+                    key=f"new_{color}"
+                )
+        new_data.update(color_quantities)
         
-        # Calculate and display current quantity
-        quantite_actuelle = sum(new_data[color] for color in color_fields)
-        st.write(f"**Current Quantity**: {quantite_actuelle}")
-        new_data["quantite_actuelle"] = quantite_actuelle
+        # Image handling
+        st.write("### Product Images")
+        selected_color = st.selectbox("Select color for images", color_fields)
+        new_images = st.file_uploader("Upload product images", 
+                                    type=['jpg', 'png', 'jpeg'],
+                                    accept_multiple_files=True)
         
-        available_colors = [c.strip() for c in new_data['couleurs-dispo-usine'].split(',')] if new_data['couleurs-dispo-usine'] else []
-        selected_color = st.selectbox("Select Color for New Image", available_colors, key="new_color_select") if available_colors else None
-        new_images = st.file_uploader("Add Images", ['jpg', 'png', 'jpeg'], accept_multiple_files=True, key="new_up")
+        if new_images:
+            try:
+                image_paths = handle_product_images(
+                    new_data['reference'],
+                    new_data['category'],
+                    new_data['denomination'],
+                    new_images,
+                    selected_color
+                )
+                new_data['images'] = ','.join(image_paths)
+            except Exception as e:
+                st.error(f"Image upload failed: {str(e)}")
+                return
         
-        if new_images and selected_color:
-            category = new_data['category'] or "CHAIR"
-            denomination = new_data['denomination'].replace(" ", "_")
-            folder_path = os.path.abspath(os.path.join("images", category, denomination))
-            os.makedirs(folder_path, exist_ok=True)
-            image_paths = []
-            for img in new_images:
-                ext = os.path.splitext(img.name)[1].lower()
-                base_name = f"{new_data['reference']}_{selected_color.upper()}"
-                img_count = len([i for i in image_paths if selected_color.upper() in i.upper()])
-                new_img_name = f"{base_name}{ext}" if img_count == 0 else f"{base_name}-{img_count}{ext}"
-                img_path = os.path.join(folder_path, new_img_name)
-                with open(img_path, "wb") as f:
-                    f.write(img.getbuffer())
-                image_paths.append(img_path)
-            new_data['images'] = ','.join(image_paths)
-            cols = st.columns(min(len(image_paths), 4))
-            for idx, img_path in enumerate(image_paths):
+        if st.button("Add Product"):
+            if add_or_update_product(new_data):
+                update_product_stock(new_data['reference'])
+                st.success("Product added successfully!")
+                st.rerun()
+
+    # Edit Product Section
+    with tab1:
+        # ... existing product selection ...
+        
+        if selected_product_display != "Select a product...":
+            # Color quantity editing
+            st.write("### Stock Management")
+            for color in available_colors:
+                db_column = get_db_color_name(color)
+                current_qty = product.get(db_column, 0)
+                updated_qty = st.number_input(
+                    f"{color} Stock",
+                    value=int(current_qty),
+                    min_value=0,
+                    key=f"edit_{db_column}"
+                )
+                updated_data[db_column] = updated_qty
+            
+            # Automatic stock recalculation
+            if st.button("Recalculate Total Stock"):
+                update_product_stock(selected_ref)
+                st.rerun()
+            
+            # Image management
+            st.write("### Image Management")
+            current_images = [img.strip() for img in product['images'].split(',')] if product['images'] else []
+            
+            # Display images with delete options
+            cols = st.columns(4)
+            for idx, img_path in enumerate(current_images):
                 with cols[idx % 4]:
-                    st.image(img_path, width=100, caption=os.path.basename(img_path))
-        
-        if st.button("Add Product", key="add_btn"):
-            add_or_update_product(new_data)
-            st.session_state.add_confirmation = f"Product '{new_data['reference']} - {new_data['denomination']}' added successfully!"
-            st.rerun()
-    
+                    st.image(img_path, width=100)
+                    if st.button(f"Delete", key=f"del_img_{idx}"):
+                        try:
+                            os.remove(img_path)
+                            current_images.remove(img_path)
+                            add_or_update_product(
+                                {"reference": selected_ref, "images": ','.join(current_images)},
+                                is_update=True
+                            )
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Delete failed: {str(e)}")
+            
+            # Add new images
+            new_images = st.file_uploader("Add new images", 
+                                         accept_multiple_files=True,
+                                         key=f"add_images_{selected_ref}")
+            if new_images:
+                try:
+                    new_paths = handle_product_images(
+                        selected_ref,
+                        product['category'],
+                        product['denomination'],
+                        new_images,
+                        selected_color
+                    )
+                    current_images.extend(new_paths)
+                    add_or_update_product(
+                        {"reference": selected_ref, "images": ','.join(current_images)},
+                        is_update=True
+                    )
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Image upload failed: {str(e)}")
+
+
     # Tab 4: Manage Discontinued
     with tab4:
         st.subheader("Discontinued Products")

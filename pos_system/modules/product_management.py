@@ -4,20 +4,117 @@ import pandas as pd
 import sqlite3
 import os
 from datetime import datetime
-from .utils import get_db_connection
-from .utils import get_db_color_name  # <-- KEY FIX
-
+from .utils import get_db_connection, get_db_color_name, transactional_update
+from io import BytesIO
 
 # Configurable feature flag
 ENABLE_PRICE_HISTORY = False  # Toggle this in a config file or environment variable
+
+def log_audit_event(username, action, reference, description):
+    """Log an audit event (placeholder implementation)."""
+    pass
+
+def add_or_update_product(product_data, is_update=False, enable_price_history=ENABLE_PRICE_HISTORY):
+    """Add or update a product with image handling."""
+    conn = get_db_connection()
+    try:
+        ref = product_data['reference']
+        errors = validate_product_data(product_data, is_update=is_update)
+        if errors:
+            try:
+                st.error(f"Validation errors: {errors}")
+            except AttributeError:
+                print(f"Validation errors: {errors}")
+            return False
+        
+        existing_df = load_products(active_only=False)
+        with conn:
+            cursor = conn.cursor()
+            values = (
+                ref,
+                product_data['denomination'],
+                product_data.get('quantite_actuelle', 0.0),
+                product_data.get('couleurs-dispo-usine', ''),
+                product_data.get('images', ''),
+                product_data.get('prix-super-gros', 0.0),
+                product_data.get('prix-gros', 0.0),
+                product_data.get('prix-détail', 0.0),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                product_data.get('discontinued', 0),
+                product_data.get('category', '')
+            )
+            
+            if is_update:
+                if ref not in existing_df['reference'].values:
+                    try:
+                        st.error(f"Cannot update: Product {ref} does not exist!")
+                    except AttributeError:
+                        print(f"Cannot update: Product {ref} does not exist!")
+                    return False
+                cursor.execute('''UPDATE products SET denomination=?, quantite_actuelle=?, 
+                                `couleurs-dispo-usine`=?, images=?, `prix-super-gros`=?, 
+                                `prix-gros`=?, `prix-détail`=?, last_updated=?, discontinued=?, 
+                                category=? WHERE reference=?''', (*values[1:], ref))
+                action = "updated"
+                try:
+                    log_audit_event(
+                        st.session_state.user['username'],
+                        "UPDATE",
+                        ref,
+                        f"Fields changed: {list(product_data.keys())}"
+                    )
+                except AttributeError:
+                    print(f"Audit log: UPDATE {ref} - Fields changed: {list(product_data.keys())}")
+            else:
+                if ref in existing_df['reference'].values:
+                    try:
+                        st.error("Reference already exists!")
+                    except AttributeError:
+                        print("Reference already exists!")
+                    return False
+                cursor.execute('''INSERT INTO products 
+                                (reference, denomination, quantite_actuelle, `couleurs-dispo-usine`, 
+                                images, `prix-super-gros`, `prix-gros`, `prix-détail`, last_updated, 
+                                discontinued, category)
+                                VALUES (?,?,?,?,?,?,?,?,?,?,?)''', values)
+                action = "added"
+            
+            if enable_price_history and is_update:
+                old_product = existing_df[existing_df['reference'] == ref].iloc[0]
+                for price_type, new_val, old_val in [
+                    ('super_gros', product_data['prix-super-gros'], old_product['prix-super-gros']),
+                    ('gros', product_data['prix-gros'], old_product['prix-gros']),
+                    ('detail', product_data['prix-détail'], old_product['prix-détail'])
+                ]:
+                    if new_val != old_val:
+                        cursor.execute('''INSERT INTO price_history 
+                                        (product_ref, price_type, old_price, new_price, changed_at)
+                                        VALUES (?, ?, ?, ?, ?)''', 
+                                        (ref, price_type, old_val, new_val, datetime.now()))
+            conn.commit()
+        try:
+            st.success(f"Product {action} successfully!")
+        except AttributeError:
+            print(f"Product {action} successfully!")
+        return True
+    except Exception as e:
+        conn.rollback()
+        try:
+            st.error(f"Error: {str(e)}")
+        except AttributeError:
+            print(f"Error in add_or_update_product: {str(e)}")
+        return False
+    finally:
+        conn.close()
 
 def backup_database():
     """Create a backup of the database."""
     conn = get_db_connection()
     try:
-        # Assuming the database file path is known or configured
-        db_path = "path/to/your/database.db"  # Replace with actual path or fetch from config
-        backup_path = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+        # Replace with actual database path or fetch from config
+        db_path = "path/to/your/database.db"
+        backup_path = f"backups/backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sqlite"
+        os.makedirs(os.path.dirname(backup_path), exist_ok=True)
         import shutil
         shutil.copy2(db_path, backup_path)
         return backup_path
@@ -26,28 +123,27 @@ def backup_database():
         return None
     finally:
         conn.close()
-    
+
 def calculate_current_quantity(product_row):
-    """Calculate quantite_actuelle from color quantities"""
+    """Calculate quantite_actuelle from color quantities."""
     color_fields = [
         'uni_colour', 'default_colour', 'brown', 'brown_deg',
         'blue', 'white', 'black', 'green_bottle', 'red', 'grey',
         'grey_deg', 'beige', 'yellow', 'orange', 'garnet',
         'golden', 'green', 'rose'
     ]
-    return sum(int(product_row[col]) for col in color_fields if col in product_row)
+    return sum(int(product_row[col]) for col in color_fields if col in product_row and pd.notna(product_row[col]))
 
 def load_products(active_only=True):
+    """Load products from the database."""
     conn = get_db_connection()
     if conn is None:
         st.error("Debug: Failed to connect to database")
         return pd.DataFrame()
     
     query = "SELECT * FROM products WHERE discontinued = 0" if active_only else "SELECT * FROM products"
-    #st.write(f"Debug: Executing query: {query}")  # Log query
     try:
         df = pd.read_sql_query(query, conn)
-        #st.write(f"Debug: Raw data from DB: {df.shape}")  # Log shape of data
     except Exception as e:
         st.error(f"Debug: Error loading products: {e}")
         df = pd.DataFrame()
@@ -121,59 +217,6 @@ def import_products_from_excel(file):
     finally:
         conn.close()
 
-def add_or_update_product(product_data, is_update=False):
-    """Add or update a product with image handling."""
-    conn = get_db_connection()
-    try:
-        ref = product_data['reference']
-        existing_df = load_products(active_only=False)
-        with conn:
-            cursor = conn.cursor()
-            values = (
-                ref, product_data['denomination'], product_data['quantite_actuelle'],
-                product_data['couleurs-dispo-usine'], product_data['images'],
-                product_data['prix-super-gros'], product_data['prix-gros'], product_data['prix-détail'],
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 0
-            )
-            
-            if is_update and ref in existing_df['reference'].values:
-                cursor.execute('''UPDATE products SET denomination=?, quantite_actuelle=?, 
-                                `couleurs-dispo-usine`=?, images=?, `prix-super-gros`=?, 
-                                `prix-gros`=?, `prix-détail`=?, last_updated=?, discontinued=?
-                                WHERE reference=?''', (*values[1:], ref))
-                action = "updated"
-            else:
-                if ref in existing_df['reference'].values:
-                    st.error("Reference already exists!")
-                    return False
-                cursor.execute('''INSERT INTO products 
-                                (reference, denomination, quantite_actuelle, `couleurs-dispo-usine`, 
-                                images, `prix-super-gros`, `prix-gros`, `prix-détail`, last_updated, discontinued)
-                                VALUES (?,?,?,?,?,?,?,?,?,?)''', values)
-                action = "added"
-            
-            if ENABLE_PRICE_HISTORY and is_update:
-                old_product = existing_df[existing_df['reference'] == ref].iloc[0]
-                for price_type, new_val, old_val in [
-                    ('super_gros', product_data['prix-super-gros'], old_product['prix-super-gros']),
-                    ('gros', product_data['prix-gros'], old_product['prix-gros']),
-                    ('detail', product_data['prix-détail'], old_product['prix-détail'])
-                ]:
-                    if new_val != old_val:
-                        cursor.execute('''INSERT INTO price_history 
-                                        (product_ref, price_type, old_price, new_price, changed_at)
-                                        VALUES (?, ?, ?, ?, ?)''', 
-                                        (ref, price_type, old_val, new_val, datetime.now()))
-            conn.commit()
-        st.success(f"Product {action} successfully!")
-        return True
-    except Exception as e:
-        conn.rollback()
-        st.error(f"Error: {str(e)}")
-        return False
-    finally:
-        conn.close()
-
 def mark_discontinued(reference):
     """Mark a product as discontinued."""
     conn = get_db_connection()
@@ -189,23 +232,8 @@ def mark_discontinued(reference):
     finally:
         conn.close()
 
-def permanently_delete(reference):
-    """Permanently delete a discontinued product (admin only)."""
-    conn = get_db_connection()
-    try:
-        with conn:
-            conn.execute("DELETE FROM products WHERE reference=? AND discontinued=1", (reference,))
-        st.success("Product permanently deleted!")
-        return True
-    except Exception as e:
-        st.error(f"Error: {str(e)}")
-        return False
-    finally:
-        conn.close()
-
-# modules/product_management.py
 def check_stock(reference, quantity, color=None):
-    """Check stock for a specific product and color"""
+    """Check stock for a specific product and color."""
     products_df = load_products()
     product = products_df[products_df['reference'] == reference]
     
@@ -213,7 +241,6 @@ def check_stock(reference, quantity, color=None):
         return False, "Product not found"
         
     if color:
-        # Get database column name for the color
         db_color = get_db_color_name(color)
         if db_color not in product.columns:
             return False, f"Color {color} not available"
@@ -222,7 +249,6 @@ def check_stock(reference, quantity, color=None):
         if pd.isna(stock) or stock < quantity:
             return False, f"Only {stock} units available in {color}"
     else:
-        # Check total stock if no color specified
         stock = product['quantite_actuelle'].values[0]
         if pd.isna(stock) or stock < quantity:
             return False, f"Only {stock} units available in total"
@@ -230,6 +256,7 @@ def check_stock(reference, quantity, color=None):
     return True, "In stock"
 
 def update_stock(reference, quantity_change, color=None):
+    """Update stock levels for a product."""
     conn = get_db_connection()
     try:
         with conn:
@@ -242,7 +269,6 @@ def update_stock(reference, quantity_change, color=None):
                     WHERE reference = ?
                 """, (quantity_change, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
 
-            # Calculate new total quantity from all colors
             cursor.execute("SELECT * FROM products WHERE reference = ?", (reference,))
             product = cursor.fetchone()
             colors = [c.strip().lower() for c in product['couleurs-dispo-usine'].split(',')] if product['couleurs-dispo-usine'] else []
@@ -265,7 +291,7 @@ def update_stock(reference, quantity_change, color=None):
         conn.close()
 
 def restock_product(reference, quantity_to_add, color=None):
-    """Restock a product with color-aware quantity updates"""
+    """Restock a product with color-aware quantity updates."""
     if quantity_to_add <= 0:
         raise ValueError("Restock quantity must be positive")
         
@@ -273,20 +299,16 @@ def restock_product(reference, quantity_to_add, color=None):
     try:
         with conn:
             cursor = conn.cursor()
-            
-            # Get current values for validation
             cursor.execute("SELECT * FROM products WHERE reference = ?", (reference,))
             product = cursor.fetchone()
             if not product:
                 raise ValueError(f"Product {reference} not found")
             
-            # Validate color exists if specified
             if color and color != "total":
                 color = color.lower().replace(" ", "_")
                 if color not in product.keys():
                     raise ValueError(f"Invalid color {color} for product {reference}")
                 
-                # Update color-specific quantity
                 cursor.execute(f"""
                     UPDATE products 
                     SET `{color}` = `{color}` + ?,
@@ -296,7 +318,6 @@ def restock_product(reference, quantity_to_add, color=None):
                 """, (quantity_to_add, quantity_to_add, 
                       datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
             else:
-                # Update general restock quantity
                 cursor.execute("""
                     UPDATE products 
                     SET quantite_restockee = quantite_restockee + ?,
@@ -307,7 +328,6 @@ def restock_product(reference, quantity_to_add, color=None):
             
             conn.commit()
             return True
-            
     except sqlite3.Error as e:
         conn.rollback()
         st.error(f"Database error during restock: {str(e)}")
@@ -317,7 +337,6 @@ def restock_product(reference, quantity_to_add, color=None):
 
 def generate_excel_template():
     """Generate a sample Excel template."""
-    from io import BytesIO
     sample_data = {
         'reference': ['PROD001'], 'denomination': ['Sample Product'], 'quantite_actuelle': [100],
         'couleurs-dispo-usine': ['Red,Blue'], 'images': ['image1.jpg'], 
@@ -326,13 +345,107 @@ def generate_excel_template():
     output = BytesIO()
     pd.DataFrame(sample_data).to_excel(output, index=False)
     return output.getvalue()
-    """Generate a sample Excel template."""
-    from io import BytesIO
-    sample_data = {
-        'reference': ['PROD001'], 'denomination': ['Sample Product'], 'quantite_actuelle': [100],
-        'couleurs-dispo-usine': ['Red,Blue'], 'images': ['image1.jpg'], 
-        'prix-super-gros': [5000], 'prix-gros': [7500], 'prix-détail': [10000]
-    }
-    output = BytesIO()
-    pd.DataFrame(sample_data).to_excel(output, index=False)
-    return output.getvalue()
+
+def validate_product_data(data, is_update=False):
+    """Validate product data before insertion/update."""
+    errors = []
+    required_fields = ['reference', 'denomination', 'category']
+    for field in required_fields:
+        if not data.get(field):
+            errors.append(f"Field '{field}' is required")
+    
+    if not is_update:
+        existing_refs = load_products(active_only=False)['reference'].tolist()
+        if data['reference'] in existing_refs:
+            errors.append("Reference must be unique")
+    
+    price_fields = ['prix-super-gros', 'prix-gros', 'prix-détail']
+    for field in price_fields:
+        if float(data.get(field, 0)) < 0:
+            errors.append(f"{field} cannot be negative")
+    
+    return errors
+
+def handle_product_images(reference, category, denomination, new_images, selected_color):
+    """Process and store product images with proper organization."""
+    image_paths = []
+    base_dir = os.path.join("images", category.strip().replace(" ", "_"), denomination.strip().replace(" ", "_"))
+    os.makedirs(base_dir, exist_ok=True)
+
+    for idx, img in enumerate(new_images):
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        ext = img.type.split("/")[-1]
+        filename = f"{reference}_{selected_color}_{timestamp}_{idx}.{ext}"
+        img_path = os.path.join(base_dir, filename)
+        
+        with open(img_path, "wb") as f:
+            f.write(img.getbuffer())
+        
+        image_paths.append(img_path)
+    
+    return image_paths
+
+def update_product_stock(reference):
+    """Recalculate total stock from color quantities."""
+    conn = get_db_connection()
+    try:
+        product = load_products(active_only=False).query(f"reference == '{reference}'")
+        if product.empty:
+            raise ValueError(f"Product {reference} not found")
+        product = product.iloc[0]
+        
+        COLOR_STYLES = [
+            'uni_colour', 'default_colour', 'brown', 'brown_deg', 'blue', 'white', 'black',
+            'green_bottle', 'red', 'grey', 'grey_deg', 'beige', 'yellow', 'orange', 'garnet',
+            'golden', 'green', 'rose'
+        ]
+        color_fields = [col for col in product.index if col in COLOR_STYLES]
+        total_stock = sum(int(product[col]) for col in color_fields if pd.notna(product[col]))
+        
+        with conn:
+            conn.execute("""
+                UPDATE products 
+                SET quantite_actuelle = ?
+                WHERE reference = ?
+            """, (total_stock, reference))
+        return True
+    except Exception as e:
+        st.error(f"Stock update failed: {str(e)}")
+        return False
+    finally:
+        conn.close()
+
+@transactional_update
+def permanently_delete(reference, conn=None):
+    """Admin-only deletion with transaction safety."""
+    transactions = conn.execute(
+        "SELECT COUNT(*) FROM transactions WHERE items LIKE ?",
+        (f'%{reference}%',)
+    ).fetchone()[0]
+    
+    if transactions > 0:
+        raise ValueError("Product has associated transactions")
+    
+    conn.execute("DELETE FROM price_history WHERE product_ref = ?", (reference,))
+    conn.execute("DELETE FROM products WHERE reference = ?", (reference,))
+    
+    try:
+        log_audit_event(st.session_state.user['username'],
+                       "DELETE", reference, 
+                       "Product permanently deleted")
+    except AttributeError:
+        pass  # Skip logging if not in Streamlit context
+    
+    return True
+
+def safe_delete_product(reference):
+    """User-friendly delete handler."""
+    try:
+        if permanently_delete(reference):
+            st.success("Product deleted successfully")
+            return True
+    except ValueError as e:
+        st.error(str(e))
+    except Exception as e:
+        st.error(f"Deletion failed: {str(e)}")
+    return False

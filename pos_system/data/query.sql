@@ -1,2 +1,1 @@
-SELECT "couleurs-dispo-usine" FROM "products"
-009876543
+sqlite3 data/pos_system.db < migrations/002_price_history.sql

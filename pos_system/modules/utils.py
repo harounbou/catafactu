@@ -234,3 +234,61 @@ def find_image_path_for_color(image_paths, color):
     
     st.warning(f"No valid images found for {image_paths}")
     return None
+
+# modules/utils.py
+
+def transactional_update(func):
+    """Decorator for database operations requiring transaction safety"""
+    def wrapper(*args, **kwargs):
+        conn = None
+        try:
+            conn = get_db_connection()
+            conn.execute("BEGIN")
+            result = func(*args, **kwargs, conn=conn)
+            conn.commit()
+            return result
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            st.error(f"Operation failed: {str(e)}")
+            return False
+        finally:
+            if conn:
+                conn.close()
+    return wrapper
+
+def log_audit_event(user, action, reference, details=None):
+    """Record audit trail entries"""
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            INSERT INTO audit_log 
+            (timestamp, user, action, reference, details)
+            VALUES (?, ?, ?, ?, ?)
+        """, (datetime.now(), user, action, reference, str(details)))
+        conn.commit()
+    except Exception as e:
+        st.error(f"Audit log failed: {str(e)}")
+    finally:
+        conn.close()
+
+# modules/utils.py
+
+def transactional_update(func):
+    """Decorator for transactional database operations"""
+    def wrapper(*args, **kwargs):
+        conn = None
+        try:
+            conn = get_db_connection()
+            conn.execute("BEGIN")
+            result = func(*args, conn=conn, **kwargs)
+            conn.commit()
+            return result
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            raise e
+        finally:
+            if conn:
+                conn.close()
+    return wrapper

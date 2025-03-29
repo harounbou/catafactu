@@ -1,8 +1,9 @@
-#client_management.py
+# modules/client_management.py
 import pandas as pd
 import streamlit as st
 import sqlite3
 from .utils import get_db_connection, fetch_df_from_db, save_df_to_db, validate_email, validate_phone
+
 
 def initialize_clients_df():
     conn = get_db_connection()
@@ -17,15 +18,31 @@ def initialize_clients_df():
     finally:
         conn.close()
 
-def get_client_info(clients_df, identifier, search_type="Nom"):
-    if search_type == "ID Client":
-        client = clients_df[clients_df['id_client'] == identifier]
-    else:
-        client = clients_df[clients_df['nom_client'] == identifier]
+def get_client_info(df, identifier, column_name):
+    """Retrieve client information with robust error handling"""
+    if df is None or df.empty:
+        return None
     
-    if not client.empty:
-        return client.iloc[0].to_dict()
-    return None
+    # Initialize as empty DataFrame
+    client = pd.DataFrame()
+
+    try:
+        if column_name not in df.columns:
+            st.error(f"Column '{column_name}' not found in DataFrame.")
+            return None
+
+        # Fixed case conversion - removed .str for non-series object
+        client = df[
+            df[column_name].astype(str).str.lower() == str(identifier).lower()  # Fixed line
+        ]
+
+        if not client.empty:
+            return client.iloc[0].to_dict()
+        return None
+
+    except Exception as e:
+        st.error(f"Error retrieving client info: {str(e)}")
+        return None
 
 def add_new_client(clients_df, new_client):
     new_id = clients_df['id_client'].max() + 1 if not clients_df.empty else 1
@@ -36,6 +53,7 @@ def save_clients(clients_df):
     conn = get_db_connection()
     try:
         clients_df.to_sql('clients', conn, if_exists='replace', index=False)
+        conn.commit()
     finally:
         conn.close()
 
@@ -43,7 +61,6 @@ def clients_page():
     st.title("Gestion des Clients")
     clients_df = initialize_clients_df()
     
-    # Search Section
     with st.container():
         st.markdown("### Recherche Client")
         search_cols = st.columns([3, 1])
@@ -52,13 +69,12 @@ def clients_page():
         with search_cols[1]:
             if st.button("🔍 Rechercher", use_container_width=True):
                 filtered = clients_df[
-                    (clients_df['nom_client'].str.contains(search_term, case=False)) |
-                    (clients_df['entreprise_client'].str.contains(search_term, case=False)) |
-                    (clients_df['telephone_client'].str.contains(search_term))
+                    (clients_df['nom_client'].str.contains(search_term, case=False, na=False)) |
+                    (clients_df['entreprise_client'].str.contains(search_term, case=False, na=False)) |
+                    (clients_df['telephone_client'].str.contains(search_term, na=False))
                 ]
                 st.session_state.filtered_clients = filtered if not filtered.empty else None
     
-    # Data Editor
     if 'filtered_clients' in st.session_state and st.session_state.filtered_clients is not None:
         edited_df = st.data_editor(
             st.session_state.filtered_clients,
@@ -88,7 +104,6 @@ def clients_page():
             }
         )
     
-    # Save Button
     if st.button("Sauvegarder Modifications", type="primary"):
         save_clients(edited_df)
         st.success("Clients mis à jour avec succès!")
@@ -106,35 +121,19 @@ def add_new_client_info(clients_df, client_info):
             clients_df = pd.concat([clients_df, pd.DataFrame([client_info])], ignore_index=True)
             save_df_to_db(clients_df, 'clients')
             client_id = client_info['id_client']
-            # Ensure no duplicates in recent_clients
             if 'recent_clients' not in st.session_state:
                 st.session_state['recent_clients'] = []
             if client_id in st.session_state['recent_clients']:
-                st.session_state['recent_clients'].remove(client_id)  # Remove existing entry
-            st.session_state['recent_clients'].insert(0, client_id)  # Add to front
+                st.session_state['recent_clients'].remove(client_id)
+            st.session_state['recent_clients'].insert(0, client_id)
             if len(st.session_state['recent_clients']) > 5:
-                st.session_state['recent_clients'].pop()  # Keep only 5 most recent
+                st.session_state['recent_clients'].pop()
             conn.close()
             return clients_df
         except sqlite3.Error as e:
             st.error(f"Failed to add new client: {e}")
             conn.close()
     return clients_df
-
-def add_new_client(clients_df, new_client_info):
-    """Add a new client and refresh clients_df"""
-    conn = get_db_connection()
-    try:
-        new_client_df = pd.DataFrame([new_client_info])
-        if 'id_client' not in new_client_df.columns or pd.isna(new_client_df['id_client'].iloc[0]):
-            max_id = clients_df['id_client'].max() if not clients_df.empty else 0
-            new_client_df['id_client'] = max_id + 1
-        updated_df = pd.concat([clients_df, new_client_df], ignore_index=True)
-        updated_df.to_sql('clients', conn, if_exists='replace', index=False)
-        st.session_state['clients_df'] = updated_df
-        return updated_df
-    finally:
-        conn.close()
 
 def update_client(clients_df, client_info, index):
     clients_df.loc[index, client_info.keys()] = client_info.values()
@@ -165,14 +164,5 @@ def delete_client(clients_df, index):
         clients_df.to_sql('clients', conn, if_exists='replace', index=False)
         st.session_state['clients_df'] = clients_df
         return clients_df
-    finally:
-        conn.close()
-
-def save_clients(clients_df):
-    """Save clients_df to database"""
-    conn = get_db_connection()
-    try:
-        clients_df.to_sql('clients', conn, if_exists='replace', index=False)
-        st.session_state['clients_df'] = clients_df  # Update session state
     finally:
         conn.close()

@@ -3,201 +3,617 @@
 ├── armchair.png
 ├── backups
 │   ├── backup_20250324_000035.sqlite
-│   └── images-bkup
+│   ├── backup_20250326_000022.sqlite
+│   ├── backup_20250327_000043.sqlite
+│   ├── backup_20250328_000035.sqlite
+│   ├── images-bkup
+│   │   ├── BEDS
+│   │   │   └── Lit_Bebe
+│   │   ├── CHAIR
+│   │   │   ├── CHAISE_ACCOUDOIRE
+│   │   │   │   └── Temp
+│   │   │   │       └── LZ0005.JPG
+│   │   │   ├── CHAISE_BALANCOIRE
+│   │   │   │   └── Temp
+│   │   │   │       ├── CHAISE BALONCOIORE BAJ 06.jpg
+│   │   │   │       ├── CHAISE BALONCOIORE BLEU.jpg
+│   │   │   │       ├── CHAISE BALONCOIORE BLEU.png
+│   │   │   │       ├── CHAISE BALONCOIRE 005.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE 005.png
+│   │   │   │       ├── CHAISE BALONCOIRE 03.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE 03.png
+│   │   │   │       ├── CHAISE BALONCOIRE BAJ 01.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE BAJ 01.png
+│   │   │   │       ├── CHAISE BALONCOIRE BAJ 02.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE BAJ 02.png
+│   │   │   │       ├── CHAISE BALONCOIRE BAJ 03.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE BAJ 04.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE BAJ 04.png
+│   │   │   │       ├── CHAISE BALONCOIRE NOIR 02.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE NOIRE.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE ROUGE 03.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE ROUGE 03.png
+│   │   │   │       ├── CHAISE BALONCOIRE ROUGE.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE ROUGE.png
+│   │   │   │       ├── CHAISE BALONCOIRE baj.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE baj.png
+│   │   │   │       ├── CHAISE BALONCOIRE.jpg
+│   │   │   │       ├── CHAISE BALONCOIRE.png
+│   │   │   │       ├── CHAISE BALONCOIRE01.jpg
+│   │   │   │       ├── CHAOISE BALONCOIRE 02.jpg
+│   │   │   │       ├── CHAOISE BALONCOIRE 02.png
+│   │   │   │       ├── ChaiseBalancoirTakideco2.jpg
+│   │   │   │       ├── ChaiseBalancoirTakideco4.jpg
+│   │   │   │       ├── ChaiseBalancoirTakideco5.jpg
+│   │   │   │       ├── ChaiseBalancoireTakideco.jpg
+│   │   │   │       ├── ChaiseBalancoireTakideco11.jpg
+│   │   │   │       ├── ChaiseBalancoireTakideco12.jpg
+│   │   │   │       ├── ChaiseBalancoireTakideco2.jpg
+│   │   │   │       ├── ChaiseBalancoireTakideco6.jpg
+│   │   │   │       ├── ChaiseBalancoireTakideco8.jpg
+│   │   │   │       ├── ChaiseBalancoireTakideco9.jpg
+│   │   │   │       ├── DIM CHAISE BALANCOIR.jpg
+│   │   │   │       └── chaise balancoire.jpg
+│   │   │   ├── CHAISE_BOLERO
+│   │   │   │   └── Temp
+│   │   │   │       ├── CHAISE BOLERO CARRE.jpg
+│   │   │   │       ├── CHAISE BOLERO CARRE.png
+│   │   │   │       ├── CHAISE BOLERO ROND.jpg
+│   │   │   │       └── CHAISE BOLERO ROND.png
+│   │   │   ├── CHAISE_ETOILE
+│   │   │   │   └── Temp
+│   │   │   │       ├── CHAISE ETOILE 02.jpg
+│   │   │   │       ├── CHAISE ETOILE 02.png
+│   │   │   │       ├── CHAISE ETOILE NATURE.jpg
+│   │   │   │       └── CHAISE ETOILE NATURE.png
+│   │   │   ├── CHAISE_HAUTE
+│   │   │   │   └── Temp
+│   │   │   │       ├── #1-RT0032.JPG
+│   │   │   │       └── DIM CHAISE HAUTE.jpg
+│   │   │   ├── CHAISE_LONGUE
+│   │   │   │   └── Temp
+│   │   │   │       ├── #1-RT0056.JPG
+│   │   │   │       ├── #2-RT0056.png
+│   │   │   │       └── #3-RT0056.JPG
+│   │   │   ├── CHAISE_LONGUE_GM
+│   │   │   │   └── Temp
+│   │   │   │       └── #1-RT0055.JPG
+│   │   │   ├── CHAISE_NAPOLEON
+│   │   │   │   ├── FR0005_BLACK.jpg
+│   │   │   │   ├── FR0005_GOLDEN-1.jpg
+│   │   │   │   ├── FR0005_GOLDEN-1.png
+│   │   │   │   ├── FR0005_GOLDEN-2.png
+│   │   │   │   ├── FR0005_GOLDEN.jpeg
+│   │   │   │   ├── FR0005_GOLDEN.jpg
+│   │   │   │   ├── FR0005_GOLDEN.png
+│   │   │   │   ├── FR0005_WHITE.jpeg
+│   │   │   │   ├── FR0005_WHITE.jpg
+│   │   │   │   └── Temp
+│   │   │   │       └── DIM CHAISE NAPOLEIN.jpg
+│   │   │   ├── Chaise_Medaillon
+│   │   │   │   ├── ME1000_BLACK.png
+│   │   │   │   ├── ME1000_GOLDEN.png
+│   │   │   │   ├── ME1000_WHITE.png
+│   │   │   │   └── Temp
+│   │   │   │       └── DIM CHAISE MEDAILLON.jpg
+│   │   │   ├── NICHE_DEMI_BALLON
+│   │   │   └── Test_Item
+│   │   │       └── TEST001_BLUE.png
+│   │   ├── CUSHIONS_ACCESSORIES
+│   │   │   └── COUSSIN_BALLON_TRESSEE
+│   │   │       └── Temp
+│   │   │           └── COUSSIN BALLON TRESSEE.jpeg
+│   │   ├── FR0005_GOLDEN.jpg
+│   │   ├── LIGHTING
+│   │   │   └── plafoniere_silicon
+│   │   ├── MIRRORS
+│   │   │   └── MIROIRE_GM
+│   │   ├── MISCELLANEOUS
+│   │   │   ├── BONQUETE_TRESSEE
+│   │   │   │   └── Temp
+│   │   │   │       └── BONQUETE TRESSEE.jpeg
+│   │   │   ├── CHAISE_
+│   │   │   ├── CHAISE_PAPILLON_
+│   │   │   │   └── Temp
+│   │   │   │       ├── DIM CHAISE PAPILLON.jpg
+│   │   │   │       ├── TABLE ET CHAISE PAPILLON.jpg
+│   │   │   │       └── TABLE ET CHAISE PAPILLON.png
+│   │   │   ├── CHAISE_PLIANTE_
+│   │   │   │   └── Temp
+│   │   │   │       └── chaise pliable.jpg
+│   │   │   ├── CHAISE_SPORT_
+│   │   │   │   └── Temp
+│   │   │   │       ├── #1-RT0046.JPG
+│   │   │   │       ├── CHAISE SPORT GRIS.jpg
+│   │   │   │       └── CHAISE SPORT GRIS.png
+│   │   │   ├── CHAISE_TOLIX_
+│   │   │   │   └── Temp
+│   │   │   │       └── DIM CHAISE TOLIX.jpg
+│   │   │   ├── PARASOL_2.50*2.50_
+│   │   │   │   └── UK0013_BROWN.png
+│   │   │   ├── PARAVENT_4_PANNEAUX_BOIS_2\012_+_THERE_ARE_3_MISSING_IN_THE\012_STOCK
+│   │   │   │   ├── RT0097_BROWN-1.jpg
+│   │   │   │   ├── RT0097_BROWN.jpg
+│   │   │   │   ├── RT0097_GREEN-2.jpg
+│   │   │   │   ├── RT0097_GREEN-3.jpg
+│   │   │   │   ├── RT0097_GREY-3.jpg
+│   │   │   │   ├── RT0097_GREY-4.jpg
+│   │   │   │   ├── RT0097_WHITE-2.jpg
+│   │   │   │   └── RT0097_WHITE-3.jpg
+│   │   │   ├── PIED_TABLE_DEMONTABLE_-_MOIN_UN_BASE
+│   │   │   │   └── Temp
+│   │   │   │       └── #1-RT0080.JPG
+│   │   │   ├── POUFFE_TRESSE_A_BOULE_
+│   │   │   ├── SALON_01_PLACE_
+│   │   │   │   └── Temp
+│   │   │   │       └── SALON 4 PLACE NOIR.jpg
+│   │   │   ├── SALON_CHEBKA\012TABLE__4_CHAISE
+│   │   │   │   └── Temp
+│   │   │   │       ├── DIM SALON CHEBKA.jpg
+│   │   │   │       └── SALON CHEBKA.jpg
+│   │   │   ├── TRANSAT
+│   │   │   │   └── Temp
+│   │   │   │       └── transat1.png
+│   │   │   ├── Veilleuse_
+│   │   │   ├── _CHAISE_CHEBKA
+│   │   │   ├── _Porte_Manteau_PM_
+│   │   │   │   └── Temp
+│   │   │   │       ├── PortManteau1.png
+│   │   │   │       ├── PortManteau2.png
+│   │   │   │       └── PortManteau3.png
+│   │   │   ├── logo
+│   │   │   │   └── 0987654321_BLUE.png
+│   │   │   └── test-item
+│   │   │       └── 0987654321_BLUE.png
+│   │   ├── PARASOL_SCREENS
+│   │   │   ├── PARAVANTE_4_Panneaux_fer
+│   │   │   ├── PARAVENT_4_PANNEAUX_FER
+│   │   │   │   └── Temp
+│   │   │   │       ├── PARAVENT 4 PANNEAUX.jpeg
+│   │   │   │       └── PARAVENT 4 PANNEAUX.png
+│   │   │   └── PARAVON_2M_?
+│   │   │       ├── RT0135_WHITE-1.png
+│   │   │       └── RT0135_WHITE.png
+│   │   ├── SHELVING
+│   │   │   └── ETAGERE_5_ETAGES
+│   │   │       └── Temp
+│   │   │           ├── Eteger 4 ètages.jpeg
+│   │   │           └── Eteger 5 ètages.jpeg
+│   │   ├── SOFA_LOUNGE
+│   │   │   ├── SALON_04_PLACE_AVEC_TABLE
+│   │   │   │   └── Temp
+│   │   │   │       └── SALON BLANC AVEC TABLE ROND.jpg
+│   │   │   ├── SALON_1_PLACE
+│   │   │   │   └── Temp
+│   │   │   │       ├── #1-RT0034.JPG
+│   │   │   │       ├── SALON 1.jpg
+│   │   │   │       └── SALON 12.jpeg
+│   │   │   └── SALON_2_PLACES
+│   │   │       └── Temp
+│   │   │           └── SALON 4 PLACES 01.jpg
+│   │   ├── STOOLS
+│   │   │   ├── TABOURET_CARRE
+│   │   │   │   └── Temp
+│   │   │   │       └── TABOURET JAUNE.jpg
+│   │   │   ├── TABOURET_ROND
+│   │   │   │   └── Temp
+│   │   │   │       └── TABOURET ROSE.jpg
+│   │   │   └── TABOURET_TRESSE_RECTANGULAIRE
+│   │   │       └── Temp
+│   │   │           └── TABOURET TRESSE RECTANGULAIRE HA0002.jpeg
+│   │   ├── STORAGE
+│   │   │   ├── ARMOIRE
+│   │   │   │   └── Temp
+│   │   │   │       ├── RT0041.JPG
+│   │   │   │       └── RT0041.png
+│   │   │   ├── BOX_FER
+│   │   │   │   └── Temp
+│   │   │   │       └── #1-RT0057.jpg
+│   │   │   ├── PORTE_CHAUSSURE
+│   │   │   │   └── Temp
+│   │   │   │       └── PORTE CHAUSSURE.jpeg
+│   │   │   ├── POT_DE_SEPARATION
+│   │   │   │   └── Temp
+│   │   │   │       └── #1-RT0083.JPG
+│   │   │   ├── POUF_BARIL
+│   │   │   │   └── Temp
+│   │   │   │       └── POUF BARIL.jpeg
+│   │   │   └── POUF_COFFRE
+│   │   │       └── Temp
+│   │   │           └── POUF COFFRE.jpeg
+│   │   ├── TABLE
+│   │   │   ├── TABLE_BALANCOIRE
+│   │   │   │   └── Temp
+│   │   │   │       ├── DIM TABLE BALANCOIR.jpg
+│   │   │   │       ├── TABLE BALONCOIRE BAIJE.jpg
+│   │   │   │       ├── TABLE BALONCOIRE BAIJE.png
+│   │   │   │       └── TABLE BALONCOIRE BAIJE1.png
+│   │   │   ├── TABLE_BASSE_TABLE_LMKAOUASS
+│   │   │   │   └── Temp
+│   │   │   │       └── TABLE BASSE (TABLE LMKAOUASS).jpeg
+│   │   │   ├── TABLE_HAUTE
+│   │   │   │   └── Temp
+│   │   │   │       ├── #1-RT0040.JPG
+│   │   │   │       └── DIM TABLE HAUTE.jpg
+│   │   │   ├── TABLE_LOVE
+│   │   │   │   └── Temp
+│   │   │   │       └── #1-RT007475.JPG
+│   │   │   ├── TABLE_RONDE_TETE_A_TETE
+│   │   │   │   └── Temp
+│   │   │   │       ├── #1-LZ0006.JPG
+│   │   │   │       └── TABLE RONDE TETE A TETE LZ0006.jpeg
+│   │   │   ├── table_basse_060_x_080
+│   │   │   │   └── Temp
+│   │   │   │       └── TABLE BASSE 0.60 X 0.80 RT0034.jpeg
+│   │   │   ├── table_box_130_x_070
+│   │   │   │   └── Temp
+│   │   │   │       └── #1-RT0047.jpg
+│   │   │   └── table_gigogne_050_x_050
+│   │   │       └── Temp
+│   │   │           └── #1-RT0060.JPG
+│   │   ├── benchmarking
+│   │   │   ├── CHAISE_BOLERO.jpg
+│   │   │   ├── CHAISE_ETOILE.png
+│   │   │   ├── CHAISE_MEDAILLON.jpg
+│   │   │   └── CHAISE_NAPOLEON.jpg
+│   │   ├── logo.png
+│   │   └── nature.png
+│   └── images-old
 │       ├── BEDS
 │       │   └── Lit_Bebe
+│       ├── CACHE_POT
 │       ├── CHAIR
 │       │   ├── CHAISE_ACCOUDOIRE
+│       │   │   ├── LZ0005_BROWN.JPG
+│       │   │   ├── LZ0005_BROWN_2.jpg
 │       │   │   └── Temp
-│       │   │       └── LZ0005.JPG
+│       │   │       └── LZ0005_BLACK.jpg
 │       │   ├── CHAISE_BALANCOIRE
+│       │   │   ├── HDD0104_BEIGE.jpg
+│       │   │   ├── HDD0104_BEIGE_1.jpg
+│       │   │   ├── HDD0104_BEIGE_4.jpg
+│       │   │   ├── HDD0104_BEIGE_9.jpg
+│       │   │   ├── HDD0104_BLACK.jpg
+│       │   │   ├── HDD0104_BLACK_1.jpg
+│       │   │   ├── HDD0104_BLUE.jpg
+│       │   │   ├── HDD0104_BROWN.jpg
+│       │   │   ├── HDD0104_BROWN.png
+│       │   │   ├── HDD0104_BROWN_2.jpg
+│       │   │   ├── HDD0104_BROWN_4.jpg
+│       │   │   ├── HDD0104_GREY_ROSE.png
+│       │   │   ├── HDD0104_GREY_ROSE_2.jpg
+│       │   │   ├── HDD0104_ORANGE.jpg
+│       │   │   ├── HDD0104_RED_1.jpg
+│       │   │   ├── HDD0104_RED_1.png
+│       │   │   ├── HDD0104_RED_2.jpg
+│       │   │   ├── HDD0104_RED_2.png
+│       │   │   ├── HDD0104_WHITE_BLACK.jpg
+│       │   │   ├── HDD0104_WHITE_BLACK.png
+│       │   │   ├── HDD0104_YELLOW.jpg
 │       │   │   └── Temp
-│       │   │       ├── CHAISE BALONCOIORE BAJ 06.jpg
-│       │   │       ├── CHAISE BALONCOIORE BLEU.jpg
-│       │   │       ├── CHAISE BALONCOIORE BLEU.png
-│       │   │       ├── CHAISE BALONCOIRE 005.jpg
-│       │   │       ├── CHAISE BALONCOIRE 005.png
 │       │   │       ├── CHAISE BALONCOIRE 03.jpg
 │       │   │       ├── CHAISE BALONCOIRE 03.png
-│       │   │       ├── CHAISE BALONCOIRE BAJ 01.jpg
-│       │   │       ├── CHAISE BALONCOIRE BAJ 01.png
-│       │   │       ├── CHAISE BALONCOIRE BAJ 02.jpg
-│       │   │       ├── CHAISE BALONCOIRE BAJ 02.png
-│       │   │       ├── CHAISE BALONCOIRE BAJ 03.jpg
-│       │   │       ├── CHAISE BALONCOIRE BAJ 04.jpg
-│       │   │       ├── CHAISE BALONCOIRE BAJ 04.png
-│       │   │       ├── CHAISE BALONCOIRE NOIR 02.jpg
-│       │   │       ├── CHAISE BALONCOIRE NOIRE.jpg
-│       │   │       ├── CHAISE BALONCOIRE ROUGE 03.jpg
-│       │   │       ├── CHAISE BALONCOIRE ROUGE 03.png
-│       │   │       ├── CHAISE BALONCOIRE ROUGE.jpg
-│       │   │       ├── CHAISE BALONCOIRE ROUGE.png
-│       │   │       ├── CHAISE BALONCOIRE baj.jpg
-│       │   │       ├── CHAISE BALONCOIRE baj.png
-│       │   │       ├── CHAISE BALONCOIRE.jpg
-│       │   │       ├── CHAISE BALONCOIRE.png
-│       │   │       ├── CHAISE BALONCOIRE01.jpg
-│       │   │       ├── CHAOISE BALONCOIRE 02.jpg
-│       │   │       ├── CHAOISE BALONCOIRE 02.png
-│       │   │       ├── ChaiseBalancoirTakideco2.jpg
-│       │   │       ├── ChaiseBalancoirTakideco4.jpg
-│       │   │       ├── ChaiseBalancoirTakideco5.jpg
 │       │   │       ├── ChaiseBalancoireTakideco.jpg
-│       │   │       ├── ChaiseBalancoireTakideco11.jpg
-│       │   │       ├── ChaiseBalancoireTakideco12.jpg
-│       │   │       ├── ChaiseBalancoireTakideco2.jpg
-│       │   │       ├── ChaiseBalancoireTakideco6.jpg
-│       │   │       ├── ChaiseBalancoireTakideco8.jpg
-│       │   │       ├── ChaiseBalancoireTakideco9.jpg
-│       │   │       ├── DIM CHAISE BALANCOIR.jpg
+│       │   │       ├── HDD0104_BEIGE.png
+│       │   │       ├── HDD0104_BEIGE_1.jpg
+│       │   │       ├── HDD0104_BEIGE_1.png
+│       │   │       ├── HDD0104_BEIGE_2.jpg
+│       │   │       ├── HDD0104_BEIGE_2.png
+│       │   │       ├── HDD0104_BEIGE_3.jpg
+│       │   │       ├── HDD0104_BEIGE_3.png
+│       │   │       ├── HDD0104_BEIGE_5.jpg
+│       │   │       ├── HDD0104_BEIGE_6.jpg
+│       │   │       ├── HDD0104_BEIGE_7.jpg
+│       │   │       ├── HDD0104_BEIGE_8.jpg
+│       │   │       ├── HDD0104_BLACK_1.jpg
+│       │   │       ├── HDD0104_BLUE.png
+│       │   │       ├── HDD0104_BLUE_2.jpg
+│       │   │       ├── HDD0104_BROWN_3.jpg
+│       │   │       ├── HDD0104_GREY_ROSE.jpg
+│       │   │       ├── HDD0104_RED.jpg
 │       │   │       └── chaise balancoire.jpg
 │       │   ├── CHAISE_BOLERO
+│       │   │   ├── RT0038_BEIGE.png
+│       │   │   ├── RT0038_BLACK.jpg
+│       │   │   ├── RT0038_BROWN_GRADIENT.jpg
+│       │   │   ├── RT0038_BROWN_GRADIENT_1.jpg
+│       │   │   ├── RT0038_GREY_GRADIENT.jpg
+│       │   │   ├── RT0038_WHITE_GREY_BLACK.png
 │       │   │   └── Temp
-│       │   │       ├── CHAISE BOLERO CARRE.jpg
-│       │   │       ├── CHAISE BOLERO CARRE.png
-│       │   │       ├── CHAISE BOLERO ROND.jpg
-│       │   │       └── CHAISE BOLERO ROND.png
+│       │   │       ├── P.jpg
+│       │   │       └── RT0038_GREY_GRADIENT.png
+│       │   ├── CHAISE_CHEBKA
+│       │   │   ├── RT0159_BEIGE.jpg
+│       │   │   ├── RT0159_BLACK.jpg
+│       │   │   ├── RT0159_BROWN GRADIENT.jpg
+│       │   │   ├── RT0159_GREEN.jpg
+│       │   │   ├── RT159_BLACK.jpg
+│       │   │   ├── RT163_BEIGE.jpg
+│       │   │   ├── RT163_BROWN GRADIENT.jpg
+│       │   │   ├── RT163_BROWN GRADIENT_2.jpg
+│       │   │   ├── RT163_GREEN.jpg
+│       │   │   └── RT163_GREEN_2.jpg
 │       │   ├── CHAISE_ETOILE
+│       │   │   ├── RT0130_BEIGE.jpg
+│       │   │   ├── RT0130_BROWN_GRADIENT.jpg
+│       │   │   ├── RT0130_GREY_GRADIENT.jpg
 │       │   │   └── Temp
-│       │   │       ├── CHAISE ETOILE 02.jpg
-│       │   │       ├── CHAISE ETOILE 02.png
-│       │   │       ├── CHAISE ETOILE NATURE.jpg
-│       │   │       └── CHAISE ETOILE NATURE.png
+│       │   │       ├── RT0130_BEIGE.png
+│       │   │       └── RT0130_BROWN_GRADIENT.png
 │       │   ├── CHAISE_HAUTE
+│       │   │   ├── RT0032_BLACK.png
+│       │   │   ├── RT0032_GREY.png
+│       │   │   ├── RTRT0032_BROWN_GRADIENT_1.jpg
+│       │   │   ├── RTRT0032_BROWN_GRADIENT_2.jpg
+│       │   │   ├── RTRT0032_BROWN_GRADIENT_3.jpg
+│       │   │   ├── RTRT0032_BROWN_GRADIENT_4.jpg
 │       │   │   └── Temp
-│       │   │       ├── #1-RT0032.JPG
-│       │   │       └── DIM CHAISE HAUTE.jpg
 │       │   ├── CHAISE_LONGUE
+│       │   │   ├── #2-RT0056_BLACK.png
+│       │   │   ├── RT0056_WHITE.JPG
 │       │   │   └── Temp
-│       │   │       ├── #1-RT0056.JPG
-│       │   │       ├── #2-RT0056.png
 │       │   │       └── #3-RT0056.JPG
 │       │   ├── CHAISE_LONGUE_GM
+│       │   │   ├── RT0055_BROWN_GRADIENT.JPG
+│       │   │   ├── RT0055_BROWN_GRADIENT_1.jpg
 │       │   │   └── Temp
-│       │   │       └── #1-RT0055.JPG
+│       │   │       └── RT0055_RED.jpg
 │       │   ├── CHAISE_NAPOLEON
 │       │   │   ├── FR0005_BLACK.jpg
-│       │   │   ├── FR0005_GOLDEN-1.jpg
-│       │   │   ├── FR0005_GOLDEN-1.png
-│       │   │   ├── FR0005_GOLDEN-2.png
-│       │   │   ├── FR0005_GOLDEN.jpeg
+│       │   │   ├── FR0005_BROWN.jpg
 │       │   │   ├── FR0005_GOLDEN.jpg
-│       │   │   ├── FR0005_GOLDEN.png
-│       │   │   ├── FR0005_WHITE.jpeg
+│       │   │   ├── FR0005_GOLDEN_1.jpg
+│       │   │   ├── FR0005_GREY.jpg
 │       │   │   ├── FR0005_WHITE.jpg
 │       │   │   └── Temp
-│       │   │       └── DIM CHAISE NAPOLEIN.jpg
+│       │   ├── CHAISE_PAPILLON_
+│       │   │   └── Temp
+│       │   │       ├── FR0001_BLUE.jpg
+│       │   │       ├── FR0001_WHITE.jpg
+│       │   │       ├── TABLE ET CHAISE PAPILLON.jpg
+│       │   │       └── TABLE ET CHAISE PAPILLON.png
+│       │   ├── CHAISE_PLIANTE_
+│       │   │   └── Temp
+│       │   │       ├── RT146_BEIGE BLACK.jpg
+│       │   │       ├── RT146_BROWN GRADIENT.jpg
+│       │   │       ├── RT146_GREY GRADIENT.jpg
+│       │   │       ├── RT146_WHITE GREY BLACK.jpg
+│       │   │       └── chaise pliable.jpg
+│       │   ├── CHAISE_SPORT_
+│       │   │   └── Temp
+│       │   │       ├── RT0046_BLACK.jpg
+│       │   │       ├── RT0046_BROWN GRADIENT.jpg
+│       │   │       ├── RT0046_BROWN GRADIENT_2.jpg
+│       │   │       ├── RT0046_GREY GRADIENT.jpg
+│       │   │       ├── RT0046_GREY GRADIENT_1.jpg
+│       │   │       ├── RT0046_GREY GRADIENT_1.png
+│       │   │       ├── RT0046_GREY GRADIENT_2.jpg
+│       │   │       ├── RT0046_WHITE.png
+│       │   │       └── RT0046_YELLOW.png
+│       │   ├── CHAISE_TOLIX_
+│       │   │   └── Temp
+│       │   │       ├── DIM CHAISE TOLIX.jpg
+│       │   │       ├── RT0154_BEIGE.jpg
+│       │   │       ├── RT0154_BROWN GRADIENT.jpg
+│       │   │       └── RT0154_GREY GRADIENT.png
 │       │   ├── Chaise_Medaillon
 │       │   │   ├── ME1000_BLACK.png
 │       │   │   ├── ME1000_GOLDEN.png
-│       │   │   ├── ME1000_WHITE.png
-│       │   │   └── Temp
-│       │   │       └── DIM CHAISE MEDAILLON.jpg
+│       │   │   └── ME1000_WHITE.png
 │       │   ├── NICHE_DEMI_BALLON
-│       │   └── Test_Item
-│       │       └── TEST001_BLUE.png
+│       │   │   ├── RT0109_BLACK_1.jpg
+│       │   │   └── RT0109_BLACK_2.jpg
+│       │   └── chaise fifou
+│       │       ├── RT0083+_BROWN_GRADIENT.jpg
+│       │       └── temp
+│       │           ├── RT0038+_BLACK.jpg
+│       │           ├── RT0083+_BROWN_GRADIENT.jpg
+│       │           └── RT0083+_BROWN_GRADIENT_2.jpg
 │       ├── CUSHIONS_ACCESSORIES
+│       │   ├── CACH POT GM
+│       │   │   └── temp
+│       │   │       ├── RT0148_BEIGE.jpg
+│       │   │       └── RT0148_BROWN_GRADIENT.jpg
+│       │   ├── CACH POT PM
+│       │   │   └── temp
+│       │   │       ├── RT0143_BLUE.jpg
+│       │   │       └── RT0143_ROSE.jpg
 │       │   └── COUSSIN_BALLON_TRESSEE
 │       │       └── Temp
 │       │           └── COUSSIN BALLON TRESSEE.jpeg
 │       ├── FR0005_GOLDEN.jpg
 │       ├── LIGHTING
-│       │   └── plafoniere_silicon
+│       │   ├── VEILLEUSE
+│       │   │   ├── V001
+│       │   │   │   ├── 0-02-04-2b8c6761d02aa554e51435383c3bb2f89cd4b0839bfb0a90ba7d8269b63b7220_8cb2b4baeb7d844e.jpg
+│       │   │   │   ├── 0-02-04-bfb47217ccf64a1aefff456dde961ec17e1d67a89cf43e44c54f7e85bbca843c_e7ae19d3e62887a0.jpg
+│       │   │   │   ├── 0-02-04-c1e1fda29a2c9ac2ef0d31d99a36b481f1e9c499362385d0625fa38ec3bdb659_6eef3fb20ff19d70.jpg
+│       │   │   │   ├── 0-02-04-c1e1fda29a2c9ac2ef0d31d99a36b481f1e9c499362385d0625fa38ec3bdb659_f4fd57ef885b5b9.jpg
+│       │   │   │   ├── 0-02-04-c2bc254adbd3a0c9811b9c62085d498e45cbd62c0bde26a6e0e52a172e691707_91102804cb55d619.jpg
+│       │   │   │   ├── 0-02-04-e09e3e7c972d035b2f249baca1d2b2a1b14727d77f9c531a47e37fe488802300_19f54e4ac2a7d62e.jpg
+│       │   │   │   ├── V0001_BROWN.jpg
+│       │   │   │   ├── V0001_BROWN_1.jpg
+│       │   │   │   ├── V0001_BROWN_2.jpg
+│       │   │   │   ├── V0001_GREY.jpg
+│       │   │   │   ├── V0001_GREY_1.jpg
+│       │   │   │   ├── V0001_WHITE_1.jpg
+│       │   │   │   └── V0001_white.jpg
+│       │   │   ├── V002
+│       │   │   │   ├── 0-02-04-10aa69e7aeffd3b3c8ac5ab468ec0b8145e62b16fdcd6eba43ef34e31c014955_216a3df58e610faa.jpg
+│       │   │   │   ├── 0-02-04-36b5bc2ce41d96219115b48b68be4cb456be2b7435e19747e40ec66cfbf9951f_f1b08c146d50f436.jpg
+│       │   │   │   ├── 0-02-04-8bfecabd457b39fde236124276676417b9d4ab78168d6422406b81abfe0e8f87_60bd3925688d564b.jpg
+│       │   │   │   ├── 0-02-04-9d15aab7a4305dddd43608247368e74d7f976eacd326189827cf80a6a5f8ee61_e1cc88253395b535.jpg
+│       │   │   │   ├── 0-02-04-a74c87236447ed0c87966e8d6dd5c51a126bfdcdfbddf64fb78a5f2a47038def_fe86b0b55752842d.jpg
+│       │   │   │   ├── 0-02-04-b6c964dd365da8316bef4d99380b0f2c20bea044743c3e187014008ea7903947_5cf06f9e79619b5b.jpg
+│       │   │   │   ├── V0002_BROWN.jpg
+│       │   │   │   ├── V0002_GREY.jpg
+│       │   │   │   ├── V0002_WHITE.jpg
+│       │   │   │   └── V0002_WHITE_1.jpg
+│       │   │   ├── V003
+│       │   │   ├── V004
+│       │   │   │   ├── 0-02-04-1a1fd29841bc25aa53f1aae1bc8c11ae50e329d8dba0b72f8a51955d2d01df6e_8400761485ed0e7e.jpg
+│       │   │   │   ├── 0-02-04-257564683d5ee8ac87463a30ba09af230162d14a9306473e381a4d7f82870b47_a98f2efd8b881af0.jpg
+│       │   │   │   ├── 0-02-04-66958ca2737c48475cbbb901be1525f6a24afc7fd0b5f6ad2ff8ebe9365ce244_ea13991427b226eb.jpg
+│       │   │   │   ├── 0-02-04-797837e84b9a08e185294b3749650bcf5a4dc39851b12086a882f7d97e0458c8_2a8044713500fa3e.jpg
+│       │   │   │   ├── 0-02-04-b1bd1a7ecd9442b3bdcdd90f2e19c1e2063d3b546a8376bb554289fb7a1ff815_6c35bac0720820b6.jpg
+│       │   │   │   └── 0-02-04-b717a614e6e6b58753cbb098e16b58ec3671a7556233e25c99c46da2542bc0bf_14f5f4daa245ae80.jpg
+│       │   │   └── V005
+│       │   │       ├── 0-02-04-046ffb4ca16a8c83260a68a2b3b6b26bf35c868bf35cb5b955a4f90d02a8f152_13ba39ee2127fa41.jpg
+│       │   │       ├── 0-02-04-0951c89428c80dcbd8b94b7c5fec59d3d1c1c49b2a0d88ce08d67b72b0373474_d888ed8b60a13201.jpg
+│       │   │       ├── 0-02-04-33f20c7db33e9a143a2b33a78e513b47b7a62814827f1d94092ee69f79267be1_923e4185b8dc764b.jpg
+│       │   │       ├── 0-02-04-634de7e546d6a49b8eba139938505c4da97edcbdef10a83c8b2b6d102ef342b4_2cf1f1e2ffc01893.jpg
+│       │   │       ├── 0-02-04-85825f8bc5e368af049ddedf97ea5aee254fb36d29ce10a1612c173a4983c193_1054a1cf8b7ce8ba.jpg
+│       │   │       ├── 0-02-04-9eb65d65a04ad380a88fd09c134e61b602708314a1f31aa08aec8255ae8d514d_73ec545bc30b12ae.jpg
+│       │   │       ├── 0-02-04-ab35f3ccd72590fcbd6d1dc3be623805faf90947df4cfeaa2a88bb9b205cb4a2_9df488fa2d9ae0ae.jpg
+│       │   │       ├── 0-02-04-ad67cd1c1f6715b591bd076a8c3f0121588d9439f82bf8f21c0aff666ff818de_163011a7efd59146.jpg
+│       │   │       ├── 0-02-04-d559f6102206cab667e0f8f138c008b44014fd46fc524b60419f4c7edae5b4ba_814c8bf734dadd77.jpg
+│       │   │       └── 0-02-04-e9ad5567a9d20869fb6da85aefb13a7677353aac4d047d47726f77b871fe94e9_afe07b2f4744ff7d.jpg
+│       │   └── plafoniere
+│       │       ├── plafoniere 28x22.5
+│       │       │   ├── PLAFONIER28x22.5_BEIGE.jpg
+│       │       │   └── PLAFONIER28x22.5_BROWN.jpg
+│       │       ├── plafoniere 30x20
+│       │       │   ├── 0-02-04-c40dea88da58622fbeb09ad8bbb4bfdb1f57d5332a40be2a68b39cea68b62d69_579384195bb6fff8.jpg
+│       │       │   └── 0-02-04-f25318992f4ae0e7431ffdcb245b6cf490db96462227392da2c7cd44582348ee_23923d294fff25c8.jpg
+│       │       └── plafoniere 40x20
+│       │           ├── PLAFONIER40x20_BEIGE.jpg
+│       │           └── PLAFONIER40x20_BROWN.jpg
 │       ├── MIRRORS
 │       │   └── MIROIRE_GM
 │       ├── MISCELLANEOUS
 │       │   ├── BONQUETE_TRESSEE
 │       │   │   └── Temp
 │       │   │       └── BONQUETE TRESSEE.jpeg
-│       │   ├── CHAISE_
-│       │   ├── CHAISE_PAPILLON_
-│       │   │   └── Temp
-│       │   │       ├── DIM CHAISE PAPILLON.jpg
-│       │   │       ├── TABLE ET CHAISE PAPILLON.jpg
-│       │   │       └── TABLE ET CHAISE PAPILLON.png
-│       │   ├── CHAISE_PLIANTE_
-│       │   │   └── Temp
-│       │   │       └── chaise pliable.jpg
-│       │   ├── CHAISE_SPORT_
-│       │   │   └── Temp
-│       │   │       ├── #1-RT0046.JPG
-│       │   │       ├── CHAISE SPORT GRIS.jpg
-│       │   │       └── CHAISE SPORT GRIS.png
-│       │   ├── CHAISE_TOLIX_
-│       │   │   └── Temp
-│       │   │       └── DIM CHAISE TOLIX.jpg
-│       │   ├── PARASOL_2.50*2.50_
-│       │   │   └── UK0013_BROWN.png
-│       │   ├── PARAVENT_4_PANNEAUX_BOIS_2\012_+_THERE_ARE_3_MISSING_IN_THE\012_STOCK
-│       │   │   ├── RT0097_BROWN-1.jpg
-│       │   │   ├── RT0097_BROWN.jpg
-│       │   │   ├── RT0097_GREEN-2.jpg
-│       │   │   ├── RT0097_GREEN-3.jpg
-│       │   │   ├── RT0097_GREY-3.jpg
-│       │   │   ├── RT0097_GREY-4.jpg
-│       │   │   ├── RT0097_WHITE-2.jpg
-│       │   │   └── RT0097_WHITE-3.jpg
 │       │   ├── PIED_TABLE_DEMONTABLE_-_MOIN_UN_BASE
 │       │   │   └── Temp
-│       │   │       └── #1-RT0080.JPG
+│       │   │       ├── IMG-aa3d35006975daf6555e5722636a50c9-V.jpg
+│       │   │       └── RT0080_WHITE.jpg
 │       │   ├── POUFFE_TRESSE_A_BOULE_
-│       │   ├── SALON_01_PLACE_
+│       │   │   ├── 0-02-05-d5747e782d4b9a7874d468370b0d627ce615ba491737e700f0d7b73ad40ec4c1_ef301d1fcab0e699.jpg
+│       │   │   ├── 0-02-05-f8502649ea13161c9b2e5931e670ce7d8248bb9cd1ce1383b2ac6a1be0c5e9f6_55360e000bc6c863.jpg
+│       │   │   ├── HA0005_BEIGE.jpg
+│       │   │   ├── HA0005_BLACK.jpg
+│       │   │   ├── HA0005_ORANGE.jpg
+│       │   │   └── HA0005_WHITE.jpg
+│       │   ├── SALON_CHEBKA_TABLE__4_CHAISE
 │       │   │   └── Temp
-│       │   │       └── SALON 4 PLACE NOIR.jpg
-│       │   ├── SALON_CHEBKA\012TABLE__4_CHAISE
+│       │   └── _Porte_Manteau_PM_
+│       │       └── Temp
+│       │           ├── PM1000_GOLDEN_1.png
+│       │           ├── PM1000_GOLDEN_2.png
+│       │           └── PM1000_GOLDEN_3.png
+│       ├── NICHE
+│       ├── PARASOL
+│       ├── PARAVENT
+│       │   ├── PARAVANTE_4_PANNEAUX_BOIS
+│       │   │   ├── RT0097_BEIGE BLACK BROWN GRADIENT.jpg
+│       │   │   ├── RT0097_BEIGE.jpg
+│       │   │   ├── RT0097_BLACK.webp
+│       │   │   ├── RT0097_BLANC.jpg
+│       │   │   ├── RT0097_BROWN CHOCO.jpg
+│       │   │   ├── RT0097_GREEN BOTTLE.jpg
+│       │   │   ├── RT0097_GREEN BOTTLE_2.jpg
+│       │   │   ├── RT0097_GREY.jpg
+│       │   │   └── RT0097_WHITE BLACK GREY GRADIENT.webp
+│       │   └── PARAVENT_4_PANNEAUX_FER
+│       │       └── Temp
+│       │           ├── FER_BEIGE BLACK BROWN GRADIENT.jpg
+│       │           ├── FER_BEIGE.jpg
+│       │           ├── FER_BLACK.webp
+│       │           ├── FER_BLANC.jpg
+│       │           ├── FER_BROWN CHOCO.jpg
+│       │           ├── FER_GREEN BOTTLE.jpg
+│       │           ├── FER_GREEN BOTTLE_2.jpg
+│       │           ├── FER_GREY.jpg
+│       │           ├── FER_WHITE BLACK GREY GRADIENT.webp
+│       │           ├── PARAVENT 4 PANNEAUX.jpeg
+│       │           └── PARAVENT 4 PANNEAUX.png
+│       ├── PORTE_MANTEAU
+│       │   ├── PORTEMANTEAU_MURALE
+│       │   │   └── PM1001_BLACK.jpg
+│       │   └── PORTEMANTEAU_STAND
+│       │       └── Temp
+│       ├── SALONS
+│       │   ├── LAMKAOUSS
+│       │   ├── SALON34
+│       │   │   ├── RT0034_BEIGE.jpg
+│       │   │   ├── RT0034_BLACK_1.jpg
+│       │   │   ├── RT0034_BLACK_2.jpg
+│       │   │   ├── RT0034_BROWN GRADIENT.jpg
+│       │   │   ├── RT0034_BROWN GRADIENT_2.jpg
+│       │   │   ├── RT0034_GREY GRADIENT.jpg
+│       │   │   ├── RT0034_GREY.jpg
+│       │   │   ├── RT0034_WHITE.JPG
+│       │   │   └── RT0034_WHITE_2.jpg
+│       │   ├── SALON34PLUS
+│       │   │   ├── RT0034+_BEIGE.jpg
+│       │   │   ├── RT0034+_BEIGE_2.jpg
+│       │   │   ├── RT0034+_BLACK.jpg
+│       │   │   ├── RT0034+_BROWN GRADIENT.jpg
+│       │   │   ├── RT0034+_GREY GRADIENT.jpg
+│       │   │   ├── RT0034+_GREY GRADIENT_1.jpg
+│       │   │   ├── RT0034+_GREY GRADIENT_2.jpg
+│       │   │   ├── RT0034+_GREY GRADIENT_3.jpg
+│       │   │   ├── RT0034+_GREY GRADIENT_4.jpg
+│       │   │   └── RT0034+_GREY GRADIENT_5.jpg
+│       │   ├── SALONRT0151152153
+│       │   │   ├── RT0151152153_GREY GRADIENT.jpg
+│       │   │   ├── RT0151152153_GREY GRADIENT_2.jpg
+│       │   │   ├── RT0151_GREY GRADIENT.jpg
+│       │   │   ├── RT0152_GREY GRADIENT.jpg
+│       │   │   └── RT0153_GREY GRADIENT.jpg
+│       │   ├── SALONT899091
+│       │   │   ├── RT899091_BLACK.jpg
+│       │   │   ├── RT899091_BLACK_2.jpg
+│       │   │   ├── RT899091_BROWN GRADIENT.jpeg
+│       │   │   ├── RT899091_BROWN GRADIENT.jpg
+│       │   │   ├── RT899091_GREY GRADIENT.jpg
+│       │   │   ├── RT899091_GREY GRADIENT_2.jpg
+│       │   │   ├── RT899091_GREY GRADIENT_3.jpg
+│       │   │   ├── RT899091_GREY GRADIENT_4.jpg
+│       │   │   └── RT899091_GREY GRADIENT_5.jpg
+│       │   ├── SALON_1_PLACE
+│       │   │   ├── RT0089_BLACK.jpg
+│       │   │   ├── RT0089_BROWN GRADIENT.jpg
+│       │   │   ├── RT0089_GREY GRADIENT.jpg
+│       │   │   ├── RT0089_GREY GRADIENT.png
+│       │   │   └── RT0089_WHITE.jpg
+│       │   ├── SALON_1_PLACE-
 │       │   │   └── Temp
-│       │   │       ├── DIM SALON CHEBKA.jpg
-│       │   │       └── SALON CHEBKA.jpg
-│       │   ├── TRANSAT
-│       │   │   └── Temp
-│       │   │       └── transat1.png
-│       │   ├── Veilleuse_
-│       │   ├── _CHAISE_CHEBKA
-│       │   ├── _Porte_Manteau_PM_
-│       │   │   └── Temp
-│       │   │       ├── PortManteau1.png
-│       │   │       ├── PortManteau2.png
-│       │   │       └── PortManteau3.png
-│       │   ├── logo
-│       │   │   └── 0987654321_BLUE.png
-│       │   └── test-item
-│       │       └── 0987654321_BLUE.png
-│       ├── PARASOL_SCREENS
-│       │   ├── PARAVANTE_4_Panneaux_fer
-│       │   ├── PARAVENT_4_PANNEAUX_FER
-│       │   │   └── Temp
-│       │   │       ├── PARAVENT 4 PANNEAUX.jpeg
-│       │   │       └── PARAVENT 4 PANNEAUX.png
-│       │   └── PARAVON_2M_?
-│       │       ├── RT0135_WHITE-1.png
-│       │       └── RT0135_WHITE.png
+│       │   │       └── RT0151152153
+│       │   ├── SALON_CHEBKA
+│       │   │   ├── RT163_BLACK.jpg
+│       │   │   ├── RT163_BROWN GRADIENT.png
+│       │   │   ├── RT163_GREEN.png
+│       │   │   └── RT163_GREEN_2.png
+│       │   ├── SALON_CHICHA
+│       │   │   ├── RT828586_BEIGE.png
+│       │   │   ├── RT828586_BROWN GRADIENT.jpg
+│       │   │   ├── RT828586_GREY GRADIENT.jpg
+│       │   │   └── RT828586_GREY GRADIENT_2.jpg
+│       │   └── SALON_PYRAMIDE
+│       │       ├── RT0107_BLACK.jpg
+│       │       ├── RT0107_BROWN GRADIENT.jpg
+│       │       ├── RT0107_BROWN GRADIENT_2.jpg
+│       │       └── RT0107_BROWN GRADIENT_3.jpg
 │       ├── SHELVING
 │       │   └── ETAGERE_5_ETAGES
 │       │       └── Temp
-│       │           ├── Eteger 4 ètages.jpeg
-│       │           └── Eteger 5 ètages.jpeg
-│       ├── SOFA_LOUNGE
-│       │   ├── SALON_04_PLACE_AVEC_TABLE
-│       │   │   └── Temp
-│       │   │       └── SALON BLANC AVEC TABLE ROND.jpg
-│       │   ├── SALON_1_PLACE
-│       │   │   └── Temp
-│       │   │       ├── #1-RT0034.JPG
-│       │   │       ├── SALON 1.jpg
-│       │   │       └── SALON 12.jpeg
-│       │   └── SALON_2_PLACES
-│       │       └── Temp
-│       │           └── SALON 4 PLACES 01.jpg
+│       │           ├── MA0003_BLACK.jpeg
+│       │           └── MA0004_BLACK.jpeg
 │       ├── STOOLS
 │       │   ├── TABOURET_CARRE
 │       │   │   └── Temp
-│       │   │       └── TABOURET JAUNE.jpg
+│       │   │       └── RT0117_BROWN GRADIENT.jpg
 │       │   ├── TABOURET_ROND
 │       │   │   └── Temp
-│       │   │       └── TABOURET ROSE.jpg
+│       │   │       ├── RT0113_BEIGE BROWN_1.jpg
+│       │   │       └── RT0113_BEIGE BROWN_2.jpg
 │       │   └── TABOURET_TRESSE_RECTANGULAIRE
 │       │       └── Temp
-│       │           └── TABOURET TRESSE RECTANGULAIRE HA0002.jpeg
+│       │           ├── HA0001_ROSE_2.jpg
+│       │           ├── HA0001_YELLOW.jpeg
+│       │           └── HA0001_YELLOW.jpg
 │       ├── STORAGE
 │       │   ├── ARMOIRE
 │       │   │   └── Temp
@@ -221,33 +637,151 @@
 │       ├── TABLE
 │       │   ├── TABLE_BALANCOIRE
 │       │   │   └── Temp
-│       │   │       ├── DIM TABLE BALANCOIR.jpg
-│       │   │       ├── TABLE BALONCOIRE BAIJE.jpg
-│       │   │       ├── TABLE BALONCOIRE BAIJE.png
-│       │   │       └── TABLE BALONCOIRE BAIJE1.png
+│       │   │       ├── HDD0105_BEIGE_1.jpg
+│       │   │       ├── HDD0105_BEIGE_1.png
+│       │   │       ├── HDD0105_BEIGE_2.png
+│       │   │       ├── HDD0105_BLUE.jpg
+│       │   │       ├── HDD0105_GREY_1.jpg
+│       │   │       ├── HDD0105_GREY_2.jpg
+│       │   │       ├── HDD0105_ORANGE.jpg
+│       │   │       ├── HDD0105_ROSE_1.jpg
+│       │   │       └── HDD0105_ROSE_2.jpg
 │       │   ├── TABLE_BASSE_TABLE_LMKAOUASS
 │       │   │   └── Temp
-│       │   │       └── TABLE BASSE (TABLE LMKAOUASS).jpeg
+│       │   │       ├── RT0091_BLACK.jpeg
+│       │   │       ├── RT0091_BLACK.jpg
+│       │   │       ├── RT0091_BLACK_2.jpg
+│       │   │       ├── RT0091_BROWN GRADIENT.jpeg
+│       │   │       ├── RT0091_BROWN GRADIENT.jpg
+│       │   │       ├── RT0091_GREY GRADIENT.jpg
+│       │   │       ├── RT0091_GREY GRADIENT_2.jpg
+│       │   │       ├── RT0091_GREY GRADIENT_3.jpg
+│       │   │       ├── RT0091_GREY GRADIENT_4.jpg
+│       │   │       └── RT0091_GREY GRADIENT_5.jpg
 │       │   ├── TABLE_HAUTE
 │       │   │   └── Temp
-│       │   │       ├── #1-RT0040.JPG
-│       │   │       └── DIM TABLE HAUTE.jpg
+│       │   │       ├── RT0040_BROWN_GRADIENT.JPG
+│       │   │       ├── RT0040_BROWN_GRADIENT_2.jpg
+│       │   │       └── RT0040_YELLOW.jpg
 │       │   ├── TABLE_LOVE
 │       │   │   └── Temp
 │       │   │       └── #1-RT007475.JPG
 │       │   ├── TABLE_RONDE_TETE_A_TETE
 │       │   │   └── Temp
-│       │   │       ├── #1-LZ0006.JPG
-│       │   │       └── TABLE RONDE TETE A TETE LZ0006.jpeg
+│       │   │       ├── LZ0006_BLACK.jpg
+│       │   │       ├── LZ0006_BROWN.JPG
+│       │   │       └── LZ0006_BROWN.jpeg
+│       │   ├── box 0.60x0.60 PM
+│       │   │   ├── RT0139_GREEN BOTTLE.jpg
+│       │   │   ├── RT0139_GREY GRADIENT.jpg
+│       │   │   └── temp
+│       │   │       ├── RT0139_GREEN BOTTLE.jpg
+│       │   │       └── RT0139_GREY GRADIENT.jpg
+│       │   ├── box 1.20x0.60 GM
+│       │   │   └── temp
+│       │   │       ├── RT0094_BLACK.jpg
+│       │   │       └── RT0094_BROWN GRADIENT.jpg
+│       │   ├── table 4 chaise 0.78x0.78
+│       │   │   └── temp
+│       │   │       ├── RT0098_BLACK.jpg
+│       │   │       ├── RT0098_BROWN GRADIENT.jpg
+│       │   │       └── RT0098_GREY GRADIENT.jpg
+│       │   ├── table 6 chaises 0.70x1.30
+│       │   │   └── temp
+│       │   │       ├── RT0103_BLACK.jpg
+│       │   │       ├── RT0103_BROWN GRADIENT.jpg
+│       │   │       ├── RT0103_GREY GRADIENT.jpg
+│       │   │       └── RT0103_WHITE.jpg
+│       │   ├── table basse 3D
+│       │   │   └── temp
+│       │   │       ├── RT0059GREY GRADIENT_1.jpg
+│       │   │       ├── RT0059_BEIGE.jpg
+│       │   │       ├── RT0059_BEIGE_2.jpg
+│       │   │       ├── RT0059_BLACK.jpg
+│       │   │       ├── RT0059_BROWN GRADIENT.jpg
+│       │   │       ├── RT0059_GREY GRADIENT.jpg
+│       │   │       ├── RT0059_GREY GRADIENT_2.jpg
+│       │   │       ├── RT0059_GREY GRADIENT_3.jpg
+│       │   │       ├── RT0059_GREY GRADIENT_4.jpg
+│       │   │       └── RT0059_GREY GRADIENT_5.jpg
+│       │   ├── table basse chicha
+│       │   │   └── temp
+│       │   │       ├── RT0082_BEIGE.png
+│       │   │       ├── RT0082_BROWN GRADIENT.jpg
+│       │   │       ├── RT0082_GREY GRADIENT.jpg
+│       │   │       └── RT0082_GREY GRADIENT_2.jpg
+│       │   ├── table basse pyramyde 0.60x0.80
+│       │   │   └── temp
+│       │   │       ├── RT0107_BLACK.jpg
+│       │   │       ├── RT0107_BROWN GRADIENT.jpg
+│       │   │       ├── RT0107_BROWN GRADIENT_2.jpg
+│       │   │       └── RT0107_BROWN GRADIENT_3.jpg
+│       │   ├── table box 0.65x0.70
+│       │   │   └── temp
+│       │   │       └── 0-02-05-6ccf6abe33fd27e0250c4a73eb00a8855f4535e3bf4d9fe0c26c2195148124f6_f7513c37964a969e.jpg
+│       │   ├── table carre demontable
+│       │   │   └── temp
+│       │   │       ├── RT0046_BROWN GRADIENT_2.jpg
+│       │   │       ├── RT0080_BROWN GRADIENT.jpg
+│       │   │       ├── RT0080_GREY GRADIENT.png
+│       │   │       ├── RT0080_WHITE.png
+│       │   │       └── RT0080_YELLOW.png
+│       │   ├── table demontable 1 pied
+│       │   │   └── temp
+│       │   │       └── RT0145_BEIGE.jpg
+│       │   ├── table fifou
+│       │   │   └── temp
+│       │   │       ├── 0-02-05-44d3073717d627812fef9a7b25d6c8e7e8c43d88f903343104c996f64661b551_b3521f54474a8f2b.jpg
+│       │   │       └── 0-02-05-9e20a6df7bad49d70a3be390f3ee600ea9a0376aa2a5bde9d9aff75191a5751a_c8abe89978cbc39c.jpg
+│       │   ├── table rond 0.60
+│       │   │   └── temp
+│       │   │       ├── RT0142_BEIGE GRADIENT.jpg
+│       │   │       ├── RT0142_BEIGE.jpg
+│       │   │       ├── RT0142_BROWNGRADIENT.jpg
+│       │   │       └── RT0142_GREY GRADIENT.jpg
+│       │   ├── table rond 0.80
+│       │   │   └── temp
+│       │   │       ├── RT0110_BEIGE.jpg
+│       │   │       ├── RT0110_BLACK.jpg
+│       │   │       ├── RT0110_BROWN GRADIENT.jpg
+│       │   │       ├── RT0110_BROWN GRADIENT_1.jpg
+│       │   │       ├── RT0110_BROWN GRADIENT_2.jpg
+│       │   │       ├── RT0110_GREY GRADIENT.webp
+│       │   │       └── RT0110_WHITE.jpg
+│       │   ├── table tete a tete pivotante
+│       │   │   └── temp
+│       │   │       ├── RT0152_BEIGE.jpg
+│       │   │       ├── RT0152_BLACK.jpg
+│       │   │       ├── RT0152_BROWN GRADIENT.png
+│       │   │       └── RT0152_GREY GRADIENT.png
 │       │   ├── table_basse_060_x_080
 │       │   │   └── Temp
-│       │   │       └── TABLE BASSE 0.60 X 0.80 RT0034.jpeg
+│       │   │       ├── RT0034_BEIGE.jpg
+│       │   │       ├── RT0034_BLACK_1.jpg
+│       │   │       ├── RT0034_BLACK_2.jpg
+│       │   │       ├── RT0034_BROWN GRADIENT.jpeg
+│       │   │       ├── RT0034_BROWN GRADIENT.jpg
+│       │   │       ├── RT0034_BROWN GRADIENT_2.jpg
+│       │   │       ├── RT0034_GREY GRADIENT.jpg
+│       │   │       ├── RT0034_GREY.jpg
+│       │   │       ├── RT0034_WHITE.JPG
+│       │   │       └── RT0034_WHITE_2.jpg
 │       │   ├── table_box_130_x_070
 │       │   │   └── Temp
-│       │   │       └── #1-RT0047.jpg
+│       │   │       └── RT0047_BROWN_GRADIENT.jpg
 │       │   └── table_gigogne_050_x_050
 │       │       └── Temp
-│       │           └── #1-RT0060.JPG
+│       │           ├── RT0060_BLACK.JPG
+│       │           └── RT0060_BROWN_GRADIENT.jpg
+│       ├── TRANSAT
+│       │   └── Temp
+│       │       ├── RT0063_BLACK.jpg
+│       │       ├── RT0063_BLACK_2.jpg
+│       │       ├── RT0096_BLACK.png
+│       │       ├── RT0096_BROWN GRADIENT.jpg
+│       │       ├── RT0096_BROWN GRADIENT_2.jpg
+│       │       ├── RT0096_BROWN GRADIENT_3.jpg
+│       │       └── TAKIDECO2.jpg
 │       ├── benchmarking
 │       │   ├── CHAISE_BOLERO.jpg
 │       │   ├── CHAISE_ETOILE.png
@@ -258,6 +792,9 @@
 ├── data
 │   ├── db_structure.py
 │   ├── db_structure.txt
+│   ├── delete_records_in_column.py
+│   ├── organise_image_path.py
+│   ├── populate_image_path_and_colours_in_products.py
 │   ├── pos_system.db
 │   ├── query.sql
 │   └── users.json
@@ -265,32 +802,31 @@
 ├── images
 │   ├── BEDS
 │   │   └── Lit_Bebe
-│   ├── CACHE_POT
 │   ├── CHAIR
 │   │   ├── CHAISE_ACCOUDOIRE
-│   │   │   ├── LZ0005_BROWN (2).jpg
 │   │   │   ├── LZ0005_BROWN.JPG
+│   │   │   ├── LZ0005_BROWN_2.jpg
 │   │   │   └── Temp
 │   │   │       └── LZ0005_BLACK.jpg
 │   │   ├── CHAISE_BALANCOIRE
-│   │   │   ├── HDD0104_BEIGE (1).jpg
-│   │   │   ├── HDD0104_BEIGE (4).jpg
-│   │   │   ├── HDD0104_BEIGE (9).jpg
 │   │   │   ├── HDD0104_BEIGE.jpg
+│   │   │   ├── HDD0104_BEIGE_1.jpg
+│   │   │   ├── HDD0104_BEIGE_4.jpg
+│   │   │   ├── HDD0104_BEIGE_9.jpg
 │   │   │   ├── HDD0104_BLACK.jpg
 │   │   │   ├── HDD0104_BLACK_1.jpg
 │   │   │   ├── HDD0104_BLUE.jpg
-│   │   │   ├── HDD0104_BROWN (2).jpg
-│   │   │   ├── HDD0104_BROWN (4).jpg
 │   │   │   ├── HDD0104_BROWN.jpg
 │   │   │   ├── HDD0104_BROWN.png
-│   │   │   ├── HDD0104_GREY_ROSE (2).jpg
+│   │   │   ├── HDD0104_BROWN_2.jpg
+│   │   │   ├── HDD0104_BROWN_4.jpg
 │   │   │   ├── HDD0104_GREY_ROSE.png
+│   │   │   ├── HDD0104_GREY_ROSE_2.jpg
 │   │   │   ├── HDD0104_ORANGE.jpg
-│   │   │   ├── HDD0104_RED (1).jpg
-│   │   │   ├── HDD0104_RED (1).png
-│   │   │   ├── HDD0104_RED (2).jpg
-│   │   │   ├── HDD0104_RED (2).png
+│   │   │   ├── HDD0104_RED_1.jpg
+│   │   │   ├── HDD0104_RED_1.png
+│   │   │   ├── HDD0104_RED_2.jpg
+│   │   │   ├── HDD0104_RED_2.png
 │   │   │   ├── HDD0104_WHITE_BLACK.jpg
 │   │   │   ├── HDD0104_WHITE_BLACK.png
 │   │   │   ├── HDD0104_YELLOW.jpg
@@ -298,21 +834,21 @@
 │   │   │       ├── CHAISE BALONCOIRE 03.jpg
 │   │   │       ├── CHAISE BALONCOIRE 03.png
 │   │   │       ├── ChaiseBalancoireTakideco.jpg
-│   │   │       ├── HDD0104_BEIGE (1).jpg
-│   │   │       ├── HDD0104_BEIGE (1).png
-│   │   │       ├── HDD0104_BEIGE (2).jpg
-│   │   │       ├── HDD0104_BEIGE (2).png
-│   │   │       ├── HDD0104_BEIGE (3).jpg
-│   │   │       ├── HDD0104_BEIGE (3).png
-│   │   │       ├── HDD0104_BEIGE (5).jpg
-│   │   │       ├── HDD0104_BEIGE (6).jpg
-│   │   │       ├── HDD0104_BEIGE (7).jpg
-│   │   │       ├── HDD0104_BEIGE (8).jpg
 │   │   │       ├── HDD0104_BEIGE.png
-│   │   │       ├── HDD0104_BLACK (1).jpg
-│   │   │       ├── HDD0104_BLUE (2).jpg
+│   │   │       ├── HDD0104_BEIGE_1.jpg
+│   │   │       ├── HDD0104_BEIGE_1.png
+│   │   │       ├── HDD0104_BEIGE_2.jpg
+│   │   │       ├── HDD0104_BEIGE_2.png
+│   │   │       ├── HDD0104_BEIGE_3.jpg
+│   │   │       ├── HDD0104_BEIGE_3.png
+│   │   │       ├── HDD0104_BEIGE_5.jpg
+│   │   │       ├── HDD0104_BEIGE_6.jpg
+│   │   │       ├── HDD0104_BEIGE_7.jpg
+│   │   │       ├── HDD0104_BEIGE_8.jpg
+│   │   │       ├── HDD0104_BLACK_1.jpg
 │   │   │       ├── HDD0104_BLUE.png
-│   │   │       ├── HDD0104_BROWN (3).jpg
+│   │   │       ├── HDD0104_BLUE_2.jpg
+│   │   │       ├── HDD0104_BROWN_3.jpg
 │   │   │       ├── HDD0104_GREY_ROSE.jpg
 │   │   │       ├── HDD0104_RED.jpg
 │   │   │       └── chaise balancoire.jpg
@@ -333,10 +869,10 @@
 │   │   │   ├── RT0159_GREEN.jpg
 │   │   │   ├── RT159_BLACK.jpg
 │   │   │   ├── RT163_BEIGE.jpg
-│   │   │   ├── RT163_BROWN GRADIENT (2).jpg
 │   │   │   ├── RT163_BROWN GRADIENT.jpg
-│   │   │   ├── RT163_GREEN (2).jpg
-│   │   │   └── RT163_GREEN.jpg
+│   │   │   ├── RT163_BROWN GRADIENT_2.jpg
+│   │   │   ├── RT163_GREEN.jpg
+│   │   │   └── RT163_GREEN_2.jpg
 │   │   ├── CHAISE_ETOILE
 │   │   │   ├── RT0130_BEIGE.jpg
 │   │   │   ├── RT0130_BROWN_GRADIENT.jpg
@@ -347,10 +883,10 @@
 │   │   ├── CHAISE_HAUTE
 │   │   │   ├── RT0032_BLACK.png
 │   │   │   ├── RT0032_GREY.png
-│   │   │   ├── RTRT0032_BROWN_GRADIENT (1).jpg
-│   │   │   ├── RTRT0032_BROWN_GRADIENT (2).JPG
-│   │   │   ├── RTRT0032_BROWN_GRADIENT (3).jpg
-│   │   │   ├── RTRT0032_BROWN_GRADIENT (4).jpg
+│   │   │   ├── RTRT0032_BROWN_GRADIENT_1.jpg
+│   │   │   ├── RTRT0032_BROWN_GRADIENT_2.jpg
+│   │   │   ├── RTRT0032_BROWN_GRADIENT_3.jpg
+│   │   │   ├── RTRT0032_BROWN_GRADIENT_4.jpg
 │   │   │   └── Temp
 │   │   ├── CHAISE_LONGUE
 │   │   │   ├── #2-RT0056_BLACK.png
@@ -386,12 +922,12 @@
 │   │   ├── CHAISE_SPORT_
 │   │   │   └── Temp
 │   │   │       ├── RT0046_BLACK.jpg
-│   │   │       ├── RT0046_BROWN GRADIENT (2).jpg
 │   │   │       ├── RT0046_BROWN GRADIENT.jpg
-│   │   │       ├── RT0046_GREY GRADIENT (1).JPG
-│   │   │       ├── RT0046_GREY GRADIENT (1).png
-│   │   │       ├── RT0046_GREY GRADIENT (2).jpg
+│   │   │       ├── RT0046_BROWN GRADIENT_2.jpg
 │   │   │       ├── RT0046_GREY GRADIENT.jpg
+│   │   │       ├── RT0046_GREY GRADIENT_1.jpg
+│   │   │       ├── RT0046_GREY GRADIENT_1.png
+│   │   │       ├── RT0046_GREY GRADIENT_2.jpg
 │   │   │       ├── RT0046_WHITE.png
 │   │   │       └── RT0046_YELLOW.png
 │   │   ├── CHAISE_TOLIX_
@@ -405,14 +941,14 @@
 │   │   │   ├── ME1000_GOLDEN.png
 │   │   │   └── ME1000_WHITE.png
 │   │   ├── NICHE_DEMI_BALLON
-│   │   │   ├── RT0109_BLACK (1).jpg
-│   │   │   └── RT0109_BLACK (2).jpg
+│   │   │   ├── RT0109_BLACK_1.jpg
+│   │   │   └── RT0109_BLACK_2.jpg
 │   │   └── chaise fifou
 │   │       ├── RT0083+_BROWN_GRADIENT.jpg
 │   │       └── temp
 │   │           ├── RT0038+_BLACK.jpg
-│   │           ├── RT0083+_BROWN_GRADIENT (2).jpg
-│   │           └── RT0083+_BROWN_GRADIENT.jpg
+│   │           ├── RT0083+_BROWN_GRADIENT.jpg
+│   │           └── RT0083+_BROWN_GRADIENT_2.jpg
 │   ├── CUSHIONS_ACCESSORIES
 │   │   ├── CACH POT GM
 │   │   │   └── temp
@@ -425,6 +961,7 @@
 │   │   └── COUSSIN_BALLON_TRESSEE
 │   │       └── Temp
 │   │           └── COUSSIN BALLON TRESSEE.jpeg
+│   ├── FR0005_GOLDEN.jpg
 │   ├── LIGHTING
 │   │   ├── VEILLEUSE
 │   │   │   ├── V001
@@ -434,12 +971,12 @@
 │   │   │   │   ├── 0-02-04-c1e1fda29a2c9ac2ef0d31d99a36b481f1e9c499362385d0625fa38ec3bdb659_f4fd57ef885b5b9.jpg
 │   │   │   │   ├── 0-02-04-c2bc254adbd3a0c9811b9c62085d498e45cbd62c0bde26a6e0e52a172e691707_91102804cb55d619.jpg
 │   │   │   │   ├── 0-02-04-e09e3e7c972d035b2f249baca1d2b2a1b14727d77f9c531a47e37fe488802300_19f54e4ac2a7d62e.jpg
-│   │   │   │   ├── V0001_BROWN(1).jpg
-│   │   │   │   ├── V0001_BROWN(2).jpg
 │   │   │   │   ├── V0001_BROWN.jpg
-│   │   │   │   ├── V0001_GREY(1).jpg
+│   │   │   │   ├── V0001_BROWN_1.jpg
+│   │   │   │   ├── V0001_BROWN_2.jpg
 │   │   │   │   ├── V0001_GREY.jpg
-│   │   │   │   ├── V0001_WHITE(1).jpg
+│   │   │   │   ├── V0001_GREY_1.jpg
+│   │   │   │   ├── V0001_WHITE_1.jpg
 │   │   │   │   └── V0001_white.jpg
 │   │   │   ├── V002
 │   │   │   │   ├── 0-02-04-10aa69e7aeffd3b3c8ac5ab468ec0b8145e62b16fdcd6eba43ef34e31c014955_216a3df58e610faa.jpg
@@ -450,9 +987,8 @@
 │   │   │   │   ├── 0-02-04-b6c964dd365da8316bef4d99380b0f2c20bea044743c3e187014008ea7903947_5cf06f9e79619b5b.jpg
 │   │   │   │   ├── V0002_BROWN.jpg
 │   │   │   │   ├── V0002_GREY.jpg
-│   │   │   │   ├── V0002_WHITE(1).jpg
-│   │   │   │   └── V0002_WHITE.jpg
-│   │   │   ├── V003
+│   │   │   │   ├── V0002_WHITE.jpg
+│   │   │   │   └── V0002_WHITE_1.jpg
 │   │   │   ├── V004
 │   │   │   │   ├── 0-02-04-1a1fd29841bc25aa53f1aae1bc8c11ae50e329d8dba0b72f8a51955d2d01df6e_8400761485ed0e7e.jpg
 │   │   │   │   ├── 0-02-04-257564683d5ee8ac87463a30ba09af230162d14a9306473e381a4d7f82870b47_a98f2efd8b881af0.jpg
@@ -502,10 +1038,9 @@
 │   │   │   └── Temp
 │   │   └── _Porte_Manteau_PM_
 │   │       └── Temp
-│   │           ├── PM1000_GOLDEN (1).png
-│   │           ├── PM1000_GOLDEN (2).png
-│   │           └── PM1000_GOLDEN (3).png
-│   ├── NICHE
+│   │           ├── PM1000_GOLDEN_1.png
+│   │           ├── PM1000_GOLDEN_2.png
+│   │           └── PM1000_GOLDEN_3.png
 │   ├── PARASOL
 │   ├── PARAVENT
 │   │   ├── PARAVANTE_4_PANNEAUX_BOIS
@@ -514,8 +1049,8 @@
 │   │   │   ├── RT0097_BLACK.webp
 │   │   │   ├── RT0097_BLANC.jpg
 │   │   │   ├── RT0097_BROWN CHOCO.jpg
-│   │   │   ├── RT0097_GREEN BOTTLE (2).jpg
 │   │   │   ├── RT0097_GREEN BOTTLE.jpg
+│   │   │   ├── RT0097_GREEN BOTTLE_2.jpg
 │   │   │   ├── RT0097_GREY.jpg
 │   │   │   └── RT0097_WHITE BLACK GREY GRADIENT.webp
 │   │   └── PARAVENT_4_PANNEAUX_FER
@@ -525,8 +1060,8 @@
 │   │           ├── FER_BLACK.webp
 │   │           ├── FER_BLANC.jpg
 │   │           ├── FER_BROWN CHOCO.jpg
-│   │           ├── FER_GREEN BOTTLE (2).jpg
 │   │           ├── FER_GREEN BOTTLE.jpg
+│   │           ├── FER_GREEN BOTTLE_2.jpg
 │   │           ├── FER_GREY.jpg
 │   │           ├── FER_WHITE BLACK GREY GRADIENT.webp
 │   │           ├── PARAVENT 4 PANNEAUX.jpeg
@@ -537,44 +1072,43 @@
 │   │   └── PORTEMANTEAU_STAND
 │   │       └── Temp
 │   ├── SALONS
-│   │   ├── LAMKAOUSS
 │   │   ├── SALON34
 │   │   │   ├── RT0034_BEIGE.jpg
-│   │   │   ├── RT0034_BLACK (1).jpg
-│   │   │   ├── RT0034_BLACK (2).jpg
-│   │   │   ├── RT0034_BROWN GRADIENT (2).jpg
+│   │   │   ├── RT0034_BLACK_1.jpg
+│   │   │   ├── RT0034_BLACK_2.jpg
 │   │   │   ├── RT0034_BROWN GRADIENT.jpg
+│   │   │   ├── RT0034_BROWN GRADIENT_2.jpg
 │   │   │   ├── RT0034_GREY GRADIENT.jpg
 │   │   │   ├── RT0034_GREY.jpg
-│   │   │   ├── RT0034_WHITE (2).jpg
-│   │   │   └── RT0034_WHITE.JPG
+│   │   │   ├── RT0034_WHITE.JPG
+│   │   │   └── RT0034_WHITE_2.jpg
 │   │   ├── SALON34PLUS
-│   │   │   ├── RT0034+_BEIGE (2).jpg
 │   │   │   ├── RT0034+_BEIGE.jpg
+│   │   │   ├── RT0034+_BEIGE_2.jpg
 │   │   │   ├── RT0034+_BLACK.jpg
 │   │   │   ├── RT0034+_BROWN GRADIENT.jpg
-│   │   │   ├── RT0034+_GREY GRADIENT (1).jpg
-│   │   │   ├── RT0034+_GREY GRADIENT (2).jpg
-│   │   │   ├── RT0034+_GREY GRADIENT (3).jpg
-│   │   │   ├── RT0034+_GREY GRADIENT (4).jpg
-│   │   │   ├── RT0034+_GREY GRADIENT (5).jpg
-│   │   │   └── RT0034+_GREY GRADIENT.jpg
+│   │   │   ├── RT0034+_GREY GRADIENT.jpg
+│   │   │   ├── RT0034+_GREY GRADIENT_1.jpg
+│   │   │   ├── RT0034+_GREY GRADIENT_2.jpg
+│   │   │   ├── RT0034+_GREY GRADIENT_3.jpg
+│   │   │   ├── RT0034+_GREY GRADIENT_4.jpg
+│   │   │   └── RT0034+_GREY GRADIENT_5.jpg
 │   │   ├── SALONRT0151152153
-│   │   │   ├── RT0151152153_GREY GRADIENT (2).jpg
 │   │   │   ├── RT0151152153_GREY GRADIENT.jpg
+│   │   │   ├── RT0151152153_GREY GRADIENT_2.jpg
 │   │   │   ├── RT0151_GREY GRADIENT.jpg
 │   │   │   ├── RT0152_GREY GRADIENT.jpg
 │   │   │   └── RT0153_GREY GRADIENT.jpg
 │   │   ├── SALONT899091
-│   │   │   ├── RT899091_BLACK (2).jpg
 │   │   │   ├── RT899091_BLACK.jpg
+│   │   │   ├── RT899091_BLACK_2.jpg
 │   │   │   ├── RT899091_BROWN GRADIENT.jpeg
 │   │   │   ├── RT899091_BROWN GRADIENT.jpg
-│   │   │   ├── RT899091_GREY GRADIENT (2).jpg
-│   │   │   ├── RT899091_GREY GRADIENT (3).jpg
-│   │   │   ├── RT899091_GREY GRADIENT (4).jpg
-│   │   │   ├── RT899091_GREY GRADIENT (5).jpg
-│   │   │   └── RT899091_GREY GRADIENT.jpg
+│   │   │   ├── RT899091_GREY GRADIENT.jpg
+│   │   │   ├── RT899091_GREY GRADIENT_2.jpg
+│   │   │   ├── RT899091_GREY GRADIENT_3.jpg
+│   │   │   ├── RT899091_GREY GRADIENT_4.jpg
+│   │   │   └── RT899091_GREY GRADIENT_5.jpg
 │   │   ├── SALON_1_PLACE
 │   │   │   ├── RT0089_BLACK.jpg
 │   │   │   ├── RT0089_BROWN GRADIENT.jpg
@@ -587,18 +1121,18 @@
 │   │   ├── SALON_CHEBKA
 │   │   │   ├── RT163_BLACK.jpg
 │   │   │   ├── RT163_BROWN GRADIENT.png
-│   │   │   ├── RT163_GREEN (2).png
-│   │   │   └── RT163_GREEN.png
+│   │   │   ├── RT163_GREEN.png
+│   │   │   └── RT163_GREEN_2.png
 │   │   ├── SALON_CHICHA
 │   │   │   ├── RT828586_BEIGE.png
 │   │   │   ├── RT828586_BROWN GRADIENT.jpg
-│   │   │   ├── RT828586_GREY GRADIENT (2).jpg
-│   │   │   └── RT828586_GREY GRADIENT.jpg
+│   │   │   ├── RT828586_GREY GRADIENT.jpg
+│   │   │   └── RT828586_GREY GRADIENT_2.jpg
 │   │   └── SALON_PYRAMIDE
 │   │       ├── RT0107_BLACK.jpg
-│   │       ├── RT0107_BROWN GRADIENT (2).jpg
-│   │       ├── RT0107_BROWN GRADIENT (3).jpg
-│   │       └── RT0107_BROWN GRADIENT.jpg
+│   │       ├── RT0107_BROWN GRADIENT.jpg
+│   │       ├── RT0107_BROWN GRADIENT_2.jpg
+│   │       └── RT0107_BROWN GRADIENT_3.jpg
 │   ├── SHELVING
 │   │   └── ETAGERE_5_ETAGES
 │   │       └── Temp
@@ -610,11 +1144,11 @@
 │   │   │       └── RT0117_BROWN GRADIENT.jpg
 │   │   ├── TABOURET_ROND
 │   │   │   └── Temp
-│   │   │       ├── RT0113_BEIGE BROWN (1).jpg
-│   │   │       └── RT0113_BEIGE BROWN (2).jpg
+│   │   │       ├── RT0113_BEIGE BROWN_1.jpg
+│   │   │       └── RT0113_BEIGE BROWN_2.jpg
 │   │   └── TABOURET_TRESSE_RECTANGULAIRE
 │   │       └── Temp
-│   │           ├── HA0001_ROSE (2).jpg
+│   │           ├── HA0001_ROSE_2.jpg
 │   │           ├── HA0001_YELLOW.jpeg
 │   │           └── HA0001_YELLOW.jpg
 │   ├── STORAGE
@@ -640,31 +1174,31 @@
 │   ├── TABLE
 │   │   ├── TABLE_BALANCOIRE
 │   │   │   └── Temp
-│   │   │       ├── HDD0105_BEIGE (1).jpg
-│   │   │       ├── HDD0105_BEIGE (1).png
-│   │   │       ├── HDD0105_BEIGE (2).png
+│   │   │       ├── HDD0105_BEIGE_1.jpg
+│   │   │       ├── HDD0105_BEIGE_1.png
+│   │   │       ├── HDD0105_BEIGE_2.png
 │   │   │       ├── HDD0105_BLUE.jpg
-│   │   │       ├── HDD0105_GREY (1).jpg
-│   │   │       ├── HDD0105_GREY (2).jpg
+│   │   │       ├── HDD0105_GREY_1.jpg
+│   │   │       ├── HDD0105_GREY_2.jpg
 │   │   │       ├── HDD0105_ORANGE.jpg
-│   │   │       ├── HDD0105_ROSE (1).jpg
-│   │   │       └── HDD0105_ROSE (2).jpg
+│   │   │       ├── HDD0105_ROSE_1.jpg
+│   │   │       └── HDD0105_ROSE_2.jpg
 │   │   ├── TABLE_BASSE_TABLE_LMKAOUASS
 │   │   │   └── Temp
-│   │   │       ├── RT0091_BLACK (2).jpg
 │   │   │       ├── RT0091_BLACK.jpeg
 │   │   │       ├── RT0091_BLACK.jpg
+│   │   │       ├── RT0091_BLACK_2.jpg
 │   │   │       ├── RT0091_BROWN GRADIENT.jpeg
 │   │   │       ├── RT0091_BROWN GRADIENT.jpg
-│   │   │       ├── RT0091_GREY GRADIENT (2).jpg
-│   │   │       ├── RT0091_GREY GRADIENT (3).jpg
-│   │   │       ├── RT0091_GREY GRADIENT (4).jpg
-│   │   │       ├── RT0091_GREY GRADIENT (5).jpg
-│   │   │       └── RT0091_GREY GRADIENT.jpg
+│   │   │       ├── RT0091_GREY GRADIENT.jpg
+│   │   │       ├── RT0091_GREY GRADIENT_2.jpg
+│   │   │       ├── RT0091_GREY GRADIENT_3.jpg
+│   │   │       ├── RT0091_GREY GRADIENT_4.jpg
+│   │   │       └── RT0091_GREY GRADIENT_5.jpg
 │   │   ├── TABLE_HAUTE
 │   │   │   └── Temp
-│   │   │       ├── RT0040_BROWN_GRADIENT (2).jpg
 │   │   │       ├── RT0040_BROWN_GRADIENT.JPG
+│   │   │       ├── RT0040_BROWN_GRADIENT_2.jpg
 │   │   │       └── RT0040_YELLOW.jpg
 │   │   ├── TABLE_LOVE
 │   │   │   └── Temp
@@ -697,34 +1231,34 @@
 │   │   │       └── RT0103_WHITE.jpg
 │   │   ├── table basse 3D
 │   │   │   └── temp
-│   │   │       ├── RT0059GREY GRADIENT (1).jpg
-│   │   │       ├── RT0059_BEIGE (2).jpg
+│   │   │       ├── RT0059GREY GRADIENT_1.jpg
 │   │   │       ├── RT0059_BEIGE.jpg
+│   │   │       ├── RT0059_BEIGE_2.jpg
 │   │   │       ├── RT0059_BLACK.jpg
 │   │   │       ├── RT0059_BROWN GRADIENT.jpg
-│   │   │       ├── RT0059_GREY GRADIENT (2).jpg
-│   │   │       ├── RT0059_GREY GRADIENT (3).jpg
-│   │   │       ├── RT0059_GREY GRADIENT (4).jpg
-│   │   │       ├── RT0059_GREY GRADIENT (5).jpg
-│   │   │       └── RT0059_GREY GRADIENT.jpg
+│   │   │       ├── RT0059_GREY GRADIENT.jpg
+│   │   │       ├── RT0059_GREY GRADIENT_2.jpg
+│   │   │       ├── RT0059_GREY GRADIENT_3.jpg
+│   │   │       ├── RT0059_GREY GRADIENT_4.jpg
+│   │   │       └── RT0059_GREY GRADIENT_5.jpg
 │   │   ├── table basse chicha
 │   │   │   └── temp
 │   │   │       ├── RT0082_BEIGE.png
 │   │   │       ├── RT0082_BROWN GRADIENT.jpg
-│   │   │       ├── RT0082_GREY GRADIENT (2).jpg
-│   │   │       └── RT0082_GREY GRADIENT.jpg
+│   │   │       ├── RT0082_GREY GRADIENT.jpg
+│   │   │       └── RT0082_GREY GRADIENT_2.jpg
 │   │   ├── table basse pyramyde 0.60x0.80
 │   │   │   └── temp
 │   │   │       ├── RT0107_BLACK.jpg
-│   │   │       ├── RT0107_BROWN GRADIENT (2).jpg
-│   │   │       ├── RT0107_BROWN GRADIENT (3).jpg
-│   │   │       └── RT0107_BROWN GRADIENT.jpg
+│   │   │       ├── RT0107_BROWN GRADIENT.jpg
+│   │   │       ├── RT0107_BROWN GRADIENT_2.jpg
+│   │   │       └── RT0107_BROWN GRADIENT_3.jpg
 │   │   ├── table box 0.65x0.70
 │   │   │   └── temp
 │   │   │       └── 0-02-05-6ccf6abe33fd27e0250c4a73eb00a8855f4535e3bf4d9fe0c26c2195148124f6_f7513c37964a969e.jpg
 │   │   ├── table carre demontable
 │   │   │   └── temp
-│   │   │       ├── RT0046_BROWN GRADIENT (2).jpg
+│   │   │       ├── RT0046_BROWN GRADIENT_2.jpg
 │   │   │       ├── RT0080_BROWN GRADIENT.jpg
 │   │   │       ├── RT0080_GREY GRADIENT.png
 │   │   │       ├── RT0080_WHITE.png
@@ -746,9 +1280,9 @@
 │   │   │   └── temp
 │   │   │       ├── RT0110_BEIGE.jpg
 │   │   │       ├── RT0110_BLACK.jpg
-│   │   │       ├── RT0110_BROWN GRADIENT (1).jpg
-│   │   │       ├── RT0110_BROWN GRADIENT (2).jpg
 │   │   │       ├── RT0110_BROWN GRADIENT.jpg
+│   │   │       ├── RT0110_BROWN GRADIENT_1.jpg
+│   │   │       ├── RT0110_BROWN GRADIENT_2.jpg
 │   │   │       ├── RT0110_GREY GRADIENT.webp
 │   │   │       └── RT0110_WHITE.jpg
 │   │   ├── table tete a tete pivotante
@@ -760,15 +1294,15 @@
 │   │   ├── table_basse_060_x_080
 │   │   │   └── Temp
 │   │   │       ├── RT0034_BEIGE.jpg
-│   │   │       ├── RT0034_BLACK (1).jpg
-│   │   │       ├── RT0034_BLACK (2).jpg
-│   │   │       ├── RT0034_BROWN GRADIENT (2).jpg
+│   │   │       ├── RT0034_BLACK_1.jpg
+│   │   │       ├── RT0034_BLACK_2.jpg
 │   │   │       ├── RT0034_BROWN GRADIENT.jpeg
 │   │   │       ├── RT0034_BROWN GRADIENT.jpg
+│   │   │       ├── RT0034_BROWN GRADIENT_2.jpg
 │   │   │       ├── RT0034_GREY GRADIENT.jpg
 │   │   │       ├── RT0034_GREY.jpg
-│   │   │       ├── RT0034_WHITE (2).jpg
-│   │   │       └── RT0034_WHITE.JPG
+│   │   │       ├── RT0034_WHITE.JPG
+│   │   │       └── RT0034_WHITE_2.jpg
 │   │   ├── table_box_130_x_070
 │   │   │   └── Temp
 │   │   │       └── RT0047_BROWN_GRADIENT.jpg
@@ -778,20 +1312,26 @@
 │   │           └── RT0060_BROWN_GRADIENT.jpg
 │   ├── TRANSAT
 │   │   └── Temp
-│   │       ├── RT0063_BLACK (2).jpg
 │   │       ├── RT0063_BLACK.jpg
+│   │       ├── RT0063_BLACK_2.jpg
 │   │       ├── RT0096_BLACK.png
-│   │       ├── RT0096_BROWN GRADIENT (2).jpg
-│   │       ├── RT0096_BROWN GRADIENT (3).jpg
 │   │       ├── RT0096_BROWN GRADIENT.jpg
+│   │       ├── RT0096_BROWN GRADIENT_2.jpg
+│   │       ├── RT0096_BROWN GRADIENT_3.jpg
 │   │       └── TAKIDECO2.jpg
-│   └── benchmarking
-│       ├── CHAISE_BOLERO.jpg
-│       ├── CHAISE_ETOILE.png
-│       ├── CHAISE_MEDAILLON.jpg
-│       └── CHAISE_NAPOLEON.jpg
+│   ├── benchmarking
+│   │   ├── CHAISE_BOLERO.jpg
+│   │   ├── CHAISE_ETOILE.png
+│   │   ├── CHAISE_MEDAILLON.jpg
+│   │   └── CHAISE_NAPOLEON.jpg
+│   ├── logo.png
+│   └── nature.png
 ├── modules
 │   ├── __init__.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-313.pyc
+│   │   ├── product_management.cpython-313.pyc
+│   │   └── utils.cpython-313.pyc
 │   ├── bon_de_commande.py
 │   ├── client_management.py
 │   ├── pdf_generator.py
@@ -802,8 +1342,13 @@
 │   ├── stock_utils.py
 │   ├── transaction_management.py
 │   └── utils.py
+├── rename_image.py
 ├── requirements.txt
-├── tree.txt
+├── tests
+│   ├── __pycache__
+│   │   └── test_product_management.cpython-313-pytest-8.3.5.pyc
+│   └── test_product_management.py
+├── tree.tx
 └── venv
     ├── bin
     │   ├── Activate.ps1
@@ -821,8 +1366,10 @@
     │   ├── pip
     │   ├── pip3
     │   ├── pip3.13
+    │   ├── py.test
     │   ├── pyftmerge
     │   ├── pyftsubset
+    │   ├── pytest
     │   ├── python -> python3.13
     │   ├── python3 -> python3.13
     │   ├── python3.13 -> /opt/homebrew/opt/python@3.13/bin/python3.13
@@ -1074,9 +1621,161 @@
     │           │   └── report.py
     │           ├── __pycache__
     │           │   ├── docopt.cpython-313.pyc
+    │           │   ├── py.cpython-313.pyc
     │           │   ├── six.cpython-313.pyc
     │           │   └── typing_extensions.cpython-313.pyc
     │           ├── _cffi_backend.cpython-313-darwin.so
+    │           ├── _pytest
+    │           │   ├── __init__.py
+    │           │   ├── __pycache__
+    │           │   │   ├── __init__.cpython-313.pyc
+    │           │   │   ├── _argcomplete.cpython-313.pyc
+    │           │   │   ├── _version.cpython-313.pyc
+    │           │   │   ├── cacheprovider.cpython-313.pyc
+    │           │   │   ├── capture.cpython-313.pyc
+    │           │   │   ├── compat.cpython-313.pyc
+    │           │   │   ├── debugging.cpython-313.pyc
+    │           │   │   ├── deprecated.cpython-313.pyc
+    │           │   │   ├── doctest.cpython-313.pyc
+    │           │   │   ├── faulthandler.cpython-313.pyc
+    │           │   │   ├── fixtures.cpython-313.pyc
+    │           │   │   ├── freeze_support.cpython-313.pyc
+    │           │   │   ├── helpconfig.cpython-313.pyc
+    │           │   │   ├── hookspec.cpython-313.pyc
+    │           │   │   ├── junitxml.cpython-313.pyc
+    │           │   │   ├── legacypath.cpython-313.pyc
+    │           │   │   ├── logging.cpython-313.pyc
+    │           │   │   ├── main.cpython-313.pyc
+    │           │   │   ├── monkeypatch.cpython-313.pyc
+    │           │   │   ├── nodes.cpython-313.pyc
+    │           │   │   ├── outcomes.cpython-313.pyc
+    │           │   │   ├── pastebin.cpython-313.pyc
+    │           │   │   ├── pathlib.cpython-313.pyc
+    │           │   │   ├── pytester.cpython-313.pyc
+    │           │   │   ├── pytester_assertions.cpython-313.pyc
+    │           │   │   ├── python.cpython-313.pyc
+    │           │   │   ├── python_api.cpython-313.pyc
+    │           │   │   ├── python_path.cpython-313.pyc
+    │           │   │   ├── recwarn.cpython-313.pyc
+    │           │   │   ├── reports.cpython-313.pyc
+    │           │   │   ├── runner.cpython-313.pyc
+    │           │   │   ├── scope.cpython-313.pyc
+    │           │   │   ├── setuponly.cpython-313.pyc
+    │           │   │   ├── setupplan.cpython-313.pyc
+    │           │   │   ├── skipping.cpython-313.pyc
+    │           │   │   ├── stash.cpython-313.pyc
+    │           │   │   ├── stepwise.cpython-313.pyc
+    │           │   │   ├── terminal.cpython-313.pyc
+    │           │   │   ├── threadexception.cpython-313.pyc
+    │           │   │   ├── timing.cpython-313.pyc
+    │           │   │   ├── tmpdir.cpython-313.pyc
+    │           │   │   ├── unittest.cpython-313.pyc
+    │           │   │   ├── unraisableexception.cpython-313.pyc
+    │           │   │   ├── warning_types.cpython-313.pyc
+    │           │   │   └── warnings.cpython-313.pyc
+    │           │   ├── _argcomplete.py
+    │           │   ├── _code
+    │           │   │   ├── __init__.py
+    │           │   │   ├── __pycache__
+    │           │   │   │   ├── __init__.cpython-313.pyc
+    │           │   │   │   ├── code.cpython-313.pyc
+    │           │   │   │   └── source.cpython-313.pyc
+    │           │   │   ├── code.py
+    │           │   │   └── source.py
+    │           │   ├── _io
+    │           │   │   ├── __init__.py
+    │           │   │   ├── __pycache__
+    │           │   │   │   ├── __init__.cpython-313.pyc
+    │           │   │   │   ├── pprint.cpython-313.pyc
+    │           │   │   │   ├── saferepr.cpython-313.pyc
+    │           │   │   │   ├── terminalwriter.cpython-313.pyc
+    │           │   │   │   └── wcwidth.cpython-313.pyc
+    │           │   │   ├── pprint.py
+    │           │   │   ├── saferepr.py
+    │           │   │   ├── terminalwriter.py
+    │           │   │   └── wcwidth.py
+    │           │   ├── _py
+    │           │   │   ├── __init__.py
+    │           │   │   ├── __pycache__
+    │           │   │   │   ├── __init__.cpython-313.pyc
+    │           │   │   │   ├── error.cpython-313.pyc
+    │           │   │   │   └── path.cpython-313.pyc
+    │           │   │   ├── error.py
+    │           │   │   └── path.py
+    │           │   ├── _version.py
+    │           │   ├── assertion
+    │           │   │   ├── __init__.py
+    │           │   │   ├── __pycache__
+    │           │   │   │   ├── __init__.cpython-313.pyc
+    │           │   │   │   ├── rewrite.cpython-313.pyc
+    │           │   │   │   ├── truncate.cpython-313.pyc
+    │           │   │   │   └── util.cpython-313.pyc
+    │           │   │   ├── rewrite.py
+    │           │   │   ├── truncate.py
+    │           │   │   └── util.py
+    │           │   ├── cacheprovider.py
+    │           │   ├── capture.py
+    │           │   ├── compat.py
+    │           │   ├── config
+    │           │   │   ├── __init__.py
+    │           │   │   ├── __pycache__
+    │           │   │   │   ├── __init__.cpython-313.pyc
+    │           │   │   │   ├── argparsing.cpython-313.pyc
+    │           │   │   │   ├── compat.cpython-313.pyc
+    │           │   │   │   ├── exceptions.cpython-313.pyc
+    │           │   │   │   └── findpaths.cpython-313.pyc
+    │           │   │   ├── argparsing.py
+    │           │   │   ├── compat.py
+    │           │   │   ├── exceptions.py
+    │           │   │   └── findpaths.py
+    │           │   ├── debugging.py
+    │           │   ├── deprecated.py
+    │           │   ├── doctest.py
+    │           │   ├── faulthandler.py
+    │           │   ├── fixtures.py
+    │           │   ├── freeze_support.py
+    │           │   ├── helpconfig.py
+    │           │   ├── hookspec.py
+    │           │   ├── junitxml.py
+    │           │   ├── legacypath.py
+    │           │   ├── logging.py
+    │           │   ├── main.py
+    │           │   ├── mark
+    │           │   │   ├── __init__.py
+    │           │   │   ├── __pycache__
+    │           │   │   │   ├── __init__.cpython-313.pyc
+    │           │   │   │   ├── expression.cpython-313.pyc
+    │           │   │   │   └── structures.cpython-313.pyc
+    │           │   │   ├── expression.py
+    │           │   │   └── structures.py
+    │           │   ├── monkeypatch.py
+    │           │   ├── nodes.py
+    │           │   ├── outcomes.py
+    │           │   ├── pastebin.py
+    │           │   ├── pathlib.py
+    │           │   ├── py.typed
+    │           │   ├── pytester.py
+    │           │   ├── pytester_assertions.py
+    │           │   ├── python.py
+    │           │   ├── python_api.py
+    │           │   ├── python_path.py
+    │           │   ├── recwarn.py
+    │           │   ├── reports.py
+    │           │   ├── runner.py
+    │           │   ├── scope.py
+    │           │   ├── setuponly.py
+    │           │   ├── setupplan.py
+    │           │   ├── skipping.py
+    │           │   ├── stash.py
+    │           │   ├── stepwise.py
+    │           │   ├── terminal.py
+    │           │   ├── threadexception.py
+    │           │   ├── timing.py
+    │           │   ├── tmpdir.py
+    │           │   ├── unittest.py
+    │           │   ├── unraisableexception.py
+    │           │   ├── warning_types.py
+    │           │   └── warnings.py
     │           ├── _watchdog_fsevents.cpython-313-darwin.so
     │           ├── altair
     │           │   ├── __init__.py
@@ -2661,6 +3360,24 @@
     │           │   ├── METADATA
     │           │   ├── RECORD
     │           │   └── WHEEL
+    │           ├── iniconfig
+    │           │   ├── __init__.py
+    │           │   ├── __pycache__
+    │           │   │   ├── __init__.cpython-313.pyc
+    │           │   │   ├── _parse.cpython-313.pyc
+    │           │   │   ├── _version.cpython-313.pyc
+    │           │   │   └── exceptions.cpython-313.pyc
+    │           │   ├── _parse.py
+    │           │   ├── _version.py
+    │           │   ├── exceptions.py
+    │           │   └── py.typed
+    │           ├── iniconfig-2.1.0.dist-info
+    │           │   ├── INSTALLER
+    │           │   ├── METADATA
+    │           │   ├── RECORD
+    │           │   ├── WHEEL
+    │           │   └── licenses
+    │           │       └── LICENSE
     │           ├── jinja2
     │           │   ├── __init__.py
     │           │   ├── __pycache__
@@ -9358,12 +10075,39 @@
     │           │   ├── WHEEL
     │           │   ├── entry_points.txt
     │           │   └── top_level.txt
+    │           ├── pluggy
+    │           │   ├── __init__.py
+    │           │   ├── __pycache__
+    │           │   │   ├── __init__.cpython-313.pyc
+    │           │   │   ├── _callers.cpython-313.pyc
+    │           │   │   ├── _hooks.cpython-313.pyc
+    │           │   │   ├── _manager.cpython-313.pyc
+    │           │   │   ├── _result.cpython-313.pyc
+    │           │   │   ├── _tracing.cpython-313.pyc
+    │           │   │   ├── _version.cpython-313.pyc
+    │           │   │   └── _warnings.cpython-313.pyc
+    │           │   ├── _callers.py
+    │           │   ├── _hooks.py
+    │           │   ├── _manager.py
+    │           │   ├── _result.py
+    │           │   ├── _tracing.py
+    │           │   ├── _version.py
+    │           │   ├── _warnings.py
+    │           │   └── py.typed
+    │           ├── pluggy-1.5.0.dist-info
+    │           │   ├── INSTALLER
+    │           │   ├── LICENSE
+    │           │   ├── METADATA
+    │           │   ├── RECORD
+    │           │   ├── WHEEL
+    │           │   └── top_level.txt
     │           ├── protobuf-5.29.4.dist-info
     │           │   ├── INSTALLER
     │           │   ├── LICENSE
     │           │   ├── METADATA
     │           │   ├── RECORD
     │           │   └── WHEEL
+    │           ├── py.py
     │           ├── pyarrow
     │           │   ├── __init__.pxd
     │           │   ├── __init__.py
@@ -10438,6 +11182,23 @@
     │           │   ├── METADATA
     │           │   ├── RECORD
     │           │   ├── WHEEL
+    │           │   └── top_level.txt
+    │           ├── pytest
+    │           │   ├── __init__.py
+    │           │   ├── __main__.py
+    │           │   ├── __pycache__
+    │           │   │   ├── __init__.cpython-313.pyc
+    │           │   │   └── __main__.cpython-313.pyc
+    │           │   └── py.typed
+    │           ├── pytest-8.3.5.dist-info
+    │           │   ├── AUTHORS
+    │           │   ├── INSTALLER
+    │           │   ├── LICENSE
+    │           │   ├── METADATA
+    │           │   ├── RECORD
+    │           │   ├── REQUESTED
+    │           │   ├── WHEEL
+    │           │   ├── entry_points.txt
     │           │   └── top_level.txt
     │           ├── python_dateutil-2.9.0.post0.dist-info
     │           │   ├── INSTALLER
@@ -13514,4 +14275,4 @@
             └── man1
                 └── ttx.1
 
-1420 directories, 12095 files
+1601 directories, 12675 files
