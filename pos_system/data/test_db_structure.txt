@@ -62,15 +62,6 @@ Columns:
   - created_by (TEXT)
   - status (TEXT)
 
-Table: price_history
-Columns:
-  - id (INTEGER) [PK]
-  - product_ref (TEXT)
-  - price_type (TEXT)
-  - old_price (REAL)
-  - new_price (REAL)
-  - changed_at (TEXT)
-
 Table: products
 Columns:
   - reference (TEXT)
@@ -154,3 +145,26 @@ Columns:
   - quantite_vendu_actue (INT)
   - last_updated (TEXT)
   - discontinued (NUM)
+
+Table: categories
+Columns:
+  - name (TEXT) [PK]
+  - description (TEXT)
+
+Table: audit_log
+Columns:
+  - id (INTEGER) [PK]
+  - timestamp (DATETIME)
+  - user (TEXT)
+  - action (TEXT)
+  - reference (TEXT)
+  - details (TEXT)
+
+Table: price_history
+Columns:
+  - id (INTEGER) [PK]
+  - product_ref (TEXT)
+  - price_type (TEXT)
+  - old_price (REAL)
+  - new_price (REAL)
+  - changed_at (DATETIME)

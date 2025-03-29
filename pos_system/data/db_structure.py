@@ -1,12 +1,12 @@
 import sqlite3
 
 # Connect to the database
-db_path = "pos_system.db"  # Update the path if needed
+db_path = "/Users/h.boukhalfa/Desktop/pos/catafactu/pos_system/data/test_pos_system.db"  
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
 # Output file
-output_file = "db_structure.txt"
+output_file = "/Users/h.boukhalfa/Desktop/pos/catafactu/pos_system/data/test_db_structure.txt"
 
 with open(output_file, "w", encoding="utf-8") as f:
     # Get all table names

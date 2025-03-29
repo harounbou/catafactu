@@ -15,16 +15,12 @@ def log_audit_event(username, action, reference, description):
     pass
 
 def add_or_update_product(product_data, is_update=False, enable_price_history=ENABLE_PRICE_HISTORY):
-    """Add or update a product with image handling."""
     conn = get_db_connection()
     try:
         ref = product_data['reference']
         errors = validate_product_data(product_data, is_update=is_update)
         if errors:
-            try:
-                st.error(f"Validation errors: {errors}")
-            except AttributeError:
-                print(f"Validation errors: {errors}")
+            print(f"Validation errors: {errors}")
             return False
         
         existing_df = load_products(active_only=False)
@@ -33,12 +29,17 @@ def add_or_update_product(product_data, is_update=False, enable_price_history=EN
             values = (
                 ref,
                 product_data['denomination'],
-                product_data.get('quantite_actuelle', 0.0),
+                product_data.get('quantite_initiale', 0.0),
+                product_data.get('quantite_restockee', 0.0),
+                product_data.get('quantite_vendue', 0),
+                product_data.get('quantite_actuelle', 0),
                 product_data.get('couleurs-dispo-usine', ''),
                 product_data.get('images', ''),
                 product_data.get('prix-super-gros', 0.0),
                 product_data.get('prix-gros', 0.0),
                 product_data.get('prix-détail', 0.0),
+                product_data.get('red', 0),
+                product_data.get('blue', 0),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 product_data.get('discontinued', 0),
                 product_data.get('category', '')
@@ -46,63 +47,31 @@ def add_or_update_product(product_data, is_update=False, enable_price_history=EN
             
             if is_update:
                 if ref not in existing_df['reference'].values:
-                    try:
-                        st.error(f"Cannot update: Product {ref} does not exist!")
-                    except AttributeError:
-                        print(f"Cannot update: Product {ref} does not exist!")
+                    print(f"Cannot update: Product {ref} does not exist!")
                     return False
-                cursor.execute('''UPDATE products SET denomination=?, quantite_actuelle=?, 
-                                `couleurs-dispo-usine`=?, images=?, `prix-super-gros`=?, 
-                                `prix-gros`=?, `prix-détail`=?, last_updated=?, discontinued=?, 
-                                category=? WHERE reference=?''', (*values[1:], ref))
+                cursor.execute('''UPDATE products SET 
+                    denomination=?, quantite_initiale=?, quantite_restockee=?, quantite_vendue=?, 
+                    quantite_actuelle=?, `couleurs-dispo-usine`=?, images=?, `prix-super-gros`=?, 
+                    `prix-gros`=?, `prix-détail`=?, red=?, blue=?, last_updated=?, discontinued=?, category=?
+                    WHERE reference=?''', (*values[1:], ref))
                 action = "updated"
-                try:
-                    log_audit_event(
-                        st.session_state.user['username'],
-                        "UPDATE",
-                        ref,
-                        f"Fields changed: {list(product_data.keys())}"
-                    )
-                except AttributeError:
-                    print(f"Audit log: UPDATE {ref} - Fields changed: {list(product_data.keys())}")
             else:
                 if ref in existing_df['reference'].values:
-                    try:
-                        st.error("Reference already exists!")
-                    except AttributeError:
-                        print("Reference already exists!")
+                    print("Reference already exists!")
                     return False
                 cursor.execute('''INSERT INTO products 
-                                (reference, denomination, quantite_actuelle, `couleurs-dispo-usine`, 
-                                images, `prix-super-gros`, `prix-gros`, `prix-détail`, last_updated, 
-                                discontinued, category)
-                                VALUES (?,?,?,?,?,?,?,?,?,?,?)''', values)
+                    (reference, denomination, quantite_initiale, quantite_restockee, quantite_vendue, 
+                    quantite_actuelle, `couleurs-dispo-usine`, images, `prix-super-gros`, `prix-gros`, 
+                    `prix-détail`, red, blue, last_updated, discontinued, category)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', values)
                 action = "added"
             
-            if enable_price_history and is_update:
-                old_product = existing_df[existing_df['reference'] == ref].iloc[0]
-                for price_type, new_val, old_val in [
-                    ('super_gros', product_data['prix-super-gros'], old_product['prix-super-gros']),
-                    ('gros', product_data['prix-gros'], old_product['prix-gros']),
-                    ('detail', product_data['prix-détail'], old_product['prix-détail'])
-                ]:
-                    if new_val != old_val:
-                        cursor.execute('''INSERT INTO price_history 
-                                        (product_ref, price_type, old_price, new_price, changed_at)
-                                        VALUES (?, ?, ?, ?, ?)''', 
-                                        (ref, price_type, old_val, new_val, datetime.now()))
             conn.commit()
-        try:
-            st.success(f"Product {action} successfully!")
-        except AttributeError:
-            print(f"Product {action} successfully!")
+        print(f"Product {action} successfully!")
         return True
     except Exception as e:
         conn.rollback()
-        try:
-            st.error(f"Error: {str(e)}")
-        except AttributeError:
-            print(f"Error in add_or_update_product: {str(e)}")
+        print(f"Error in add_or_update_product: {str(e)}")
         return False
     finally:
         conn.close()
@@ -255,40 +224,30 @@ def check_stock(reference, quantity, color=None):
     
     return True, "In stock"
 
+
 def update_stock(reference, quantity_change, color=None):
-    """Update stock levels for a product."""
     conn = get_db_connection()
     try:
         with conn:
             cursor = conn.cursor()
-            if color:
-                cursor.execute(f"""
-                    UPDATE products 
-                    SET `{color}` = `{color}` + ?, 
-                        last_updated = ? 
-                    WHERE reference = ?
-                """, (quantity_change, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
-
-            cursor.execute("SELECT * FROM products WHERE reference = ?", (reference,))
+            cursor.execute("SELECT * FROM products WHERE reference = ? FOR UPDATE", (reference,))
             product = cursor.fetchone()
-            colors = [c.strip().lower() for c in product['couleurs-dispo-usine'].split(',')] if product['couleurs-dispo-usine'] else []
-            total = sum(int(product[color]) for color in colors if color in product)
-
-            cursor.execute("""
-                UPDATE products 
-                SET quantite_actuelle = ?, 
-                    last_updated = ? 
-                WHERE reference = ?
-            """, (total, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
-            
+            if color:
+                current = product[color] if color in product else 0
+                cursor.execute(f"UPDATE products SET `{color}` = ?, last_updated = ? WHERE reference = ?",
+                               (current + quantity_change, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
+            total = sum(int(product[col]) for col in product.keys() if col in ['red', 'blue', 'green'] and pd.notna(product[col]))
+            cursor.execute("UPDATE products SET quantite_actuelle = ?, last_updated = ? WHERE reference = ?",
+                           (total, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), reference))
             conn.commit()
             return True
     except Exception as e:
         conn.rollback()
-        st.error(f"Error updating stock: {str(e)}")
+        print(f"Error updating stock: {str(e)}")
         return False
     finally:
         conn.close()
+
 
 def restock_product(reference, quantity_to_add, color=None):
     """Restock a product with color-aware quantity updates."""
@@ -417,35 +376,12 @@ def update_product_stock(reference):
 
 @transactional_update
 def permanently_delete(reference, conn=None):
-    """Admin-only deletion with transaction safety."""
-    transactions = conn.execute(
-        "SELECT COUNT(*) FROM transactions WHERE items LIKE ?",
-        (f'%{reference}%',)
-    ).fetchone()[0]
-    
+    if st.session_state.user.get("role") != "admin":
+        raise ValueError("Only admins can permanently delete products")
+    transactions = conn.execute("SELECT COUNT(*) FROM transactions WHERE items LIKE ?", (f'%{reference}%',)).fetchone()[0]
     if transactions > 0:
         raise ValueError("Product has associated transactions")
-    
     conn.execute("DELETE FROM price_history WHERE product_ref = ?", (reference,))
     conn.execute("DELETE FROM products WHERE reference = ?", (reference,))
-    
-    try:
-        log_audit_event(st.session_state.user['username'],
-                       "DELETE", reference, 
-                       "Product permanently deleted")
-    except AttributeError:
-        pass  # Skip logging if not in Streamlit context
-    
+    log_audit_event(st.session_state.user['username'], "DELETE", reference, "Product permanently deleted")
     return True
-
-def safe_delete_product(reference):
-    """User-friendly delete handler."""
-    try:
-        if permanently_delete(reference):
-            st.success("Product deleted successfully")
-            return True
-    except ValueError as e:
-        st.error(str(e))
-    except Exception as e:
-        st.error(f"Deletion failed: {str(e)}")
-    return False
