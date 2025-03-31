@@ -12,12 +12,11 @@ import smtplib
 #from email.mime.text import MIMEText
 #from email.mime.application import MIMEApplication
 
-
-
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\d{10}$'
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # Points to pos_system/
+
 DB_PATH = os.path.join(BASE_DIR, "data", "pos_system.db")  #live
 #DB_PATH = os.path.join(BASE_DIR, "data", "test_pos_system.db")  #test
 

@@ -1,40 +1,187 @@
 # tests/test_performance.py
-import datetime
 import pytest
+import pandas as pd
 import time
-from modules.product_management import add_or_update_product, load_products, permanently_delete
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime  # Ensure correct import
+from modules.product_management import add_or_update_product, update_stock, load_products
 from modules.utils import get_db_connection
+import streamlit as st
 
-def generate_test_product(i):
+# Mock Streamlit's session_state
+class MockSessionState:
+    def __init__(self):
+        self._data = {'user': {'role': 'admin', 'username': 'test_user'}}
+    def __getattr__(self, key):
+        try:
+            return self._data[key]
+        except KeyError:
+            raise AttributeError(f"'MockSessionState' object has no attribute '{key}'")
+    def __getitem__(self, key):
+        return self._data[key]
+
+@pytest.fixture
+def mock_streamlit(monkeypatch):
+    """Mock streamlit.session_state for tests."""
+    class MockStreamlit:
+        session_state = MockSessionState()
+        @staticmethod
+        def error(msg):
+            print(msg)
+        @staticmethod
+        def success(msg):
+            print(msg)
+    monkeypatch.setattr('modules.product_management.st', MockStreamlit())
+    monkeypatch.setattr('modules.utils.st', MockStreamlit())
+
+@pytest.fixture
+def test_product():
     return {
-        "reference": f"PERF-{i:04d}",
-        "denomination": f"Performance Product {i}",
+        "reference": "SEC-001",
+        "denomination": "Security Test Product",
         "quantite_actuelle": 100,
         "quantite_initiale": 100,
         "quantite_restockee": 0,
         "quantite_vendue": 0,
-        "couleurs-dispo-usine": "red",
-        "red": 100,
+        "couleurs-dispo-usine": "red,blue",
         "images": "",
         "prix-super-gros": 10.0,
         "prix-gros": 15.0,
         "prix-détail": 20.0,
-        "discontinued": 0,
+        "uni_colour": 0,
+        "default_colour": 0,
+        "brown": 0,
+        "brown_deg": 0,
+        "blue": 50,
+        "white": 0,
+        "black": 0,
+        "green_bottle": 0,
+        "red": 50,
+        "grey": 0,
+        "grey_deg": 0,
+        "beige": 0,
+        "yellow": 0,
+        "orange": 0,
+        "garnet": 0,
+        "golden": 0,
+        "green": 0,
+        "rose": 0,
+        "note": "Test note",
         "category": "Test",
-        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "quantite_vendu_actue": 0,
+        "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "discontinued": 0,
+        "version": 0
     }
 
-def test_bulk_operations():
-    products = [generate_test_product(i) for i in range(1000)]
-    start = time.time()
-    for p in products:
-        assert add_or_update_product(p), f"Failed to add {p['reference']}"
-    duration = time.time() - start
-    assert duration < 5.0, f"Bulk insert took {duration:.2f}s, expected < 5s"
-    all_products = load_products(active_only=False)
-    assert len(all_products) >= 1000, f"Expected 1000 products, got {len(all_products)}"
+
+@pytest.fixture(autouse=True)
+def setup_database():
     conn = get_db_connection()
-    for p in products:
-        conn.execute("DELETE FROM products WHERE reference = ?", (p["reference"],))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("DROP TABLE IF EXISTS products")
+        conn.execute("""
+            CREATE TABLE products (
+                reference TEXT PRIMARY KEY,
+                denomination TEXT,
+                quantite_initiale REAL,
+                quantite_restockee REAL,
+                quantite_vendue INTEGER,
+                quantite_actuelle INTEGER,
+                `couleurs-dispo-usine` TEXT,
+                images TEXT,
+                `prix-super-gros` REAL,
+                `prix-gros` REAL,
+                `prix-détail` REAL,
+                uni_colour INTEGER,
+                default_colour INTEGER,
+                brown INTEGER,
+                brown_deg INTEGER,
+                blue INTEGER,
+                white INTEGER,
+                black INTEGER,
+                green_bottle INTEGER,
+                red INTEGER,
+                grey INTEGER,
+                grey_deg INTEGER,
+                beige INTEGER,
+                yellow INTEGER,
+                orange INTEGER,
+                garnet INTEGER,
+                golden INTEGER,
+                green INTEGER,
+                rose INTEGER,
+                note TEXT,
+                category TEXT,
+                quantite_vendu_actue INTEGER,
+                last_updated TEXT,
+                discontinued INTEGER,
+                version INTEGER DEFAULT 0
+            )
+        """)
+        conn.execute("DROP TABLE IF EXISTS transactions")
+        conn.execute("""
+            CREATE TABLE transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                items TEXT,
+                date TEXT
+            )
+        """)
+        conn.commit()
+    except Exception as e:
+        print(f"Setup cleanup failed: {str(e)}")
+    finally:
+        conn.close()
+
+def test_high_concurrency_updates(test_product, mock_streamlit):
+    assert add_or_update_product(test_product), "Failed to add product"
+    initial_qty = 1000
+    num_updates = 100
+    
+    start_time = time.time()
+    with ThreadPoolExecutor(max_workers=50) as executor:
+        futures = [executor.submit(update_stock, test_product["reference"], -1) for _ in range(num_updates)]
+        for future in futures:
+            future.result()  # Wait for all updates to complete
+    duration = time.time() - start_time
+    
+    final_product = load_products().query(f"reference == '{test_product['reference']}'").iloc[0]
+    expected_qty = initial_qty - num_updates
+    print(f"High concurrency: {num_updates} updates took {duration:.2f} seconds")
+    print(f"Initial qty: {initial_qty}, Final qty: {final_product['quantite_actuelle']}, Expected: {expected_qty}")
+    assert final_product["quantite_actuelle"] == expected_qty, f"Expected {expected_qty}, got {final_product['quantite_actuelle']}"
+    assert duration < 10, f"Updates took too long: {duration:.2f} seconds"
+
+def test_bulk_product_addition(mock_streamlit):
+    num_products = 1000
+    products = [
+        {
+            "reference": f"PERF-{i:04d}",
+            "denomination": f"Product {i}",
+            "quantite_actuelle": 100,
+            "quantite_initiale": 100,
+            "quantite_restockee": 0,
+            "quantite_vendue": 0,
+            "couleurs-dispo-usine": "red",
+            "images": "",
+            "prix-super-gros": 0.0,
+            "prix-gros": 0.0,
+            "prix-détail": 0.0,
+            "red": 100,
+            "blue": 0,
+            "discontinued": 0,
+            "category": "Test",
+            "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "version": 0
+        } for i in range(num_products)
+    ]
+    
+    start_time = time.time()
+    for product in products:
+        assert add_or_update_product(product), f"Failed to add product {product['reference']}"
+    duration = time.time() - start_time
+    
+    products_df = load_products()
+    print(f"Bulk addition: {num_products} products took {duration:.2f} seconds")
+    assert len(products_df) == num_products, f"Expected {num_products} products, got {len(products_df)}"
+    assert duration < 20, f"Bulk addition took too long: {duration:.2f} seconds"

@@ -1,15 +1,16 @@
+tree -I "images|backups|venv|.env" > tree.txt
 .
 ├── app.py
 ├── armchair.png
 ├── data
 │   ├── clear_tables.py
 │   ├── db_structure.py
+│   ├── db_structure.txt
 │   ├── delete_records_in_column.py
 │   ├── organise_image_path.py
 │   ├── populate_image_path_and_colours_in_products.py
 │   ├── pos_system.db
 │   ├── query.sql
-│   ├── test_db_structure.txt
 │   ├── test_pos_system.db
 │   └── users.json
 ├── generated_pdfs
@@ -17,7 +18,6 @@
 │   ├── __init__.py
 │   ├── bon_de_commande.py
 │   ├── client_management.py
-│   ├── inspect_table_schema.py
 │   ├── pdf_generator.py
 │   ├── pos.py
 │   ├── product_management.py
@@ -29,17 +29,14 @@
 ├── rename_image.py
 ├── requirements.txt
 ├── tests
-│   ├── test_color_concurrency.py
 │   ├── test_concurrency.py
 │   ├── test_edge_cases.py
 │   ├── test_edit_failures.py
 │   ├── test_edit_product.py
-│   ├── test_image_management.py
 │   ├── test_integration.py
 │   ├── test_performance.py
 │   ├── test_product_management.py
 │   └── test_security.py
-├── tree.txt
-└── tree1.txt
+└── tree.txt
 
-5 directories, 38 files
+5 directories, 34 files

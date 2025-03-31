@@ -113,8 +113,8 @@ Table: products
 Columns:
   - reference (TEXT) [PK]
   - denomination (TEXT)
-  - quantite_initiale (REAL)
-  - quantite_restockee (REAL)
+  - quantite_initiale (INTEGER)
+  - quantite_restockee (INTEGER)
   - quantite_vendue (INTEGER)
   - quantite_actuelle (INTEGER)
   - couleurs-dispo-usine (TEXT)
