@@ -7,17 +7,14 @@ from PIL import Image
 import streamlit as st
 import pandas as pd
 import smtplib
+from PIL import Image
 
-#from email.mime.multipart import MIMEMultipart
-#from email.mime.text import MIMEText
-#from email.mime.application import MIMEApplication
 
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\d{10}$'
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))  # Points to pos_system/
 
-DB_PATH = os.path.join(BASE_DIR, "data", "pos_system.db")  #live
+#DB_PATH = os.path.join(BASE_DIR, "data", "pos_system.db")  #live
 #DB_PATH = os.path.join(BASE_DIR, "data", "test_pos_system.db")  #test
 
 # modules/utils.py
@@ -52,20 +49,22 @@ COLOR_STYLES = {
     'default': '#f5f5f5'
 }
 
-def get_db_color_name(display_color):
-    """Map display color names to database column names"""
-    cleaned_color = display_color.lower().replace(" ", "_")
-    return COLOR_MAPPING.get(cleaned_color, cleaned_color)
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+DB_PATH = os.path.join(BASE_DIR, "data", "test_pos_system.db" if os.environ.get("TESTING") == "1" else "pos_system.db")
 
 def get_db_connection():
     """Establish a connection to the SQLite database."""
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row  # <-- KEY FIX
+        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
         return conn
     except sqlite3.Error as e:
         st.error(f"Database connection failed: {e}")
         return None
+
+def get_db_color_name(color):
+    """Convert color input to database column name."""
+    return color.lower().replace(" ", "_")
 
 def fetch_df_from_db(table_name):
     """Fetch data from a table as a pandas DataFrame."""

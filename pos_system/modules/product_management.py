@@ -11,6 +11,73 @@ import shutil
 # Configurable feature flag
 ENABLE_PRICE_HISTORY = False  # Toggle this in a config file or environment variable
 
+
+# modules/product_management.py
+import sqlite3
+from .utils import get_db_connection, get_db_color_name
+
+COLOR_COLUMNS = [
+    "uni_colour", "default_colour", "brown", "brown_deg", "blue", "white", "black",
+    "green_bottle", "red", "grey", "grey_deg", "beige", "yellow", "orange", "garnet",
+    "golden", "green", "rose"
+]
+
+def transactional_update(func):
+    """Decorator to handle transactions."""
+    def wrapper(*args, **kwargs):
+        conn = kwargs.get("conn") or get_db_connection()
+        if not conn:
+            raise ValueError("No database connection")
+        try:
+            result = func(*args, **kwargs, conn=conn)
+            conn.commit()
+            return result
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            if "conn" not in kwargs:
+                conn.close()
+    return wrapper
+
+
+@transactional_update
+def update_stock(reference, quantity_change, color=None, conn=None):
+    """Update stock atomically with revised total update logic."""
+    cursor = conn.cursor()
+
+    # Fetch current product
+    cursor.execute(f"SELECT {', '.join(COLOR_COLUMNS)}, quantite_actuelle FROM products WHERE reference = ?", (reference,))
+    product = cursor.fetchone()
+    if not product:
+        raise ValueError(f"Product {reference} not found")
+    product_dict = dict(product)
+
+    if color:  # Color-specific update
+        db_color = get_db_color_name(color)
+        if db_color not in COLOR_COLUMNS:
+            raise ValueError(f"Invalid color: {color}")
+        cursor.execute(f"""
+            UPDATE products 
+            SET {db_color} = MAX({db_color} + ?, 0),
+                version = version + 1 
+            WHERE reference = ?
+        """, (quantity_change, reference))
+        print(f"Updated {reference}: {db_color} adjusted by {quantity_change}")
+    else:  # Total update (no color specified)
+        total_current = sum(product_dict[col] for col in COLOR_COLUMNS)
+        if quantity_change != 0:  # Only update if there's a change
+            # Assign to default_colour and let quantite_actuelle update via generated column
+            cursor.execute("""
+                UPDATE products 
+                SET default_colour = MAX(default_colour + ?, 0),
+                    version = version + 1 
+                WHERE reference = ?
+            """, (quantity_change, reference))
+            print(f"Updated {reference}: default_colour adjusted by {quantity_change}, total was {total_current}")
+
+    return True
+
 def handle_product_images(reference, category, denomination, new_images=None, color=None, delete_existing=False):
     """Manage product images: add, replace, or delete."""
     base_dir = os.path.join("images", category.strip().replace(" ", "_"), reference)
@@ -39,8 +106,11 @@ def handle_product_images(reference, category, denomination, new_images=None, co
     # Return list of new images or None if no new images added
     return ",".join(image_paths) if image_paths else None
 
-def add_or_update_product(product_data, is_update=False, enable_price_history=ENABLE_PRICE_HISTORY):
-    conn = get_db_connection()
+
+# modules/product_management.py
+@transactional_update
+def add_or_update_product(product_data, is_update=False, enable_price_history=ENABLE_PRICE_HISTORY, conn=None):
+    cursor = conn.cursor()
     try:
         ref = product_data['reference']
         errors = validate_product_data(product_data, is_update=is_update)
@@ -54,7 +124,6 @@ def add_or_update_product(product_data, is_update=False, enable_price_history=EN
             "green_bottle", "red", "grey", "grey_deg", "beige", "yellow", "orange", "garnet",
             "golden", "green", "rose"
         ]
-        quantite_actuelle = sum(product_data.get(col, 0) for col in color_fields)
 
         # Handle images
         new_images = product_data.get('new_images')
@@ -65,54 +134,49 @@ def add_or_update_product(product_data, is_update=False, enable_price_history=EN
             new_images, selected_color, delete_image
         ) if new_images or delete_image else product_data.get('images', '')
 
-        with conn:
-            cursor = conn.cursor()
-            values = (
-                ref, product_data['denomination'], product_data.get('quantite_initiale', 0.0),
-                product_data.get('quantite_restockee', 0.0), product_data.get('quantite_vendue', 0),
-                quantite_actuelle, product_data.get('couleurs-dispo-usine', ''), images,
-                product_data.get('prix-super-gros', 0.0), product_data.get('prix-gros', 0.0),
-                product_data.get('prix-détail', 0.0), *[product_data.get(col, 0) for col in color_fields],
-                product_data.get('note', ''), product_data['category'], product_data.get('quantite_vendu_actue', 0),
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), product_data.get('discontinued', 0),
-                product_data.get('version', 0)
-            )
-            
-            if is_update:
-                if ref not in existing_df['reference'].values:
-                    print(f"Cannot update: Product {ref} does not exist!")
-                    return False
-                cursor.execute('''UPDATE products SET 
-                    denomination=?, quantite_initiale=?, quantite_restockee=?, quantite_vendue=?, 
-                    quantite_actuelle=?, `couleurs-dispo-usine`=?, images=?, `prix-super-gros`=?, 
-                    `prix-gros`=?, `prix-détail`=?, uni_colour=?, default_colour=?, brown=?, 
-                    brown_deg=?, blue=?, white=?, black=?, green_bottle=?, red=?, grey=?, 
-                    grey_deg=?, beige=?, yellow=?, orange=?, garnet=?, golden=?, green=?, rose=?, 
-                    note=?, category=?, quantite_vendu_actue=?, last_updated=?, discontinued=?, version=?
-                    WHERE reference=?''', (*values[1:], ref))
-                action = "updated"
-            else:
-                if ref in existing_df['reference'].values:
-                    print("Reference already exists!")
-                    return False
-                cursor.execute('''INSERT INTO products 
-                    (reference, denomination, quantite_initiale, quantite_restockee, quantite_vendue, 
-                    quantite_actuelle, `couleurs-dispo-usine`, images, `prix-super-gros`, `prix-gros`, 
-                    `prix-détail`, uni_colour, default_colour, brown, brown_deg, blue, white, black, 
-                    green_bottle, red, grey, grey_deg, beige, yellow, orange, garnet, golden, green, 
-                    rose, note, category, quantite_vendu_actue, last_updated, discontinued, version)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', values)
-                action = "added"
-            
-            conn.commit()
+        # Prepare values, excluding quantite_actuelle since it's generated
+        values = (
+            ref, product_data['denomination'], product_data.get('quantite_initiale', 0.0),
+            product_data.get('quantite_restockee', 0.0), product_data.get('quantite_vendue', 0),
+            product_data.get('couleurs-dispo-usine', ''), images,
+            product_data.get('prix-super-gros', 0.0), product_data.get('prix-gros', 0.0),
+            product_data.get('prix-détail', 0.0), *[product_data.get(col, 0) for col in color_fields],
+            product_data.get('note', ''), product_data['category'], product_data.get('quantite_vendu_actue', 0),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"), product_data.get('discontinued', 0),
+            product_data.get('version', 0)
+        )
+        
+        if is_update:
+            if ref not in existing_df['reference'].values:
+                print(f"Cannot update: Product {ref} does not exist!")
+                return False
+            cursor.execute('''UPDATE products SET 
+                denomination=?, quantite_initiale=?, quantite_restockee=?, quantite_vendue=?, 
+                `couleurs-dispo-usine`=?, images=?, `prix-super-gros`=?, 
+                `prix-gros`=?, `prix-détail`=?, uni_colour=?, default_colour=?, brown=?, 
+                brown_deg=?, blue=?, white=?, black=?, green_bottle=?, red=?, grey=?, 
+                grey_deg=?, beige=?, yellow=?, orange=?, garnet=?, golden=?, green=?, rose=?, 
+                note=?, category=?, quantite_vendu_actue=?, last_updated=?, discontinued=?, version=?
+                WHERE reference=?''', (*values[1:], ref))
+            action = "updated"
+        else:
+            if ref in existing_df['reference'].values:
+                print("Reference already exists!")
+                return False
+            cursor.execute('''INSERT INTO products 
+                (reference, denomination, quantite_initiale, quantite_restockee, quantite_vendue, 
+                `couleurs-dispo-usine`, images, `prix-super-gros`, `prix-gros`, 
+                `prix-détail`, uni_colour, default_colour, brown, brown_deg, blue, white, black, 
+                green_bottle, red, grey, grey_deg, beige, yellow, orange, garnet, golden, green, 
+                rose, note, category, quantite_vendu_actue, last_updated, discontinued, version)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', values)
+            action = "added"
+        
         print(f"Product {action} successfully!")
         return True
     except Exception as e:
-        conn.rollback()
         print(f"Error in add_or_update_product: {str(e)}")
         return False
-    finally:
-        conn.close()
 
 def log_audit_event(username, action, reference, description):
     """Log an audit event (placeholder implementation)."""
@@ -274,70 +338,6 @@ def check_stock(reference, quantity, color=None):
     
     return True, "In stock"
 
-
-
-def update_stock(reference, quantity_change, color=None):
-    conn = sqlite3.connect('data/pos_system.db')  # Adjust path as needed
-    c = conn.cursor()
-    
-    # Fetch current product
-    c.execute("SELECT * FROM products WHERE reference = ?", (reference,))
-    product = c.fetchone()
-    if not product:
-        conn.close()
-        raise ValueError(f"Product {reference} not found")
-    
-    # Convert row to dict (assuming columns match test_product)
-    columns = [desc[0] for desc in c.description]
-    product_dict = dict(zip(columns, product))
-    
-    # Color fields
-    color_fields = [
-        "uni_colour", "default_colour", "brown", "brown_deg", "blue", "white", "black",
-        "green_bottle", "red", "grey", "grey_deg", "beige", "yellow", "orange", "garnet",
-        "golden", "green", "rose"
-    ]
-    
-    if color:  # Color-specific update
-        db_color = color.lower()  # Adjust mapping if needed (e.g., via get_db_color_name)
-        if db_color not in product_dict:
-            conn.close()
-            raise ValueError(f"Color {color} not valid for product {reference}")
-        
-        new_color_qty = max(0, product_dict[db_color] + quantity_change)
-        c.execute(f"UPDATE products SET {db_color} = ?, version = version + 1 WHERE reference = ?",
-                  (new_color_qty, reference))
-        print(f"Stock updated: {reference} color {db_color} to {new_color_qty} (version {product_dict['version'] + 1})")
-    else:  # Total update: Distribute across colors proportionally
-        total_current = sum(product_dict[col] for col in color_fields if product_dict[col] is not None)
-        if total_current == 0 and quantity_change < 0:
-            conn.close()
-            return  # No stock to reduce
-        
-        new_total = max(0, total_current + quantity_change)
-        if total_current > 0:
-            scale = new_total / total_current
-            for col in color_fields:
-                if product_dict[col] is not None and product_dict[col] > 0:
-                    new_qty = int(product_dict[col] * scale)
-                    c.execute(f"UPDATE products SET {col} = ? WHERE reference = ?",
-                              (new_qty, reference))
-                    print(f"Stock updated: {reference} color {col} to {new_qty}")
-        else:  # If adding stock with no colors, use default_colour or red
-            c.execute("UPDATE products SET red = ? WHERE reference = ?",
-                      (new_total, reference))
-            print(f"Stock updated: {reference} color red to {new_total} (default)")
-    
-    # Sync quantite_actuelle to sum of colors
-    c.execute(f"SELECT {', '.join(color_fields)} FROM products WHERE reference = ?", (reference,))
-    colors = c.fetchone()
-    new_quantite_actuelle = sum(val for val in colors if val is not None)
-    c.execute("UPDATE products SET quantite_actuelle = ?, version = version + 1 WHERE reference = ?",
-              (new_quantite_actuelle, reference))
-    print(f"quantite_actuelle synced to {new_quantite_actuelle}")
-    
-    conn.commit()
-    conn.close()
 
 def restock_product(reference, quantity_to_add, color=None):
     """Restock a product with color-aware quantity updates."""
