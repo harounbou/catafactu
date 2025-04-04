@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
-
+from modules.product_management import update_stock, check_stock, get_db_connection
 from modules.product_management import add_or_update_product, update_stock, load_products
 from modules.utils import get_db_connection, DB_PATH
 
@@ -206,6 +206,7 @@ def test_new_item_unspecified_color():
     assert result["quantite_actuelle"] == 5, f"Expected quantite_actuelle 5, got {result['quantite_actuelle']}"
 
 def test_concurrent_red_updates():
+
     update_stock("CHAIRX", 50, "red")
     with ThreadPoolExecutor(max_workers=25) as executor:
         futures = [executor.submit(update_stock, "CHAIRX", -1, "red") for _ in range(50)]
@@ -218,3 +219,40 @@ def test_concurrent_red_updates():
     conn.close()
     assert result["red"] == 0, f"Expected red 0, got {result['red']}"
     assert result["quantite_actuelle"] == 9, f"Expected quantite_actuelle 9, got {result['quantite_actuelle']}"
+
+
+@pytest.fixture
+def setup_db():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM products")
+    cursor.execute("""
+        INSERT INTO products (reference, denomination, white, black, default_colour)
+        VALUES ('TEST1', 'Test Item', 10, 5, 3)
+    """)
+    conn.commit()
+    yield conn
+    conn.rollback()
+    conn.close()
+
+def test_update_stock_color_deduction(setup_db):
+    update_stock('TEST1', -3, 'white', conn=setup_db)
+    cursor = setup_db.cursor()
+    cursor.execute("SELECT white, quantite_actuelle FROM products WHERE reference = 'TEST1'")
+    result = dict(cursor.fetchone())
+    assert result['white'] == 7
+    assert result['quantite_actuelle'] == 15  # 7 + 5 + 3
+
+def test_update_stock_no_color_error(setup_db):
+    with pytest.raises(ValueError, match="Specify a color for stock reduction"):
+        update_stock('TEST1', -2, None, conn=setup_db)
+
+def test_check_stock_sufficient(setup_db):
+    success, msg = check_stock('TEST1', 2, 'white')
+    assert success
+    assert msg == "In stock"
+
+def test_check_stock_insufficient(setup_db):
+    success, msg = check_stock('TEST1', 15, 'white')
+    assert not success
+    assert "Only 10 units available in white" in msg

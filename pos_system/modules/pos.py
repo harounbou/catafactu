@@ -9,15 +9,16 @@ import zipfile
 from .client_management import get_client_info, add_new_client, save_clients, update_client
 from .transaction_management import record_transaction
 from .pdf_generator import generate_receipt_pdf, generate_order_pdf, generate_reservation_pdf
+from modules.product_management import COLOR_COLUMNS, update_stock
+
 from .utils import (
+    get_db_connection,
     validate_phone,
     find_image_path_for_color,
     get_full_image_path,
     fetch_df_from_db,
     get_db_color_name
 )
-
-from .product_management import load_products, update_stock, check_stock
 
 def replace_nan_with_none(data):
     """Recursively replace NaN with None in data structures for JSON serialization"""
@@ -29,27 +30,23 @@ def replace_nan_with_none(data):
         return None
     return data
 
-def display_stock_matrix(product, colors):
-    """Display stock availability with correct total calculation."""
-    if colors:
-        color_stock = {
-            c: int(product[get_db_color_name(c).lower()]) 
-            if get_db_color_name(c).lower() in product and pd.notna(product[get_db_color_name(c).lower()]) 
-            else 0 
-            for c in colors
-        }
-        total_quantity = sum(color_stock.values())
-    else:
-        total_quantity = int(product['quantite_actuelle']) if pd.notna(product['quantite_actuelle']) else 0
 
+def display_stock_matrix(product, colors):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(f"SELECT {', '.join(COLOR_COLUMNS)}, quantite_actuelle FROM products WHERE reference = ?", (product['reference'],))
+    db_product = dict(cursor.fetchone())
+    conn.close()
+
+    total_quantity = db_product['quantite_actuelle']
     st.write(f"**Stock Total ({product['denomination']})**: {total_quantity} unités")
-    
+
     if colors:
         st.write("**Disponibilité par couleur**:")
         num_cols = 4
+        color_stock = {c: db_product.get(get_db_color_name(c), 0) for c in colors}
         color_list = list(color_stock.items())
         num_rows = (len(color_list) + num_cols - 1) // num_cols
-        
         for row in range(num_rows):
             cols = st.columns(num_cols)
             for col_idx, col in enumerate(cols):
@@ -58,23 +55,12 @@ def display_stock_matrix(product, colors):
                     color, qty = color_list[idx]
                     with col:
                         st.markdown(
-                            f"<div style='background-color: {color.lower() if color.lower() in ['brown', 'blue', 'white', 'black', 'red', 'grey', 'beige', 'yellow', 'orange', 'green', 'rose'] else '#D3D3D3'}; "
-                            f"width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 5px; border: 1px solid #ccc;'></div> "
-                            f"{color}: {qty} unités",
+                            f"<div>{color}: {qty} unités</div>",
                             unsafe_allow_html=True
                         )
                         if qty < 5:
                             st.warning(f"⚠️ Stock faible pour {color}: {qty} unités")
-    
-    last_updated = product['last_updated'] if pd.notna(product['last_updated']) else "Inconnu"
-    st.write(f"**Dernière mise à jour du stock**: {last_updated}")
-    
-    if not colors and total_quantity < 10:
-        st.warning(f"⚠️ Stock faible: seulement {total_quantity} unités restantes au total!")
-    
-    sold_qty = int(product['quantite_vendue']) if pd.notna(product['quantite_vendue']) else 0
-    if sold_qty > 0:
-        st.info(f"📉 Tendance: {sold_qty} unités vendues récemment.")
+
 
 def stock_checker_section(products_df, prefix=""):
     """Display a standalone stock checker with enhanced stock features."""
@@ -87,6 +73,21 @@ def stock_checker_section(products_df, prefix=""):
         product = products_df[products_df['denomination'] == selected_product].iloc[0]
         colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
         display_stock_matrix(product, colors)
+
+
+def process_transaction(cart, client_name, sale_type, deduct_stock=True):
+    conn = get_db_connection()
+    try:
+        with conn:
+            for item in cart:
+                if deduct_stock:
+                    update_stock(item['reference'], -item['Quantity'], item['Color'].lower() if item['Color'] else None, conn=conn)
+            # Rest of your transaction logic (e.g., record_transaction)
+        st.success("Transaction processed successfully!")
+    except Exception as e:
+        st.error(f"Transaction failed: {str(e)}")
+    finally:
+        conn.close()
 
 def pos_page(products_df, clients_df):
     """

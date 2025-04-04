@@ -22,13 +22,17 @@ from modules.client_management import (
 from modules.product_management import (
     add_or_update_product,
     generate_excel_template,
+    handle_product_images,
     import_products_from_excel,
     load_products,
     mark_discontinued,
     permanently_delete,
+    update_product_stock,
+    update_products_schema,
     update_stock,
     restock_product,
-    backup_database
+    backup_database,
+    validate_product_data
 )
 
 from modules.transaction_management import (
@@ -46,10 +50,11 @@ from modules.pdf_generator import (
 
 from modules.proforma import proforma_page
 from modules.pos import pos_page
-from modules.restock import restock_page
+from modules.restock import get_db_color_name, restock_page
 from modules.bon_de_commande import bon_de_commande_page
 
 from modules.utils import (
+    COLOR_STYLES,
     validate_email,
     validate_phone,
     find_image_path_for_color,
@@ -133,6 +138,17 @@ def login():
         st.session_state['logged_in'] = True
         admin_user = next(u for u in users_data["users"] if u["username"] == "admin")
         st.session_state['user'] = admin_user
+        
+        
+        # Add this to app.py to run the migration (e.g., in an admin section)
+        if 'schema_updated' not in st.session_state:
+            st.session_state.schema_updated = False
+        if st.button("Update Database Schema") and not st.session_state.schema_updated:
+            update_products_schema()
+            st.session_state.schema_updated = True
+
+
+
         return True
     st.title("Connexion")
     username = st.text_input("Nom d'utilisateur", key="login_username")

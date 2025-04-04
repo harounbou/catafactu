@@ -1,5 +1,6 @@
 # modules/utils.py
 import datetime
+import shutil
 import sqlite3
 import os
 import re
@@ -8,7 +9,6 @@ import streamlit as st
 import pandas as pd
 import smtplib
 from PIL import Image
-
 
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\d{10}$'
@@ -62,9 +62,35 @@ def get_db_connection():
         st.error(f"Database connection failed: {e}")
         return None
 
+
 def get_db_color_name(color):
-    """Convert color input to database column name."""
-    return color.lower().replace(" ", "_")
+    return color.lower().replace(' ', '_')
+
+def check_stock(reference, quantity, color=None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if color:
+            db_color = get_db_color_name(color)
+            cursor.execute(f"SELECT {db_color}, quantite_actuelle FROM products WHERE reference = ?", (reference,))
+            result = cursor.fetchone()
+            if not result:
+                return False, "Product not found"
+            stock = result[db_color]
+            if stock < quantity:
+                return False, f"Only {stock} units available in {color}"
+        else:
+            cursor.execute("SELECT quantite_actuelle FROM products WHERE reference = ?", (reference,))
+            result = cursor.fetchone()
+            if not result:
+                return False, "Product not found"
+            stock = result['quantite_actuelle']
+            if stock < quantity:
+                return False, f"Only {stock} units available in total"
+        return True, "In stock"
+    finally:
+        conn.close()
+
 
 def fetch_df_from_db(table_name):
     """Fetch data from a table as a pandas DataFrame."""
@@ -236,8 +262,6 @@ def find_image_path_for_color(image_paths, color):
     st.warning(f"No valid images found for {image_paths}")
     return None
 
-# modules/utils.py
-
 def transactional_update(func):
     """Decorator for database operations requiring transaction safety"""
     def wrapper(*args, **kwargs):
@@ -273,9 +297,8 @@ def log_audit_event(user, action, reference, details=None):
     finally:
         conn.close()
 
-# modules/utils.py
-
 def transactional_update(func):
+
     """Decorator for transactional database operations"""
     def wrapper(*args, **kwargs):
         conn = None
@@ -293,3 +316,19 @@ def transactional_update(func):
             if conn:
                 conn.close()
     return wrapper
+
+def backup_database():
+    """Create a backup of the database."""
+    conn = get_db_connection()
+    try:
+        # Replace with actual database path or fetch from config
+        db_path = "data/pos_system.db"
+        backup_path = f"backups/backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sqlite"
+        os.makedirs(os.path.dirname(backup_path), exist_ok=True)
+        shutil.copy2(db_path, backup_path)
+        return backup_path
+    except Exception as e:
+        st.error(f"Backup failed: {str(e)}")
+        return None
+    finally:
+        conn.close()

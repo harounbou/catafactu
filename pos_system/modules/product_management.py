@@ -1,26 +1,101 @@
+# modules/product_management.py
 import sys
 import streamlit as st
 import pandas as pd
 import sqlite3
 import os
 from datetime import datetime
-from .utils import get_db_connection, get_db_color_name, transactional_update
 from io import BytesIO
 import shutil
+from modules.utils import get_db_color_name, get_db_connection
+
 
 # Configurable feature flag
 ENABLE_PRICE_HISTORY = False  # Toggle this in a config file or environment variable
-
-
-# modules/product_management.py
-import sqlite3
-from .utils import get_db_connection, get_db_color_name
 
 COLOR_COLUMNS = [
     "uni_colour", "default_colour", "brown", "brown_deg", "blue", "white", "black",
     "green_bottle", "red", "grey", "grey_deg", "beige", "yellow", "orange", "garnet",
     "golden", "green", "rose"
 ]
+
+
+def update_products_schema():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Backup the database first
+        backup_path = backup_database()
+        if not backup_path:
+            raise Exception("Backup failed, aborting schema update.")
+
+        # Create a new table with quantite_actuelle as a generated column
+        cursor.execute("""
+            CREATE TABLE products_new (
+                reference TEXT PRIMARY KEY,
+                denomination TEXT,
+                quantite_initiale REAL DEFAULT 0,
+                quantite_restockee REAL DEFAULT 0,
+                quantite_vendue INTEGER DEFAULT 0,
+                quantite_actuelle INTEGER GENERATED ALWAYS AS (
+                    MAX(0, uni_colour + default_colour + brown + brown_deg + blue + white + black +
+                           green_bottle + red + grey + grey_deg + beige + yellow + orange +
+                           garnet + golden + green + rose)
+                ) STORED,
+                `couleurs-dispo-usine` TEXT,
+                images TEXT,
+                `prix-super-gros` REAL,
+                `prix-gros` REAL,
+                `prix-détail` REAL,
+                uni_colour INTEGER DEFAULT 0,
+                default_colour INTEGER DEFAULT 0,
+                brown INTEGER DEFAULT 0,
+                brown_deg INTEGER DEFAULT 0,
+                blue INTEGER DEFAULT 0,
+                white INTEGER DEFAULT 0,
+                black INTEGER DEFAULT 0,
+                green_bottle INTEGER DEFAULT 0,
+                red INTEGER DEFAULT 0,
+                grey INTEGER DEFAULT 0,
+                grey_deg INTEGER DEFAULT 0,
+                beige INTEGER DEFAULT 0,
+                yellow INTEGER DEFAULT 0,
+                orange INTEGER DEFAULT 0,
+                garnet INTEGER DEFAULT 0,
+                golden INTEGER DEFAULT 0,
+                green INTEGER DEFAULT 0,
+                rose INTEGER DEFAULT 0,
+                note TEXT,
+                category TEXT,
+                quantite_vendu_actue INTEGER DEFAULT 0,
+                last_updated TEXT,
+                discontinued BOOLEAN DEFAULT 0,
+                version INTEGER DEFAULT 0
+            )
+        """)
+
+        # Copy data from the old table to the new one
+        cursor.execute("""
+            INSERT INTO products_new 
+            SELECT reference, denomination, quantite_initiale, quantite_restockee, quantite_vendue,
+                   `couleurs-dispo-usine`, images, `prix-super-gros`, `prix-gros`, `prix-détail`,
+                   uni_colour, default_colour, brown, brown_deg, blue, white, black,
+                   green_bottle, red, grey, grey_deg, beige, yellow, orange, garnet,
+                   golden, green, rose, note, category, quantite_vendu_actue, last_updated,
+                   discontinued, version
+            FROM products
+        """)
+
+        # Drop the old table and rename the new one
+        cursor.execute("DROP TABLE products")
+        cursor.execute("ALTER TABLE products_new RENAME TO products")
+        conn.commit()
+        st.success(f"Schema updated successfully! Backup saved at {backup_path}")
+    except Exception as e:
+        conn.rollback()
+        st.error(f"Schema update failed: {str(e)}")
+    finally:
+        conn.close()
 
 def transactional_update(func):
     """Decorator to handle transactions."""
@@ -40,43 +115,35 @@ def transactional_update(func):
                 conn.close()
     return wrapper
 
-
 @transactional_update
 def update_stock(reference, quantity_change, color=None, conn=None):
-    """Update stock atomically with revised total update logic."""
     cursor = conn.cursor()
-
-    # Fetch current product
-    cursor.execute(f"SELECT {', '.join(COLOR_COLUMNS)}, quantite_actuelle FROM products WHERE reference = ?", (reference,))
-    product = cursor.fetchone()
-    if not product:
-        raise ValueError(f"Product {reference} not found")
-    product_dict = dict(product)
-
-    if color:  # Color-specific update
-        db_color = get_db_color_name(color)
-        if db_color not in COLOR_COLUMNS:
-            raise ValueError(f"Invalid color: {color}")
-        cursor.execute(f"""
-            UPDATE products 
-            SET {db_color} = MAX({db_color} + ?, 0),
-                version = version + 1 
-            WHERE reference = ?
-        """, (quantity_change, reference))
-        print(f"Updated {reference}: {db_color} adjusted by {quantity_change}")
-    else:  # Total update (no color specified)
-        total_current = sum(product_dict[col] for col in COLOR_COLUMNS)
-        if quantity_change != 0:  # Only update if there's a change
-            # Assign to default_colour and let quantite_actuelle update via generated column
-            cursor.execute("""
-                UPDATE products 
-                SET default_colour = MAX(default_colour + ?, 0),
-                    version = version + 1 
-                WHERE reference = ?
-            """, (quantity_change, reference))
-            print(f"Updated {reference}: default_colour adjusted by {quantity_change}, total was {total_current}")
-
-    return True
+    try:
+        cursor.execute("SELECT quantite_actuelle FROM products WHERE reference = ?", (reference,))
+        product = cursor.fetchone()
+        if not product:
+            raise ValueError(f"Product {reference} not found")
+        
+        if quantity_change < 0 and not color:
+            raise ValueError("Specify a color for stock reduction")
+        
+        if color:
+            db_color = color.lower().replace(' ', '_')
+            if db_color not in COLOR_COLUMNS:
+                raise ValueError(f"Invalid color: {color}")
+            cursor.execute(f"SELECT {db_color} FROM products WHERE reference = ?", (reference,))
+            current_stock = cursor.fetchone()[db_color]
+            new_stock = max(0, current_stock + quantity_change)
+            cursor.execute(f"UPDATE products SET {db_color} = ? WHERE reference = ?", (new_stock, reference))
+        else:
+            # Positive updates can go to default_colour
+            cursor.execute("UPDATE products SET default_colour = default_colour + ? WHERE reference = ?", (quantity_change, reference))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        raise e
 
 def handle_product_images(reference, category, denomination, new_images=None, color=None, delete_existing=False):
     """Manage product images: add, replace, or delete."""
@@ -106,10 +173,8 @@ def handle_product_images(reference, category, denomination, new_images=None, co
     # Return list of new images or None if no new images added
     return ",".join(image_paths) if image_paths else None
 
-
-# modules/product_management.py
 @transactional_update
-def add_or_update_product(product_data, is_update=False, enable_price_history=ENABLE_PRICE_HISTORY, conn=None):
+def add_or_update_product(product_data, is_update=False, enable_price_history=False, conn=None):
     cursor = conn.cursor()
     try:
         ref = product_data['reference']
@@ -119,11 +184,7 @@ def add_or_update_product(product_data, is_update=False, enable_price_history=EN
             return False
         
         existing_df = load_products(active_only=False)
-        color_fields = [
-            "uni_colour", "default_colour", "brown", "brown_deg", "blue", "white", "black",
-            "green_bottle", "red", "grey", "grey_deg", "beige", "yellow", "orange", "garnet",
-            "golden", "green", "rose"
-        ]
+        color_fields = COLOR_COLUMNS
 
         # Handle images
         new_images = product_data.get('new_images')
@@ -134,7 +195,7 @@ def add_or_update_product(product_data, is_update=False, enable_price_history=EN
             new_images, selected_color, delete_image
         ) if new_images or delete_image else product_data.get('images', '')
 
-        # Prepare values, excluding quantite_actuelle since it's generated
+        # Prepare values, excluding quantite_actuelle
         values = (
             ref, product_data['denomination'], product_data.get('quantite_initiale', 0.0),
             product_data.get('quantite_restockee', 0.0), product_data.get('quantite_vendue', 0),
@@ -225,64 +286,55 @@ def load_products(active_only=True):
         conn.close()
     return df
 
+# modules/product_management.py
 def import_products_from_excel(file):
-    """Handle Excel import with updates and inserts."""
     conn = get_db_connection()
     try:
         df = pd.read_excel(file).astype(str).replace({'nan': None})
-        required_cols = ['reference', 'denomination', 'quantite_actuelle', 'prix-super-gros', 'prix-gros', 'prix-détail']
+        required_cols = ['reference', 'denomination', 'prix-super-gros', 'prix-gros', 'prix-détail']
         if not all(col in df.columns for col in required_cols):
             st.error("Excel file missing required columns!")
             return False
         
         existing_df = load_products(active_only=False)
-        missing_images = []
         with conn:
             cursor = conn.cursor()
             for _, row in df.iterrows():
                 ref = row['reference']
                 images = row.get('images', '')
-                if images:
-                    image_list = [img.strip() for img in images.split(',')]
-                    valid_images = []
-                    for img in image_list:
-                        img_path = img if os.path.isabs(img) else os.path.join("images", img)
-                        if os.path.exists(img_path):
-                            valid_images.append(img_path)
-                        else:
-                            missing_images.append(img)
-                    images = ','.join(valid_images) if valid_images else ''
+                # If quantite_actuelle is provided, assign it to default_colour
+                quantity = float(row.get('quantite_actuelle', 0) or 0)
                 
                 values = (
-                    ref, row['denomination'], float(row['quantite_actuelle'] or 0),
+                    ref, row['denomination'], float(row.get('quantite_initiale', 0) or 0),
+                    float(row.get('quantite_restockee', 0) or 0), 0,  # quantite_vendue
                     row.get('couleurs-dispo-usine', ''), images,
                     float(row['prix-super-gros'] or 0), float(row['prix-gros'] or 0), float(row['prix-détail'] or 0),
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 0
+                    0, quantity, *[0] * (len(COLOR_COLUMNS) - 2),  # default_colour gets quantity, others 0
+                    '', row.get('category', ''), 0,  # note, category, quantite_vendu_actue
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 0, 0  # last_updated, discontinued, version
                 )
                 
                 if ref in existing_df['reference'].values:
-                    cursor.execute('''UPDATE products SET denomination=?, quantite_actuelle=?, 
-                                    `couleurs-dispo-usine`=?, images=?, `prix-super-gros`=?, 
-                                    `prix-gros`=?, `prix-détail`=?, last_updated=?, discontinued=?
-                                    WHERE reference=?''', (*values[1:], ref))
+                    cursor.execute('''UPDATE products SET 
+                        denomination=?, quantite_initiale=?, quantite_restockee=?, quantite_vendue=?, 
+                        `couleurs-dispo-usine`=?, images=?, `prix-super-gros`=?, 
+                        `prix-gros`=?, `prix-détail`=?, uni_colour=?, default_colour=?, brown=?, 
+                        brown_deg=?, blue=?, white=?, black=?, green_bottle=?, red=?, grey=?, 
+                        grey_deg=?, beige=?, yellow=?, orange=?, garnet=?, golden=?, green=?, rose=?, 
+                        note=?, category=?, quantite_vendu_actue=?, last_updated=?, discontinued=?, version=?
+                        WHERE reference=?''', (*values[1:], ref))
                 else:
                     cursor.execute('''INSERT INTO products 
-                                    (reference, denomination, quantite_actuelle, `couleurs-dispo-usine`, 
-                                    images, `prix-super-gros`, `prix-gros`, `prix-détail`, last_updated, discontinued)
-                                    VALUES (?,?,?,?,?,?,?,?,?,?)''', values)
-                
-                if ENABLE_PRICE_HISTORY:
-                    for price_type, value in [('super_gros', row['prix-super-gros']), ('gros', row['prix-gros']), ('detail', row['prix-détail'])]:
-                        if value:
-                            cursor.execute('''INSERT INTO price_history 
-                                            (product_ref, price_type, old_price, new_price, changed_at)
-                                            VALUES (?, ?, ?, ?, ?)''', 
-                                            (ref, price_type, None, float(value), datetime.now()))
+                        (reference, denomination, quantite_initiale, quantite_restockee, quantite_vendue, 
+                        `couleurs-dispo-usine`, images, `prix-super-gros`, `prix-gros`, 
+                        `prix-détail`, uni_colour, default_colour, brown, brown_deg, blue, white, black, 
+                        green_bottle, red, grey, grey_deg, beige, yellow, orange, garnet, golden, green, 
+                        rose, note, category, quantite_vendu_actue, last_updated, discontinued, version)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', values)
             conn.commit()
         
         st.success("Products imported successfully!")
-        if missing_images:
-            st.warning(f"Some images were not found and skipped: {', '.join(set(missing_images))}")
         return True
     except Exception as e:
         conn.rollback()
@@ -439,6 +491,7 @@ def permanently_delete(reference, conn=None):
     return True
 
 def update_product_stock(reference):
+
     """Recalculate total stock from color quantities."""
     conn = get_db_connection()
     try:
@@ -467,3 +520,24 @@ def update_product_stock(reference):
         return False
     finally:
         conn.close()
+
+
+def validate_product_data(data, is_update=False):
+    """Validate product data before insertion/update."""
+    errors = []
+    required_fields = ['reference', 'denomination', 'category']
+    for field in required_fields:
+        if not data.get(field):
+            errors.append(f"Field '{field}' is required")
+    
+    if not is_update:
+        existing_refs = load_products(active_only=False)['reference'].tolist()
+        if data['reference'] in existing_refs:
+            errors.append("Reference must be unique")
+    
+    price_fields = ['prix-super-gros', 'prix-gros', 'prix-détail']
+    for field in price_fields:
+        if float(data.get(field, 0)) < 0:
+            errors.append(f"{field} cannot be negative")
+    
+    return errors
