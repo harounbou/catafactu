@@ -4,8 +4,6 @@ import pandas as pd
 import os
 import json
 from datetime import datetime, timedelta
-from io import BytesIO
-import zipfile
 from .client_management import get_client_info, add_new_client, save_clients, update_client
 from .transaction_management import record_transaction
 from .pdf_generator import generate_receipt_pdf, generate_order_pdf, generate_reservation_pdf
@@ -13,7 +11,6 @@ from modules.product_management import COLOR_COLUMNS, update_stock
 
 from .utils import (
     get_db_connection,
-    validate_phone,
     find_image_path_for_color,
     get_full_image_path,
     fetch_df_from_db,
@@ -161,42 +158,52 @@ def pos_page(products_df, clients_df):
         st.markdown('</div>', unsafe_allow_html=True)
 
     # Client Management Section
+
+    # In pos_page function, under "Client Management Section"
     with st.container():
-        st.markdown('<div class="pos-section"><h3 class="pos-title">👤 Gestion Client</h3>', unsafe_allow_html=True)
-        client_action = st.radio("Action", ["Nouveau Client", "Client Existant"], horizontal=True, label_visibility="collapsed")
-        if client_action == "Client Existant":
-            search_input = st.text_input("Rechercher Client", placeholder="Nom, entreprise ou téléphone", key="pos_search_client")
-            if st.button("🔍 Rechercher", key="pos_search_button"):
-                filtered_clients = clients_df[
-                    (clients_df['nom_client'].str.contains(search_input, case=False, na=False)) |
-                    (clients_df['entreprise_client'].str.contains(search_input, case=False, na=False)) |
-                    (clients_df['telephone_client'].str.contains(search_input, na=False))
-                ]
-                st.session_state.filtered_clients = filtered_clients if not filtered_clients.empty else None
-            if 'filtered_clients' in st.session_state and st.session_state.filtered_clients is not None:
-                selected_client = st.selectbox("Sélectionnez Client", st.session_state.filtered_clients['nom_client'], key="pos_select_client")
-                if st.button("Charger Client", type="primary", key="pos_load_client"):
-                    client_info = get_client_info(st.session_state.filtered_clients, selected_client, "Nom du client")
-                    st.session_state.pos_client = client_info
-                    st.success("Client chargé avec succès!")
-        else:
-            with st.form("pos_new_client_form"):
-                cols = st.columns(2)
-                new_client = {
-                    'nom_client': cols[0].text_input("Nom*", key="pos_new_nom"),
-                    'prenom_client': cols[1].text_input("Prénom", key="pos_new_prenom"),
-                    'entreprise_client': cols[0].text_input("Entreprise", key="pos_new_entreprise"),
-                    'telephone_client': cols[1].text_input("Téléphone*", key="pos_new_telephone"),
-                    'address_client': cols[1].text_input("Adresse", key="pos_new_address")
-                }
-                if st.form_submit_button("Enregistrer Nouveau Client", type="primary"):
-                    if new_client['nom_client'] and new_client['telephone_client']:
-                        clients_df = add_new_client(clients_df, new_client)
-                        st.session_state.pos_client = clients_df.iloc[-1].to_dict()
-                        st.success("Client enregistré avec succès!")
-                    else:
-                        st.error("Les champs 'Nom' et 'Téléphone' sont obligatoires.")
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div class="pos-section"><h3 class="pos-title">👤 Gestion Client</h3>', unsafe_allow_html=True)
+            # Set default radio option based on whether a client is selected
+            default_index = 1 if st.session_state.pos_client else 0
+            client_action = st.radio("Action", ["Nouveau Client", "Client Existant"], index=default_index, horizontal=True, label_visibility="collapsed")
+            
+            # Display selected client if one exists
+            if st.session_state.pos_client:
+                st.write(f"Client sélectionné: {st.session_state.pos_client['nom_client']}")
+            
+            if client_action == "Client Existant":
+                search_input = st.text_input("Rechercher Client", placeholder="Nom, entreprise ou téléphone", key="pos_search_client")
+                if st.button("🔍 Rechercher", key="pos_search_button"):
+                    filtered_clients = clients_df[
+                        (clients_df['nom_client'].str.contains(search_input, case=False, na=False)) |
+                        (clients_df['entreprise_client'].str.contains(search_input, case=False, na=False)) |
+                        (clients_df['telephone_client'].str.contains(search_input, na=False))
+                    ]
+                    st.session_state.filtered_clients = filtered_clients if not filtered_clients.empty else None
+                if 'filtered_clients' in st.session_state and st.session_state.filtered_clients is not None:
+                    selected_client = st.selectbox("Sélectionnez Client", st.session_state.filtered_clients['nom_client'], key="pos_select_client")
+                    if st.button("Charger Client", type="primary", key="pos_load_client"):
+                        client_info = get_client_info(st.session_state.filtered_clients, selected_client, "Nom du client")
+                        st.session_state.pos_client = client_info
+                        st.success("Client chargé avec succès!")
+            else:
+                # New client form (unchanged)
+                with st.form("pos_new_client_form"):
+                    cols = st.columns(2)
+                    new_client = {
+                        'nom_client': cols[0].text_input("Nom*", key="pos_new_nom"),
+                        'prenom_client': cols[1].text_input("Prénom", key="pos_new_prenom"),
+                        'entreprise_client': cols[0].text_input("Entreprise", key="pos_new_entreprise"),
+                        'telephone_client': cols[1].text_input("Téléphone*", key="pos_new_telephone"),
+                        'address_client': cols[1].text_input("Adresse", key="pos_new_address")
+                    }
+                    if st.form_submit_button("Enregistrer Nouveau Client", type="primary"):
+                        if new_client['nom_client'] and new_client['telephone_client']:
+                            clients_df = add_new_client(clients_df, new_client)
+                            st.session_state.pos_client = clients_df.iloc[-1].to_dict()
+                            st.success("Client enregistré avec succès!")
+                        else:
+                            st.error("Les champs 'Nom' et 'Téléphone' sont obligatoires.")
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # Item Selection Section
     with st.container():

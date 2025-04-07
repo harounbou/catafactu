@@ -1,4 +1,5 @@
 # modules/utils.py
+
 import datetime
 import shutil
 import sqlite3
@@ -7,19 +8,10 @@ import re
 from PIL import Image
 import streamlit as st
 import pandas as pd
-import smtplib
-from PIL import Image
 
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\d{10}$'
 
-
-#DB_PATH = os.path.join(BASE_DIR, "data", "pos_system.db")  #live
-#DB_PATH = os.path.join(BASE_DIR, "data", "test_pos_system.db")  #test
-
-# modules/utils.py
-
-# Add these to existing utils.py
 COLOR_MAPPING = {
     'brown_gradient': 'brown_deg',
     'grey_gradient': 'grey_deg',
@@ -45,15 +37,19 @@ COLOR_STYLES = {
     'garnet': '#ffccbc',
     'golden': '#fff3e0',
     'green': '#c8e6c9',
-    'rose': '#f8bbd0',
-    'default': '#f5f5f5'
+    'rose': '#f8bbd0'
 }
+
+COLOR_COLUMNS = [
+    "uni_colour", "default_colour", "brown", "brown_deg", "blue", "white", "black",
+    "green_bottle", "red", "grey", "grey_deg", "beige", "yellow", "orange", "garnet",
+    "golden", "green", "rose"
+]
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DB_PATH = os.path.join(BASE_DIR, "data", "test_pos_system.db" if os.environ.get("TESTING") == "1" else "pos_system.db")
 
 def get_db_connection():
-    """Establish a connection to the SQLite database."""
     try:
         conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         conn.row_factory = sqlite3.Row
@@ -62,9 +58,12 @@ def get_db_connection():
         st.error(f"Database connection failed: {e}")
         return None
 
-
 def get_db_color_name(color):
-    return color.lower().replace(' ', '_')
+    """Convert a display color name to a database column name."""
+    if not color or pd.isna(color):
+        return 'default_colour'
+    cleaned_color = color.lower().replace(' ', '_')
+    return COLOR_MAPPING.get(cleaned_color, cleaned_color)
 
 def check_stock(reference, quantity, color=None):
     conn = get_db_connection()
@@ -90,7 +89,6 @@ def check_stock(reference, quantity, color=None):
         return True, "In stock"
     finally:
         conn.close()
-
 
 def fetch_df_from_db(table_name):
     """Fetch data from a table as a pandas DataFrame."""
@@ -131,45 +129,55 @@ def truncate_text(text, max_length=14):
     return text
 
 def get_full_image_path(image_path):
-    """Resolve the full path to an image, handling relative and absolute paths."""
+    """Resolve the full path to an image, prioritizing the reference_color.jpg format."""
     if not image_path or pd.isna(image_path):
         return None
     
     IMAGE_FOLDER = os.path.join(BASE_DIR, "images")
-    image_path = image_path.strip()  # Remove leading/trailing whitespace
+    image_path = image_path.strip()
     
-    # If it's already an absolute path, use it directly if it exists
     if os.path.isabs(image_path):
         if os.path.exists(image_path):
             return image_path
         st.warning(f"Absolute image path not found: {image_path}")
         return None
     
-    # Clean relative path (remove redundant prefixes like './' or 'images/')
-    cleaned_path = image_path.lstrip('/').lstrip('./').lstrip('images/').strip()
-    full_path = os.path.join(IMAGE_FOLDER, cleaned_path)
+    # Split multiple image paths
+    image_list = [img.strip() for img in image_path.split(',') if img.strip()]
+    for img in image_list:
+        cleaned_path = img.lstrip('/').lstrip('./').lstrip('images/').strip()
+        full_path = os.path.join(IMAGE_FOLDER, cleaned_path)
+        
+        # Check if the exact path exists
+        if os.path.exists(full_path):
+            return full_path
+        
+        # Try matching the reference_color.jpg pattern
+        match = re.match(r"(.*/)?([^/]+)_([^/]+)\.(jpg|jpeg|png|webp)", cleaned_path, re.IGNORECASE)
+        if match:
+            prefix, ref, color, ext = match.groups()
+            test_path = os.path.join(IMAGE_FOLDER, prefix or '', f"{ref}_{color.upper()}.{ext.lower()}")
+            if os.path.exists(test_path):
+                return test_path
+        
+        # Fallback to checking directory for any matching file
+        base, ext = os.path.splitext(full_path)
+        extensions_to_try = [ext.lower(), '.jpg', '.jpeg', '.png', '.webp']
+        for extension in extensions_to_try:
+            test_path = f"{base}{extension}"
+            if os.path.exists(test_path):
+                return test_path
     
-    # Check if the exact path exists
-    if os.path.exists(full_path):
-        return full_path
+    # If no exact match, look for any file in the directory
+    if len(image_list) > 0:
+        dir_path, file_name = os.path.split(os.path.join(IMAGE_FOLDER, image_list[0].lstrip('/').lstrip('./').lstrip('images/')))
+        if os.path.exists(dir_path):
+            file_base = os.path.splitext(file_name)[0].lower()
+            for f in os.listdir(dir_path):
+                if f.lower().startswith(file_base):
+                    return os.path.join(dir_path, f)
     
-    # Try common image extensions if the base file doesn’t exist
-    base, ext = os.path.splitext(full_path)
-    extensions_to_try = [ext.lower(), '.jpg', '.jpeg', '.png', '.webp']
-    for extension in extensions_to_try:
-        test_path = f"{base}{extension}"
-        if os.path.exists(test_path):
-            return test_path
-    
-    # If still not found, search directory for a case-insensitive match
-    dir_path, file_name = os.path.split(full_path)
-    if os.path.exists(dir_path):
-        file_base = os.path.splitext(file_name)[0].lower()
-        for f in os.listdir(dir_path):
-            if f.lower().startswith(file_base):
-                return os.path.join(dir_path, f)
-    
-    st.warning(f"Image path not found: {full_path}*")
+    st.warning(f"Image path not found: {image_path}")
     return None
 
 def get_image_dimensions(image_path):
@@ -206,64 +214,35 @@ def validate_phone(phone):
         return True
     return bool(re.match(PHONE_REGEX, phone))
 
-"""def send_email(to_email, subject, body, attachment_path=None):
-    """"Send an email with optional attachment.""""""
-    sender_email = st.secrets["gmail"]["email"]
-    sender_password = st.secrets["gmail"]["password"]
-    
-    msg = MIMEMultipart()
-    msg['From'] = sender_email
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
-    
-    if attachment_path:
-        with open(attachment_path, "rb") as f:
-            part = MIMEApplication(f.read(), Name=os.path.basename(attachment_path))
-            part['Content-Disposition'] = f'attachment; filename="{os.path.basename(attachment_path)}"'
-            msg.attach(part)
-    
-    try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
-        server.quit()
-        return True
-    except Exception as e:
-        st.error(f"Échec de l'envoi de l'email : {e}")
-        return False"""
-
 def find_image_path_for_color(image_paths, color):
-    """
-    Find the image path matching a given color from a comma-separated list of image paths.
-    Returns the first matching full path or None if no match is found.
-    """
-    if not image_paths or not color or pd.isna(image_paths):
+    """Find the first image path matching the specified color in the filename."""
+    if not image_paths or pd.isna(image_paths) or not color:
         return None
     
-    # Split and clean the image paths
-    image_list = [img.strip() for img in str(image_paths).split(',')]
-    color = color.lower().strip()
+    color_clean = color.lower().replace(' ', '_')
+    image_list = [img.strip() for img in str(image_paths).split(',') if img.strip()]
     
-    # Look for an image containing the color in its filename
     for img in image_list:
-        full_path = get_full_image_path(img)
-        if full_path and color in os.path.basename(full_path).lower():
-            return full_path
+        img_name = os.path.basename(img).lower()
+        if f"_{color_clean}_" in img_name:
+            return get_full_image_path(img)
     
-    # If no match, return the first valid image as a fallback (optional)
+    for img in image_list:
+        img_name = os.path.basename(img).lower()
+        if color_clean in img_name:
+            return get_full_image_path(img)
+    
     for img in image_list:
         full_path = get_full_image_path(img)
         if full_path:
-            st.warning(f"No image found for color '{color}', using default: {os.path.basename(full_path)}")
+            st.warning(f"No image matched '{color}'. Using: {os.path.basename(full_path)}")
             return full_path
     
     st.warning(f"No valid images found for {image_paths}")
     return None
 
 def transactional_update(func):
-    """Decorator for database operations requiring transaction safety"""
+    """Decorator for database operations requiring transaction safety."""
     def wrapper(*args, **kwargs):
         conn = None
         try:
@@ -283,7 +262,7 @@ def transactional_update(func):
     return wrapper
 
 def log_audit_event(user, action, reference, details=None):
-    """Record audit trail entries"""
+    """Record audit trail entries."""
     conn = get_db_connection()
     try:
         conn.execute("""
@@ -296,28 +275,6 @@ def log_audit_event(user, action, reference, details=None):
         st.error(f"Audit log failed: {str(e)}")
     finally:
         conn.close()
-
-def transactional_update(func):
-
-    """Decorator for transactional database operations"""
-    def wrapper(*args, **kwargs):
-        conn = None
-        try:
-            conn = get_db_connection()
-            conn.execute("BEGIN")
-            result = func(*args, conn=conn, **kwargs)
-            conn.commit()
-            return result
-        except Exception as e:
-            if conn:
-                conn.rollback()
-            raise e
-        finally:
-            if conn:
-                conn.close()
-    return wrapper
-
-def backup_database():
     """Create a backup of the database."""
     conn = get_db_connection()
     try:

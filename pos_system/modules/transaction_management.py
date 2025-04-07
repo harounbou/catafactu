@@ -5,13 +5,14 @@ import json
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from .utils import get_db_connection
+from modules.utils import get_db_connection
 
 def initialize_db():
-    """Initialize all database tables with proper schema"""
+    """Initialize database tables and ensure schema is up to date."""
     conn = get_db_connection()
     c = conn.cursor()
     
+    # Create transactions table if it doesn’t exist
     c.execute('''CREATE TABLE IF NOT EXISTS transactions (
                     transaction_id INTEGER PRIMARY KEY,
                     client_id TEXT,
@@ -31,10 +32,12 @@ def initialize_db():
                     FOREIGN KEY(linked_proforma_id) REFERENCES transactions(transaction_id)
                  )''')
 
+    # Check existing columns and add missing ones
     c.execute("PRAGMA table_info(transactions)")
     columns = [row[1] for row in c.fetchall()]
     
     missing_columns = {
+        'client_id': 'TEXT',
         'deposit_amount': 'REAL DEFAULT 0',
         'remaining_amount': 'REAL DEFAULT 0',
         'client_info': 'TEXT',
@@ -47,6 +50,33 @@ def initialize_db():
 
     conn.commit()
     conn.close()
+
+def get_till_balance():
+    """Calculate current till balance by summing payments from payment_details."""
+    initialize_db()  # Ensure the database schema is initialized
+    conn = get_db_connection()
+    try:
+        # Fetch all transactions
+        transactions_df = pd.read_sql_query("SELECT payment_details FROM transactions", conn)
+        
+        total_sales = 0.0
+        for _, row in transactions_df.iterrows():
+            payment_details = json.loads(row['payment_details']) if row['payment_details'] else {}
+            total_sales += sum(float(amount) for amount in payment_details.values() if amount)
+        
+        # Fetch expenditures and staff payments
+        expenditures_df = pd.read_sql_query("SELECT amount FROM expenditures", conn)
+        total_expenditures = expenditures_df['amount'].sum() if not expenditures_df.empty else 0.0
+        
+        staff_payments_df = pd.read_sql_query("SELECT amount FROM staff_payments", conn)
+        total_staff_payments = staff_payments_df['amount'].sum() if not staff_payments_df.empty else 0.0
+
+        return total_sales - total_expenditures - total_staff_payments
+    except Exception as e:
+        st.error(f"Error calculating till balance: {str(e)}")
+        return 0.0
+    finally:
+        conn.close()
 
 def safe_json_loads(value):
     """Safely load JSON, returning an empty dict if value is None, empty, or invalid"""
@@ -247,8 +277,6 @@ def record_staff_payment(staff_name, amount, performed_by="N/A", note=""):
         st.error(f"Failed to record staff payment: {str(e)}")
     finally:
         conn.close()
-
-def get_till_balance():
     """Calculate current till balance"""
     initialize_db()
     conn = get_db_connection()
@@ -270,3 +298,4 @@ def get_till_balance():
         return 0.0
     finally:
         conn.close()
+

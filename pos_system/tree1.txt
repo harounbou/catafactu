@@ -1,4 +1,11 @@
-tree -I "images|backups|venv|.env" > tree.txt
+mac:
+ tree -I "images|backups|venv|.env" > tree.txt
+win:
+ tree /F > tree.txt
+findstr /V /R "images\\ backups\\ venv\\ .env\\" tree.txt > tree_filtered.txt
+
+
+
 .
 ├── app.py
 ├── armchair.png

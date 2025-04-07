@@ -14,8 +14,11 @@ from modules.utils import (
     get_db_color_name,
     fetch_df_from_db
 )
-from modules.product_management import check_stock
+from modules.utils import check_stock 
 from modules.pos import stock_checker_section
+
+
+
 
 def proforma_page(products_df, clients_df):
     """
