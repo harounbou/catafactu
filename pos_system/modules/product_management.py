@@ -1,4 +1,4 @@
-#modules/product_management.py
+# modules/product_management.py
 import glob
 import logging
 import sys
@@ -17,7 +17,6 @@ ENABLE_PRICE_HISTORY = False  # Toggle this in a config file or environment vari
 def import_products_from_excel(file):
     conn = get_db_connection()
     try:
-        import glob
         df = pd.read_excel(file)
         df = df.replace({pd.NA: None, 'nan': None, '': None})
         
@@ -232,25 +231,26 @@ def update_stock(reference, quantity_change, color=None, conn=None):
 
 def handle_product_images(reference, category, denomination, new_images=None, color=None, delete_existing=False):
     """Handle images with path: images/{category}/{denomination}/{reference}_{color}_{index}.jpg"""
+    # Sanitize category and denomination, with defaults
     category = (category or 'Uncategorized').strip().replace(" ", "_").replace("/", "_").replace("&", "_")
     denomination = (denomination or 'No_Name').strip().replace(" ", "_").replace("/", "_").replace("&", "_")
     base_dir = os.path.join("images", category, denomination)
     image_paths = []
     
+    # Delete existing images if requested
     if delete_existing and os.path.exists(base_dir):
         shutil.rmtree(base_dir)
     
+    # Handle new image uploads
     if new_images and color:
         os.makedirs(base_dir, exist_ok=True)
-        color_clean = get_db_color_name(color.lower().replace(' ', '_')).upper()  # Uppercase for consistency
+        color_clean = get_db_color_name(color).upper()  # Use reconciled get_db_color_name
         
-        # Handle multiple images with indexing
         for idx, img in enumerate(new_images, start=1):
             ext = os.path.splitext(img.name)[1].lower() or '.jpg'
-            filename = f"{reference}_{color_clean}_{idx}{ext}"  # e.g., RT0032_RED_1.jpg
+            filename = f"{reference}_{color_clean}_{idx}{ext}"
             dest_path = os.path.join(base_dir, filename)
             
-            # Skip if file exists unless delete_existing is True
             if os.path.exists(dest_path) and not delete_existing:
                 st.warning(f"Image {filename} already exists. Skipping to avoid overwrite.")
                 image_paths.append(dest_path)
@@ -262,12 +262,20 @@ def handle_product_images(reference, category, denomination, new_images=None, co
                         f.write(img.getbuffer())
                 image_paths.append(dest_path)
     
-    # If no new images, return existing paths for the specified color
+    # Return existing images if no new ones provided
     if not new_images and color:
-        color_clean = get_db_color_name(color.lower().replace(' ', '_')).upper()
+        color_clean = get_db_color_name(color).upper()
         image_pattern = os.path.join(base_dir, f"{reference}_{color_clean}_*.*")
         existing_images = glob.glob(image_pattern)
-        image_paths.extend(existing_images)
+        if existing_images:
+            image_paths.extend(existing_images)
+        else:
+            # Fallback to default if no images exist
+            default_path = "images/default.jpg"
+            if os.path.exists(default_path):
+                return default_path
+            else:
+                return ''  # Return empty string if default doesn’t exist
     
     return ','.join(image_paths) if image_paths else ''
 
@@ -401,7 +409,7 @@ def mark_discontinued(reference):
         conn.close()
 
 def restock_product(reference, quantity_to_add, color=None):
-    """Restock a product with color-aware quantity updates."""
+    """Restock a product with color-aware quantity updates and validation."""
     if quantity_to_add <= 0:
         raise ValueError("Restock quantity must be positive")
         
@@ -415,13 +423,13 @@ def restock_product(reference, quantity_to_add, color=None):
                 raise ValueError(f"Product {reference} not found")
             
             if color and color != "total":
-                color = color.lower().replace(" ", "_")
-                if color not in COLOR_COLUMNS:
-                    raise ValueError(f"Invalid color {color} for product {reference}")
+                db_color = color.lower().replace(" ", "_")
+                if db_color not in COLOR_COLUMNS:  # Integrated color validation
+                    raise ValueError(f"Invalid color {color}. Valid options: {', '.join(COLOR_COLUMNS)}")
                 
                 cursor.execute(f"""
                     UPDATE products 
-                    SET `{color}` = `{color}` + ?,
+                    SET `{db_color}` = `{db_color}` + ?,
                         quantite_restockee = quantite_restockee + ?,
                         last_updated = ?
                     WHERE reference = ?
@@ -444,7 +452,6 @@ def restock_product(reference, quantity_to_add, color=None):
         return False
     finally:
         conn.close()
-
 
 def generate_excel_template():
     """Generate a sample Excel template without images column."""

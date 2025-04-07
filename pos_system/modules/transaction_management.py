@@ -7,6 +7,30 @@ import numpy as np
 from datetime import datetime
 from modules.utils import get_db_connection
 
+# Placeholder for log_audit_event (assumed to exist elsewhere or defined here)
+def log_audit_event(user, event_type, reference, message):
+    """Log an audit event (placeholder implementation)."""
+    # If this function exists elsewhere, remove this placeholder
+    conn = get_db_connection()
+    try:
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS audit_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user TEXT,
+                        event_type TEXT,
+                        reference TEXT,
+                        message TEXT,
+                        timestamp TEXT
+                     )''')
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute("INSERT INTO audit_logs (user, event_type, reference, message, timestamp) VALUES (?, ?, ?, ?, ?)",
+                  (user, event_type, reference, message, timestamp))
+        conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Failed to log audit event: {str(e)}")
+    finally:
+        conn.close()
+
 def initialize_db():
     """Initialize database tables and ensure schema is up to date."""
     conn = get_db_connection()
@@ -110,7 +134,7 @@ def fetch_df_from_db(table_name):
 def record_transaction(client_info, items, total_amount, payment_details, final_amount, 
                       status, performed_by, tva_applied=False, tva_amount=0.0,
                       deposit_amount=0, remaining_amount=0):
-    """Record a transaction with support for deposits and partial payments"""
+    """Record a transaction with support for deposits, partial payments, and rollback."""
     conn = get_db_connection()
     try:
         # Enhanced converter for JSON serialization
@@ -162,6 +186,9 @@ def record_transaction(client_info, items, total_amount, payment_details, final_
         return transaction_id
     except Exception as e:
         conn.rollback()
+        # Log the failure (assuming reference is derived from items or client_info)
+        reference = items[0]['reference'] if items and isinstance(items, list) and 'reference' in items[0] else "unknown"
+        log_audit_event(performed_by, "transaction_failed", reference, str(e))
         st.error(f"Error recording transaction: {str(e)}")
         raise
     finally:
@@ -277,6 +304,8 @@ def record_staff_payment(staff_name, amount, performed_by="N/A", note=""):
         st.error(f"Failed to record staff payment: {str(e)}")
     finally:
         conn.close()
+
+def calculate_till_balance():
     """Calculate current till balance"""
     initialize_db()
     conn = get_db_connection()
@@ -298,4 +327,3 @@ def record_staff_payment(staff_name, amount, performed_by="N/A", note=""):
         return 0.0
     finally:
         conn.close()
-

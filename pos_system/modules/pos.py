@@ -8,7 +8,6 @@ from .client_management import get_client_info, add_new_client, save_clients, up
 from .transaction_management import record_transaction
 from .pdf_generator import generate_receipt_pdf, generate_order_pdf, generate_reservation_pdf
 from modules.product_management import COLOR_COLUMNS, update_stock
-
 from .utils import (
     get_db_connection,
     find_image_path_for_color,
@@ -27,6 +26,20 @@ def replace_nan_with_none(data):
         return None
     return data
 
+# Price validation logic from brainstorm suggestion
+price_type_mapping = {
+    "prix-super-gros": "prix-super-gros",
+    "prix-gros": "prix-gros", 
+    "prix-détail": "prix-détail"
+}
+
+def get_price(product, price_type):
+    """Retrieve price based on price type with validation."""
+    try:
+        return product[price_type_mapping[price_type]]
+    except KeyError:
+        st.error("Invalid price type configuration")
+        return 0
 
 def display_stock_matrix(product, colors):
     conn = get_db_connection()
@@ -58,7 +71,6 @@ def display_stock_matrix(product, colors):
                         if qty < 5:
                             st.warning(f"⚠️ Stock faible pour {color}: {qty} unités")
 
-
 def stock_checker_section(products_df, prefix=""):
     """Display a standalone stock checker with enhanced stock features."""
     st.subheader("Vérifier la Disponibilité")
@@ -70,7 +82,6 @@ def stock_checker_section(products_df, prefix=""):
         product = products_df[products_df['denomination'] == selected_product].iloc[0]
         colors = [c.strip() for c in product['couleurs-dispo-usine'].split(',')] if pd.notna(product['couleurs-dispo-usine']) else []
         display_stock_matrix(product, colors)
-
 
 def process_transaction(cart, client_name, sale_type, deduct_stock=True):
     conn = get_db_connection()
@@ -158,52 +169,47 @@ def pos_page(products_df, clients_df):
         st.markdown('</div>', unsafe_allow_html=True)
 
     # Client Management Section
-
-    # In pos_page function, under "Client Management Section"
     with st.container():
-            st.markdown('<div class="pos-section"><h3 class="pos-title">👤 Gestion Client</h3>', unsafe_allow_html=True)
-            # Set default radio option based on whether a client is selected
-            default_index = 1 if st.session_state.pos_client else 0
-            client_action = st.radio("Action", ["Nouveau Client", "Client Existant"], index=default_index, horizontal=True, label_visibility="collapsed")
-            
-            # Display selected client if one exists
-            if st.session_state.pos_client:
-                st.write(f"Client sélectionné: {st.session_state.pos_client['nom_client']}")
-            
-            if client_action == "Client Existant":
-                search_input = st.text_input("Rechercher Client", placeholder="Nom, entreprise ou téléphone", key="pos_search_client")
-                if st.button("🔍 Rechercher", key="pos_search_button"):
-                    filtered_clients = clients_df[
-                        (clients_df['nom_client'].str.contains(search_input, case=False, na=False)) |
-                        (clients_df['entreprise_client'].str.contains(search_input, case=False, na=False)) |
-                        (clients_df['telephone_client'].str.contains(search_input, na=False))
-                    ]
-                    st.session_state.filtered_clients = filtered_clients if not filtered_clients.empty else None
-                if 'filtered_clients' in st.session_state and st.session_state.filtered_clients is not None:
-                    selected_client = st.selectbox("Sélectionnez Client", st.session_state.filtered_clients['nom_client'], key="pos_select_client")
-                    if st.button("Charger Client", type="primary", key="pos_load_client"):
-                        client_info = get_client_info(st.session_state.filtered_clients, selected_client, "Nom du client")
-                        st.session_state.pos_client = client_info
-                        st.success("Client chargé avec succès!")
-            else:
-                # New client form (unchanged)
-                with st.form("pos_new_client_form"):
-                    cols = st.columns(2)
-                    new_client = {
-                        'nom_client': cols[0].text_input("Nom*", key="pos_new_nom"),
-                        'prenom_client': cols[1].text_input("Prénom", key="pos_new_prenom"),
-                        'entreprise_client': cols[0].text_input("Entreprise", key="pos_new_entreprise"),
-                        'telephone_client': cols[1].text_input("Téléphone*", key="pos_new_telephone"),
-                        'address_client': cols[1].text_input("Adresse", key="pos_new_address")
-                    }
-                    if st.form_submit_button("Enregistrer Nouveau Client", type="primary"):
-                        if new_client['nom_client'] and new_client['telephone_client']:
-                            clients_df = add_new_client(clients_df, new_client)
-                            st.session_state.pos_client = clients_df.iloc[-1].to_dict()
-                            st.success("Client enregistré avec succès!")
-                        else:
-                            st.error("Les champs 'Nom' et 'Téléphone' sont obligatoires.")
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="pos-section"><h3 class="pos-title">👤 Gestion Client</h3>', unsafe_allow_html=True)
+        default_index = 1 if st.session_state.pos_client else 0
+        client_action = st.radio("Action", ["Nouveau Client", "Client Existant"], index=default_index, horizontal=True, label_visibility="collapsed")
+        
+        if st.session_state.pos_client:
+            st.write(f"Client sélectionné: {st.session_state.pos_client['nom_client']}")
+        
+        if client_action == "Client Existant":
+            search_input = st.text_input("Rechercher Client", placeholder="Nom, entreprise ou téléphone", key="pos_search_client")
+            if st.button("🔍 Rechercher", key="pos_search_button"):
+                filtered_clients = clients_df[
+                    (clients_df['nom_client'].str.contains(search_input, case=False, na=False)) |
+                    (clients_df['entreprise_client'].str.contains(search_input, case=False, na=False)) |
+                    (clients_df['telephone_client'].str.contains(search_input, na=False))
+                ]
+                st.session_state.filtered_clients = filtered_clients if not filtered_clients.empty else None
+            if 'filtered_clients' in st.session_state and st.session_state.filtered_clients is not None:
+                selected_client = st.selectbox("Sélectionnez Client", st.session_state.filtered_clients['nom_client'], key="pos_select_client")
+                if st.button("Charger Client", type="primary", key="pos_load_client"):
+                    client_info = get_client_info(st.session_state.filtered_clients, selected_client, "Nom du client")
+                    st.session_state.pos_client = client_info
+                    st.success("Client chargé avec succès!")
+        else:
+            with st.form("pos_new_client_form"):
+                cols = st.columns(2)
+                new_client = {
+                    'nom_client': cols[0].text_input("Nom*", key="pos_new_nom"),
+                    'prenom_client': cols[1].text_input("Prénom", key="pos_new_prenom"),
+                    'entreprise_client': cols[0].text_input("Entreprise", key="pos_new_entreprise"),
+                    'telephone_client': cols[1].text_input("Téléphone*", key="pos_new_telephone"),
+                    'address_client': cols[1].text_input("Adresse", key="pos_new_address")
+                }
+                if st.form_submit_button("Enregistrer Nouveau Client", type="primary"):
+                    if new_client['nom_client'] and new_client['telephone_client']:
+                        clients_df = add_new_client(clients_df, new_client)
+                        st.session_state.pos_client = clients_df.iloc[-1].to_dict()
+                        st.success("Client enregistré avec succès!")
+                    else:
+                        st.error("Les champs 'Nom' et 'Téléphone' sont obligatoires.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # Item Selection Section
     with st.container():
@@ -233,26 +239,34 @@ def pos_page(products_df, clients_df):
                 with color_cols[1]:
                     if color:
                         full_selected_path = find_image_path_for_color(product['images'], color)
-                        if full_selected_path:
-                            st.image(get_full_image_path(full_selected_path), caption=color, width=80)
+                        image_path = get_full_image_path(full_selected_path) if full_selected_path else None
+                        if image_path and os.path.exists(image_path):
+                            st.image(image_path, caption=color, width=80)
+                        else:
+                            st.warning(f"Image pour {color} non trouvée.")
             
             display_stock_matrix(product, colors)
             
             qty = st.number_input("Quantité", min_value=1, value=1, key="pos_qty")
             
             if st.button("➕ Ajouter au Panier", type="primary", key="pos_add_to_cart"):
-                stock_dispo = int(product[get_db_color_name(color).lower()]) if color and get_db_color_name(color).lower() in product else int(product['quantite_actuelle'] or 0)
+                db_color = get_db_color_name(color).lower() if color else None
+                stock_dispo = int(product[db_color]) if db_color and db_color in product else int(product['quantite_actuelle'] or 0)
+                price = get_price(product, price_type)  # Use get_price for validation
                 if qty > stock_dispo:
                     st.warning(f"Stock insuffisant ({stock_dispo} disponible). Utilisez 'Commande Personnalisée' ou 'Achat en Compte'.")
-                st.session_state.pos_items.append({
-                    "reference": product['reference'],
-                    "denomination": product['denomination'],
-                    "Quantity": qty,
-                    "Price": product[price_type],
-                    "Color": color,
-                    "Image": get_full_image_path(full_selected_path) if full_selected_path else None
-                })
-                st.success("Article ajouté au panier!")
+                if price <= 0:
+                    st.error(f"Prix invalide pour {product['denomination']} ({price_type}).")
+                else:
+                    st.session_state.pos_items.append({
+                        "reference": product['reference'],
+                        "denomination": product['denomination'],
+                        "Quantity": qty,
+                        "Price": price,
+                        "Color": color,
+                        "Image": image_path if image_path and os.path.exists(image_path) else None
+                    })
+                    st.success("Article ajouté au panier!")
         st.markdown('</div>', unsafe_allow_html=True)
 
     # Cart and Transaction Finalization
@@ -264,6 +278,8 @@ def pos_page(products_df, clients_df):
                 with cols[0]:
                     if item['Image'] and os.path.exists(item['Image']):
                         st.image(item['Image'], width=60)
+                    else:
+                        st.warning(f"Image manquante pour {item['denomination']}.")
                 with cols[1]:
                     st.markdown(f"**{item['denomination']}**  \nRéf: `{item['reference']}`  \nCouleur: {item.get('Color', 'N/A')}")
                 with cols[2]:
@@ -284,17 +300,20 @@ def pos_page(products_df, clients_df):
             st.write(f"**Total:** {total:.2f} DZD")
 
             if st.button("✅ Valider Panier", type="primary", use_container_width=True, key="pos_validate_cart"):
-                stock_ok = all(
-                    int(products_df[products_df['reference'] == item['reference']].iloc[0].get(
-                        get_db_color_name(item['Color']).lower() if item['Color'] else 'quantite_actuelle', 0) or 0
-                    ) >= item['Quantity']
-                    for item in st.session_state.pos_items
-                )
+                stock_ok = True
+                for item in st.session_state.pos_items:
+                    product = products_df[products_df['reference'] == item['reference']].iloc[0]
+                    db_color = get_db_color_name(item['Color']).lower() if item['Color'] else None
+                    stock = int(product[db_color]) if db_color and db_color in product else int(product['quantite_actuelle'] or 0)
+                    if item['Quantity'] > stock:
+                        st.error(f"Stock insuffisant pour {item['denomination']} ({stock} disponible)")
+                        stock_ok = False
+                        break
                 if stock_ok:
                     st.session_state.panier_valide = True
                     st.success("Panier validé - Prêt pour finalisation!")
                 else:
-                    st.warning("Stock insuffisant pour certains articles. Ajustez ou choisissez un autre type de transaction.")
+                    st.warning("Ajustez le panier ou choisissez un autre type de transaction.")
 
             if st.session_state.panier_valide:
                 with st.container():
@@ -405,35 +424,31 @@ def pos_page(products_df, clients_df):
                                 st.rerun()
 
                         if scenario == "Générer Bon de Commande":
-                            # Generate Bon de Commande without payment or stock deduction
                             if st.button("Générer Bon de Commande", type="primary", key="generate_order"):
                                 transaction_id = record_transaction(
                                     client_info=replace_nan_with_none(st.session_state.pos_client),
                                     items=replace_nan_with_none(st.session_state.pos_items),
                                     total_amount=subtotal,
-                                    payment_details={},  # No payment details
+                                    payment_details={},
                                     final_amount=total,
-                                    status="order_generated",  # Custom status for Bon de Commande
+                                    status="order_generated",
                                     performed_by=username,
                                     tva_applied=apply_tva,
                                     tva_amount=tva_amount,
-                                    deposit_amount=0.0,  # No deposit
-                                    remaining_amount=0.0  # No remaining amount
+                                    deposit_amount=0.0,
+                                    remaining_amount=0.0
                                 )
-                                
-                                # Generate Bon de Commande PDF
                                 order_pdf_path = generate_order_pdf(
                                     order_id=transaction_id,
-                                    city="Unknown",  # You can customize this
+                                    city="Unknown",
                                     order_date=datetime.now().strftime("%d/%m/%Y"),
-                                    delivery_address="To be specified",  # You can customize this
+                                    delivery_address="To be specified",
                                     items=st.session_state.pos_items,
-                                    shipping_method="To be specified",  # You can customize this
-                                    payment_option="Non applicable",  # No payment for Bon de Commande
+                                    shipping_method="To be specified",
+                                    payment_option="Non applicable",
                                     created_by=username,
                                     watermark=""
                                 )
-                                
                                 st.session_state.pos_generated_pdf = [order_pdf_path]
                                 st.session_state.transaction_status = "order_generated"
                                 st.success(f"Bon de Commande {transaction_id} généré avec succès!")
@@ -549,13 +564,9 @@ def pos_page(products_df, clients_df):
     # PDF Download
     if st.session_state.get('pos_generated_pdf'):
         pdf_paths = st.session_state.pos_generated_pdf
-
-        # Ensure pdf_paths is a list for consistent handling
         if isinstance(pdf_paths, str):
-            pdf_paths = [pdf_paths]  # Convert single string to a list with one item
-
+            pdf_paths = [pdf_paths]
         if len(pdf_paths) == 1:
-            # Single PDF: Download directly as a PDF file
             pdf_path = pdf_paths[0]
             with open(pdf_path, "rb") as f:
                 st.download_button(
@@ -566,10 +577,8 @@ def pos_page(products_df, clients_df):
                     key="download_single_pdf"
                 )
         elif len(pdf_paths) == 2:
-            # Two PDFs: Provide two separate download buttons
             for pdf_path in pdf_paths:
                 pdf_filename = os.path.basename(pdf_path)
-                # Determine a descriptive label based on the filename
                 if "Facture" in pdf_filename:
                     label = "💾 Télécharger la Facture"
                 elif "BonDeCommande" in pdf_filename:
@@ -578,14 +587,13 @@ def pos_page(products_df, clients_df):
                     label = "💾 Télécharger le Bon d'Achat"
                 else:
                     label = f"💾 Télécharger {pdf_filename}"
-                
                 with open(pdf_path, "rb") as f:
                     st.download_button(
                         label=label,
                         data=f,
                         file_name=pdf_filename,
                         mime="application/pdf",
-                        key=f"download_{pdf_filename}"  # Unique key for each button
+                        key=f"download_{pdf_filename}"
                     )
         else:
             st.warning("Nombre inattendu de fichiers PDF générés. Contactez le support.")

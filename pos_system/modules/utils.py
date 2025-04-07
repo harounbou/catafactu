@@ -12,13 +12,6 @@ import pandas as pd
 EMAIL_REGEX = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 PHONE_REGEX = r'^\d{10}$'
 
-COLOR_MAPPING = {
-    'brown_gradient': 'brown_deg',
-    'grey_gradient': 'grey_deg',
-    'gradient_brown': 'brown_deg',
-    'gradient_grey': 'grey_deg'
-}
-
 COLOR_STYLES = {
     'uni_colour': '#f5f5f5',
     'default_colour': '#e0e0e0',
@@ -49,6 +42,38 @@ COLOR_COLUMNS = [
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DB_PATH = os.path.join(BASE_DIR, "data", "test_pos_system.db" if os.environ.get("TESTING") == "1" else "pos_system.db")
 
+# utils.py
+COLOR_MAPPING = {
+    'brown_gradient': 'brown_deg',
+    'grey_gradient': 'grey_deg',
+    'gradient_brown': 'brown_deg',
+    'gradient_grey': 'grey_deg',
+    'brown': 'brown',
+    'blue': 'blue',
+    # Add all color variants used in your app and database
+}
+
+# utils.py
+import pandas as pd
+
+COLOR_MAPPING = {
+    'brown_gradient': 'brown_deg',
+    'grey_gradient': 'grey_deg',
+    'gradient_brown': 'brown_deg',
+    'gradient_grey': 'grey_deg',
+    'brown': 'brown',
+    'blue': 'blue',
+    # Add all your variants
+}
+
+def get_db_color_name(color):
+    """Convert a display color name to a database column name."""
+    if not color or pd.isna(color):
+        return 'default_colour'
+    cleaned_color = color.lower().replace(' ', '_')
+    return COLOR_MAPPING.get(cleaned_color, cleaned_color)
+
+
 def get_db_connection():
     try:
         conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -57,13 +82,6 @@ def get_db_connection():
     except sqlite3.Error as e:
         st.error(f"Database connection failed: {e}")
         return None
-
-def get_db_color_name(color):
-    """Convert a display color name to a database column name."""
-    if not color or pd.isna(color):
-        return 'default_colour'
-    cleaned_color = color.lower().replace(' ', '_')
-    return COLOR_MAPPING.get(cleaned_color, cleaned_color)
 
 def check_stock(reference, quantity, color=None):
     conn = get_db_connection()
