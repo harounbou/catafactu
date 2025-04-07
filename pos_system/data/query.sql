@@ -1,1 +1,1 @@
-SELECT COUNT(*) FROM product_buffer;
+ALTER TABLE products_new RENAME TO products;
