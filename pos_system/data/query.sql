@@ -1,1 +1,2 @@
-ALTER TABLE products_new RENAME TO products;
+
+SELECT * FROM products LIMIT 20;
