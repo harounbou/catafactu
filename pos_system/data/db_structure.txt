@@ -120,6 +120,43 @@ Columns:
   - final_amount (REAL)
   - client_id (TEXT)
 
+Table: products_backup
+Columns:
+  - reference (TEXT) [PK]
+  - denomination (TEXT)
+  - quantite_initiale (REAL)
+  - quantite_restockee (REAL)
+  - quantite_vendue (INTEGER)
+  - couleurs-dispo-usine (TEXT)
+  - images (TEXT)
+  - prix-super-gros (REAL)
+  - prix-gros (REAL)
+  - prix-détail (REAL)
+  - uni_colour (INTEGER)
+  - default_colour (INTEGER)
+  - brown (INTEGER)
+  - brown_deg (INTEGER)
+  - blue (INTEGER)
+  - white (INTEGER)
+  - black (INTEGER)
+  - green_bottle (INTEGER)
+  - red (INTEGER)
+  - grey (INTEGER)
+  - grey_deg (INTEGER)
+  - beige (INTEGER)
+  - yellow (INTEGER)
+  - orange (INTEGER)
+  - garnet (INTEGER)
+  - golden (INTEGER)
+  - green (INTEGER)
+  - rose (INTEGER)
+  - note (TEXT)
+  - category (TEXT)
+  - quantite_vendu_actue (INTEGER)
+  - last_updated (TEXT)
+  - discontinued (BOOLEAN)
+  - version (INTEGER)
+
 Table: products
 Columns:
   - reference (TEXT) [PK]
@@ -156,3 +193,12 @@ Columns:
   - last_updated (TEXT)
   - discontinued (BOOLEAN)
   - version (INTEGER)
+
+Table: audit_logs
+Columns:
+  - id (INTEGER) [PK]
+  - user (TEXT)
+  - event_type (TEXT)
+  - reference (TEXT)
+  - message (TEXT)
+  - timestamp (TEXT)

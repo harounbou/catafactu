@@ -42,37 +42,47 @@ COLOR_COLUMNS = [
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DB_PATH = os.path.join(BASE_DIR, "data", "test_pos_system.db" if os.environ.get("TESTING") == "1" else "pos_system.db")
 
-# utils.py
+
+
 COLOR_MAPPING = {
+    # Gradient handling
     'brown_gradient': 'brown_deg',
     'grey_gradient': 'grey_deg',
     'gradient_brown': 'brown_deg',
     'gradient_grey': 'grey_deg',
+    
+    # Standard colors
     'brown': 'brown',
     'blue': 'blue',
-    # Add all color variants used in your app and database
-}
-
-# utils.py
-import pandas as pd
-
-COLOR_MAPPING = {
-    'brown_gradient': 'brown_deg',
-    'grey_gradient': 'grey_deg',
-    'gradient_brown': 'brown_deg',
-    'gradient_grey': 'grey_deg',
-    'brown': 'brown',
-    'blue': 'blue',
-    # Add all your variants
+    'white': 'white',
+    'black': 'black',
+    'green_bottle': 'green_bottle',
+    'red': 'red',
+    'grey': 'grey',
+    'beige': 'beige',
+    'yellow': 'yellow',
+    'orange': 'orange',
+    'garnet': 'garnet',
+    'golden': 'golden',
+    'green': 'green',
+    'rose': 'rose'
 }
 
 def get_db_color_name(color):
-    """Convert a display color name to a database column name."""
+    """Convert display color names to database columns"""
     if not color or pd.isna(color):
         return 'default_colour'
-    cleaned_color = color.lower().replace(' ', '_')
-    return COLOR_MAPPING.get(cleaned_color, cleaned_color)
-
+        
+    cleaned = color.strip().lower().replace(' ', '_').replace('-', '_')
+    
+    # Special cases first
+    if cleaned in ['brown_gradient', 'brown_grad']:
+        return 'brown_deg'
+    if cleaned in ['grey_gradient', 'gray_gradient']:
+        return 'grey_deg'
+        
+    # Return mapped value or original
+    return COLOR_MAPPING.get(cleaned, cleaned)
 
 def get_db_connection():
     try:
