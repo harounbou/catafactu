@@ -13,13 +13,14 @@ ENABLE_PRICE_HISTORY = False  # Toggle this in a config file or environment vari
 
 def backup_database():
     """Create a backup of the database."""
+    from .utils import DB_PATH
     conn = get_db_connection()
     try:
-        # Assuming the database file path is known or configured
-        db_path = "path/to/your/database.db"  # Replace with actual path or fetch from config
-        backup_path = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+        backup_dir = "backups"
+        os.makedirs(backup_dir, exist_ok=True)
+        backup_path = os.path.join(backup_dir, f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sqlite")
         import shutil
-        shutil.copy2(db_path, backup_path)
+        shutil.copy2(DB_PATH, backup_path)
         return backup_path
     except Exception as e:
         st.error(f"Backup failed: {str(e)}")
@@ -317,22 +318,71 @@ def restock_product(reference, quantity_to_add, color=None):
 
 def generate_excel_template():
     """Generate a sample Excel template."""
-    from io import BytesIO
     sample_data = {
-        'reference': ['PROD001'], 'denomination': ['Sample Product'], 'quantite_actuelle': [100],
-        'couleurs-dispo-usine': ['Red,Blue'], 'images': ['image1.jpg'], 
-        'prix-super-gros': [5000], 'prix-gros': [7500], 'prix-détail': [10000]
+        'reference': ['REF001', 'REF002'],
+        'denomination': ['Product 1', 'Product 2'],
+        'prix-super-gros': [1000, 2000],
+        'prix-gros': [1200, 2200],
+        'prix-détail': [1500, 2500],
+        'couleurs-dispo-usine': ['Red,Blue', 'Green,Black'],
+        'note': ['Sample note', '']
     }
-    output = BytesIO()
-    pd.DataFrame(sample_data).to_excel(output, index=False)
-    return output.getvalue()
-    """Generate a sample Excel template."""
-    from io import BytesIO
-    sample_data = {
-        'reference': ['PROD001'], 'denomination': ['Sample Product'], 'quantite_actuelle': [100],
-        'couleurs-dispo-usine': ['Red,Blue'], 'images': ['image1.jpg'], 
-        'prix-super-gros': [5000], 'prix-gros': [7500], 'prix-détail': [10000]
-    }
-    output = BytesIO()
-    pd.DataFrame(sample_data).to_excel(output, index=False)
-    return output.getvalue()
+    return pd.DataFrame(sample_data)
+
+def backup_products(backup_dir='backups'):
+    """
+    Create a backup of the products table.
+    
+    Args:
+        backup_dir (str): Directory to store the backup file
+        
+    Returns:
+        str: Path to the backup file or None if backup failed
+    """
+    import os
+    import json
+    from datetime import datetime
+    
+    try:
+        # Ensure backup directory exists
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # Create a timestamp for the backup file
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_file = os.path.join(backup_dir, f'products_backup_{timestamp}.json')
+        
+        # Get current products data
+        conn = get_db_connection()
+        products_df = pd.read_sql_query('SELECT * FROM products', conn)
+        
+        # Convert to dictionary and save as JSON
+        products_data = products_df.to_dict(orient='records')
+        with open(backup_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'timestamp': datetime.now().isoformat(),
+                'count': len(products_data),
+                'data': products_data
+            }, f, ensure_ascii=False, indent=2, default=str)
+            
+        return backup_file
+    except Exception as e:
+        print(f"Error creating products backup: {e}")
+        return None
+
+def get_product_categories():
+    """
+    Retrieve a list of unique product categories from the database.
+    
+    Returns:
+        list: A list of unique category names
+    """
+    conn = get_db_connection()
+    try:
+        query = "SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND category != ''"
+        categories_df = pd.read_sql_query(query, conn)
+        return sorted(categories_df['category'].dropna().unique().tolist())
+    except Exception as e:
+        print(f"Error retrieving product categories: {e}")
+        return []
+    finally:
+        conn.close()

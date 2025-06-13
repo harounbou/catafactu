@@ -326,18 +326,13 @@ def articles_page():
         st.error("You need elevated privileges to access this page!")
         return
     
-    st.write(f"Debug: User role = {st.session_state.user['role']}")  # Confirm role
-    
     # Initialize table (should already exist since data is present)
     if 'products_initialized' not in st.session_state:
         initialize_products_table()
         st.session_state.products_initialized = True
-        st.write("Debug: Products table initialized")
     
     st.title("📚 Product Management")
     products_df = load_products()
-    st.write(f"Debug: Loaded {len(products_df)} products")  # Check row count
-    st.write("Debug: Products DataFrame preview:", products_df.head())  # Inspect data
     
     if products_df.empty:
         st.warning("No products loaded from the database.")
@@ -348,7 +343,6 @@ def articles_page():
     
     with tab1:
         st.subheader("Product List")
-        #st.write("Debug: Rendering Tab 1")  # Confirm tab rendering
         all_columns = [
             'reference', 'denomination', 'quantite_initiale', 'quantite_restockee', 'quantite_vendue', 
             'quantite_actuelle', 'couleurs-dispo-usine', 'images', 'prix-super-gros', 'prix-gros', 
@@ -368,13 +362,6 @@ def articles_page():
                 "prix-détail": st.column_config.NumberColumn("Retail Price", format="%.2f"),
             }
         )
-       
-    # Permissions check
-    if 'role' not in st.session_state.user or st.session_state.user['role'] not in ['admin', 'inventory_manager']:
-        st.error("You need elevated privileges to access this page!")
-        return
-    
-    # Database schema enforcement
 
 def initialize_products_table():
     """Initialize the products table in the database if it doesn't exist."""
@@ -462,18 +449,15 @@ def articles_page():
             'last_updated', 'discontinued'
         ]
         
-        # Configure columns with original database names
+        # Configure columns with better display names
         column_config = {
-            col: st.column_config.Column(width="medium") 
-            for col in all_columns
+            "reference": st.column_config.TextColumn("Reference", width="medium"),
+            "denomination": st.column_config.TextColumn("Name", width="large"),
+            "quantite_actuelle": st.column_config.NumberColumn("Current Qty", width="small", disabled=True),
+            "prix-détail": st.column_config.NumberColumn("Retail Price", format="%.2f"),
+            "prix-super-gros": st.column_config.NumberColumn("Super Gros Price", format="%.2f"),
+            "prix-gros": st.column_config.NumberColumn("Gros Price", format="%.2f"),
         }
-        # Special configurations
-        column_config.update({
-            "quantite_actuelle": st.column_config.NumberColumn("quantite_actuelle", disabled=True),
-            "prix-super-gros": st.column_config.NumberColumn(format="%.2f"),
-            "prix-gros": st.column_config.NumberColumn(format="%.2f"),
-            "prix-détail": st.column_config.NumberColumn(format="%.2f"),
-        })
         
         edited_df = st.data_editor(
             products_df[all_columns],
@@ -481,12 +465,6 @@ def articles_page():
             column_config=column_config,
             key="product_list_full"
         )
-        column_config={
-                "reference": st.column_config.TextColumn("Reference", width="medium"),
-                "denomination": st.column_config.TextColumn("Name", width="large"),
-                "quantite_actuelle": st.column_config.NumberColumn("Current Qty", width="small", disabled=True),
-                "prix-détail": st.column_config.NumberColumn("Retail Price", format="%.2f"),
-            }
         
         st.write("### Select Product to Edit")
         search_query = st.text_input(

@@ -212,25 +212,176 @@ def find_image_path_for_color(image_paths, color):
     Find the image path matching a given color from a comma-separated list of image paths.
     Returns the first matching full path or None if no match is found.
     """
-    if not image_paths or not color or pd.isna(image_paths):
+    if not image_paths or pd.isna(image_paths):
         return None
+        
+    # Handle case where image_paths is already a list
+    if isinstance(image_paths, list):
+        paths = image_paths
+    else:
+        # Split the comma-separated string into a list
+        paths = [path.strip() for path in str(image_paths).split(',')]
     
-    # Split and clean the image paths
-    image_list = [img.strip() for img in str(image_paths).split(',')]
-    color = color.lower().strip()
+    # Clean the color name (remove spaces, convert to lowercase)
+    clean_color = str(color).lower().strip().replace(' ', '_')
     
-    # Look for an image containing the color in its filename
-    for img in image_list:
-        full_path = get_full_image_path(img)
-        if full_path and color in os.path.basename(full_path).lower():
-            return full_path
+    # Try to find a matching image path
+    for path in paths:
+        if not path or not isinstance(path, str):
+            continue
+            
+        # Get the filename without extension and clean it
+        filename = os.path.splitext(os.path.basename(path))[0].lower()
+        filename = filename.replace(' ', '_')
+        
+        # Check if color is in the filename
+        if clean_color in filename:
+            full_path = get_full_image_path(path)
+            if full_path and os.path.exists(full_path):
+                return full_path
     
-    # If no match, return the first valid image as a fallback (optional)
-    for img in image_list:
-        full_path = get_full_image_path(img)
-        if full_path:
-            st.warning(f"No image found for color '{color}', using default: {os.path.basename(full_path)}")
-            return full_path
-    
-    st.warning(f"No valid images found for {image_paths}")
+    # If no match found, return the first valid path if available
+    for path in paths:
+        if path and isinstance(path, str):
+            full_path = get_full_image_path(path)
+            if full_path and os.path.exists(full_path):
+                return full_path
+                
     return None
+
+def format_currency(amount, currency='DZD'):
+    """
+    Format a number as a currency string.
+    
+    Args:
+        amount (float): The amount to format
+        currency (str): The currency code (default: 'DZD')
+        
+    Returns:
+        str: Formatted currency string
+    """
+    try:
+        amount = float(amount)
+        if currency == 'DZD':
+            return f"{amount:,.0f} {currency}".replace(",", " ")
+        else:
+            return f"{currency} {amount:,.2f}"
+    except (ValueError, TypeError):
+        return f"0 {currency}"
+
+def calculate_discount(original_price, discount_percent):
+    """
+    Calculate the discounted price after applying a percentage discount.
+    
+    Args:
+        original_price (float): Original price before discount
+        discount_percent (float): Discount percentage (0-100)
+        
+    Returns:
+        float: Price after discount
+    """
+    try:
+        discount = float(original_price) * (float(discount_percent) / 100)
+        return max(0, float(original_price) - discount)
+    except (ValueError, TypeError):
+        return original_price
+
+def apply_tax(amount, tax_rate=19.0):
+    """
+    Calculate the tax amount and total including tax.
+    
+    Args:
+        amount (float): Amount before tax
+        tax_rate (float): Tax rate as a percentage (default: 19.0%)
+        
+    Returns:
+        tuple: (tax_amount, total_with_tax)
+    """
+    try:
+        tax = (float(amount) * float(tax_rate)) / 100
+        return tax, float(amount) + tax
+    except (ValueError, TypeError):
+        return 0.0, amount
+
+def get_current_user():
+    """
+    Get the currently logged-in user from the session state.
+    
+    Returns:
+        dict: User information or None if not logged in
+    """
+    if 'user' in st.session_state:
+        return st.session_state.user
+    return None
+
+def log_activity(action, details=None):
+    """
+    Log user activity to a log file.
+    
+    Args:
+        action (str): Description of the action performed
+        details (dict, optional): Additional details about the action
+    """
+    import logging
+    logger = logging.getLogger('activity')
+    logger.setLevel(logging.INFO)
+    
+    # Create file handler if it doesn't exist
+    if not logger.handlers:
+        os.makedirs('logs', exist_ok=True)
+        fh = logging.FileHandler('logs/activity.log')
+        fh.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(message)s')
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+    
+    # Get current user
+    user = get_current_user()
+    username = user.get('username', 'anonymous') if user else 'anonymous'
+    
+    # Format the log message
+    log_msg = f"User: {username} - Action: {action}"
+    if details:
+        log_msg += f" - Details: {details}"
+    
+    logger.info(log_msg)
+
+def get_system_stats():
+    """
+    Get basic system statistics.
+    
+    Returns:
+        dict: Dictionary containing system statistics
+    """
+    import psutil
+    import platform
+    from datetime import datetime
+    
+    try:
+        # Get memory usage
+        memory = psutil.virtual_memory()
+        
+        # Get disk usage
+        disk = psutil.disk_usage('/')
+        
+        # Get CPU usage
+        cpu_percent = psutil.cpu_percent(interval=1)
+        
+        # Get system info
+        system_info = {
+            'os': f"{platform.system()} {platform.release()}",
+            'python_version': platform.python_version(),
+            'cpu_usage': f"{cpu_percent}%",
+            'memory_used': f"{memory.used / (1024**3):.1f} GB",
+            'memory_total': f"{memory.total / (1024**3):.1f} GB",
+            'memory_percent': f"{memory.percent}%",
+            'disk_used': f"{disk.used / (1024**3):.1f} GB",
+            'disk_total': f"{disk.total / (1024**3):.1f} GB",
+            'disk_percent': f"{disk.percent}%",
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        return system_info
+    except Exception as e:
+        print(f"Error getting system stats: {e}")
+        return {}

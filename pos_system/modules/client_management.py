@@ -176,3 +176,43 @@ def save_clients(clients_df):
         st.session_state['clients_df'] = clients_df  # Update session state
     finally:
         conn.close()
+
+def backup_clients(backup_dir='backups'):
+    """
+    Create a backup of the clients table.
+    
+    Args:
+        backup_dir (str): Directory to store the backup file
+        
+    Returns:
+        str: Path to the backup file or None if backup failed
+    """
+    import os
+    import json
+    from datetime import datetime
+    
+    try:
+        # Ensure backup directory exists
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # Create a timestamp for the backup file
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_file = os.path.join(backup_dir, f'clients_backup_{timestamp}.json')
+        
+        # Get current clients data
+        conn = get_db_connection()
+        clients_df = pd.read_sql_query('SELECT * FROM clients', conn)
+        
+        # Convert to dictionary and save as JSON
+        clients_data = clients_df.to_dict(orient='records')
+        with open(backup_file, 'w', encoding='utf-8') as f:
+            json.dump({
+                'timestamp': datetime.now().isoformat(),
+                'count': len(clients_data),
+                'data': clients_data
+            }, f, ensure_ascii=False, indent=2)
+            
+        return backup_file
+    except Exception as e:
+        print(f"Error creating clients backup: {e}")
+        return None

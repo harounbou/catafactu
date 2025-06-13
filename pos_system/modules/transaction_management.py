@@ -250,23 +250,77 @@ def record_staff_payment(staff_name, amount, performed_by="N/A", note=""):
 
 def get_till_balance():
     """Calculate current till balance"""
-    initialize_db()
     conn = get_db_connection()
     try:
-        c = conn.cursor()
+        # Get sum of all transactions
+        transactions = pd.read_sql_query("""
+            SELECT 
+                SUM(CASE WHEN status = 'completed' THEN total_amount ELSE 0 END) as total_income,
+                SUM(CASE WHEN status = 'canceled' THEN total_amount ELSE 0 END) as total_canceled,
+                (SELECT COALESCE(SUM(amount), 0) FROM expenditures) as total_expenses,
+                (SELECT COALESCE(SUM(amount), 0) FROM staff_payments) as total_staff_payments
+            FROM transactions
+        """, conn)
         
-        c.execute("SELECT SUM(payment_amount) FROM transactions WHERE status = 'completed'")
-        total_sales = c.fetchone()[0] or 0.0
+        balance = (transactions['total_income'].iloc[0] or 0) - \
+                 (transactions['total_expenses'].iloc[0] or 0) - \
+                 (transactions['total_staff_payments'].iloc[0] or 0)
         
-        c.execute("SELECT SUM(amount) FROM expenditures")
-        total_expenditures = c.fetchone()[0] or 0.0
-        
-        c.execute("SELECT SUM(amount) FROM staff_payments")
-        total_staff_payments = c.fetchone()[0] or 0.0
-
-        return total_sales - total_expenditures - total_staff_payments
+        return balance
     except Exception as e:
-        st.error(f"Error calculating till balance: {str(e)}")
-        return 0.0
+        st.error(f"Error calculating till balance: {e}")
+        return 0
+
+def backup_transactions(backup_dir='backups'):
+    """
+    Create a backup of all transaction-related tables.
+    
+    Args:
+        backup_dir (str): Directory to store the backup file
+        
+    Returns:
+        dict: Dictionary with backup file paths or None if backup failed
+    """
+    import os
+    import json
+    from datetime import datetime
+    
+    try:
+        # Ensure backup directory exists
+        os.makedirs(backup_dir, exist_ok=True)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        conn = get_db_connection()
+        backup_files = {}
+        
+        # Backup transactions table
+        transactions_df = pd.read_sql_query('SELECT * FROM transactions', conn)
+        transactions_file = os.path.join(backup_dir, f'transactions_backup_{timestamp}.json')
+        transactions_df.to_json(transactions_file, orient='records', date_format='iso', default_handler=str)
+        backup_files['transactions'] = transactions_file
+        
+        # Backup expenditures table
+        try:
+            expenditures_df = pd.read_sql_query('SELECT * FROM expenditures', conn)
+            expenditures_file = os.path.join(backup_dir, f'expenditures_backup_{timestamp}.json')
+            expenditures_df.to_json(expenditures_file, orient='records', date_format='iso', default_handler=str)
+            backup_files['expenditures'] = expenditures_file
+        except Exception as e:
+            print(f"Warning: Could not backup expenditures: {e}")
+        
+        # Backup staff_payments table
+        try:
+            staff_payments_df = pd.read_sql_query('SELECT * FROM staff_payments', conn)
+            staff_payments_file = os.path.join(backup_dir, f'staff_payments_backup_{timestamp}.json')
+            staff_payments_df.to_json(staff_payments_file, orient='records', date_format='iso', default_handler=str)
+            backup_files['staff_payments'] = staff_payments_file
+        except Exception as e:
+            print(f"Warning: Could not backup staff_payments: {e}")
+        
+        return backup_files
+        
+    except Exception as e:
+        print(f"Error creating transactions backup: {e}")
+        return None
     finally:
         conn.close()

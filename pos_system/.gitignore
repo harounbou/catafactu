@@ -1,20 +1,96 @@
-# Existing
+# Environment variables
 .env
+.env.local
+.env.*.local
 
-# Virtual environment
+# Virtual Environment
 venv/
+env/
+ENV/
+.venv/
 
-# Backups and databases
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Backups
 backups/
+*.bak
+*.swp
+*~
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Local development
+local_settings.py
 
 # Generated files
 generated_pdfs/
+*.pdf
 
-# Python cache files
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
 
-# Optional: Ignore images if hosted externally
-# images/
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Local development
+local_settings.py
+
+# Mac OS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Project specific
+data/
+!data/example/
+!data/sample/
